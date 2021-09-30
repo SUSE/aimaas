@@ -22,10 +22,14 @@ from .schemas import (
 
 
 def create_attribute(db: Session, data: AttributeCreateSchema) -> Attribute:
-    exists = db.execute(select(Attribute).where(Attribute.name == data.name)).scalar()
-    if exists:
-        # TODO custom exceptions
-        raise Exception(f'Attribute with name `{data.name}` already exists')
+    attr = db.execute(
+        select(Attribute)
+        .where(Attribute.name == data.name)
+        .where(Attribute.type == data.type)
+    ).scalar()
+    if attr:
+        return attr
+
     a = Attribute(name=data.name, type=data.type)
     db.add(a)
     db.commit()
