@@ -99,6 +99,8 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
     if len(schemas) == 1 and schemas[0].id != schema_id or len(schemas) > 1:
         raise Exception(f'Schemas with name {data.name} and/or slug {data.slug} already exist')
 
+    sch.name = data.name
+    sch.slug = data.slug
     attr_def_ids: Dict[int, AttributeDefinition] = {i.id: i for i in sch.attr_defs}
     for attr in data.update_attributes:
         attr_def = attr_def_ids.get(attr.id)
