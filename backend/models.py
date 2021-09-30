@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import List, Union, Optional
+from typing import List, Union, Optional, NamedTuple
 
 from sqlalchemy import (
     select, Enum, DateTime,
@@ -56,33 +56,18 @@ class ValueDatetime(Value):
     value = Column(DateTime)
 
 
+class Mapping(NamedTuple):
+    model: Value
+    converter: type
+
+
 class AttrType(enum.Enum):
-    str = 'str'
-    bool = 'bool'
-    int = 'int'
-    float = 'float'
-    fk = 'fk'
-    dt = 'dt'
-
-
-val_map = {
-    AttrType.str: ValueStr,
-    AttrType.bool: ValueBool,
-    AttrType.int: ValueInt,
-    AttrType.float: ValueFloat,
-    AttrType.fk: ValueForeignKey,
-    AttrType.dt: ValueDatetime
-}
-
-
-type_map = {
-    AttrType.str: str,
-    AttrType.bool: bool,
-    AttrType.int: int,
-    AttrType.float: float,
-    AttrType.fk: int,
-    AttrType.dt: datetime
-}
+    STR = Mapping(ValueStr, str)
+    BOOL = Mapping(ValueBool, bool)
+    INT = Mapping(ValueInt, int)
+    FLOAT = Mapping(ValueFloat, float)
+    FK = Mapping(ValueForeignKey, int)
+    DT = Mapping(ValueDatetime, datetime)
 
 
 class BoundFK(Base):
@@ -118,7 +103,7 @@ class Entity(Base):
     schema = relationship('Schema', back_populates='entities')
 
     def get(self, attr_name: str, db: Session) -> Union[Optional[Value], List[Value]]:
-        attr = db.execute(select(Attribute).where(Attribute.name == attr_name)).scalar()
+        attr: Attribute = db.execute(select(Attribute).where(Attribute.name == attr_name)).scalar()
         if attr is None:
             raise KeyError(f'There is no attribute named `{attr_name}`')
         
@@ -130,7 +115,7 @@ class Entity(Base):
         if attr_def is None:
             raise KeyError(f'There is no attribute named `{attr_name}` defined for schema id {self.schema_id}')
 
-        val_model = val_map[AttrType(attr.type)]
+        val_model = attr.type.value.model
         q = select(val_model).where(val_model.attribute_id == attr.id).where(val_model.entity_id == self.id)
         if attr_def.list:
             return db.execute(q).scalars().all()

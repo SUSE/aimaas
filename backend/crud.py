@@ -1,4 +1,5 @@
 from typing import Dict
+import sqlalchemy
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 
@@ -9,9 +10,6 @@ from .models import (
     BoundFK,
     Entity,
     Schema,
-    Value,
-    val_map,
-    type_map
 )
 
 from .schemas import (
@@ -60,7 +58,7 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
         )
         db.add(ad)
         db.flush()
-        if a.type == AttrType.fk:
+        if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
                 raise Exception('You need to bind foreign key to some schema')
             if attr.bind_to_schema == -1:
@@ -141,7 +139,7 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         )
         db.add(ad)
         db.flush()
-        if a.type == AttrType.fk:
+        if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
                 raise Exception('You need to bind foreign key to some schema')
             if attr.bind_to_schema == -1:
@@ -176,15 +174,8 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         ).scalar()
         if attr_def is None:
             raise Exception(f'There is no attribute definition for schema id {schema_id} and attribute id {attr.id}')
-
-        model: Value = val_map.get(AttrType(attr.type))
-        if model is None:
-            raise Exception(f'No value model found for type `{attr.type}`')
         
-        caster = type_map.get(AttrType(attr.type))
-        if caster is None:
-            raise Exception(f'No caster found for type `{attr.type}`')
-
+        model, caster = attr.type.value
         try:
             if isinstance(value, list):
                 if not attr_def.list:
