@@ -163,18 +163,16 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
     db.flush()
 
     for field, value in data.items():
-        attr: Attribute = db.execute(select(Attribute).where(Attribute.name == field)).scalar()
-        if attr is None:
-            raise Exception(f'Attribute with name `{field}` does not exist')
-
         attr_def: AttributeDefinition = db.execute(
             select(AttributeDefinition)
             .where(AttributeDefinition.schema_id == schema_id)
-            .where(AttributeDefinition.attribute_id == attr.id)
+            .where(Attribute.name == field)
+            .join(Attribute, AttributeDefinition.attribute_id == Attribute.id)
         ).scalar()
         if attr_def is None:
             raise Exception(f'There is no attribute definition for schema id {schema_id} and attribute id {attr.id}')
         
+        attr: Attribute = attr_def.attribute
         model, caster = attr.type.value
         try:
             if isinstance(value, list):

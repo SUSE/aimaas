@@ -103,18 +103,17 @@ class Entity(Base):
     schema = relationship('Schema', back_populates='entities')
 
     def get(self, attr_name: str, db: Session) -> Union[Optional[Value], List[Value]]:
-        attr: Attribute = db.execute(select(Attribute).where(Attribute.name == attr_name)).scalar()
-        if attr is None:
-            raise KeyError(f'There is no attribute named `{attr_name}`')
-        
-        attr_def = db.execute(
+        attr_def: AttributeDefinition = db.execute(
             select(AttributeDefinition)
             .where(AttributeDefinition.schema_id == self.schema_id)
-            .where(AttributeDefinition.attribute_id == attr.id)
+            .where(Attribute.name == attr_name)
+            .join(Attribute, AttributeDefinition.attribute_id == Attribute.id)
         ).scalar()
+
         if attr_def is None:
             raise KeyError(f'There is no attribute named `{attr_name}` defined for schema id {self.schema_id}')
 
+        attr: Attribute = attr_def.attribute
         val_model = attr.type.value.model
         q = select(val_model).where(val_model.attribute_id == attr.id).where(val_model.entity_id == self.id)
         if attr_def.list:
