@@ -9,6 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.sql.schema import UniqueConstraint
 
 from .database import Base
 
@@ -141,8 +142,12 @@ class Attribute(Base):
     __tablename__ = 'attributes'
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(128), unique=True)
-    type = Column(Enum(AttrType))
+    name = Column(String(128))
+    type: AttrType = Column(Enum(AttrType))
+
+    __table_args__ = (
+        UniqueConstraint('name', 'type'),
+    )
 
     attr_defs = relationship('AttributeDefinition', back_populates='attribute')
 
