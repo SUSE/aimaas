@@ -34,13 +34,13 @@ def create_attribute(db: Session, data: AttributeCreateSchema) -> Attribute:
 
 def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     # TODO require lock here and in update?
-    exists = db.execute(select(Schema).where( (Schema.name == data.name) | (Schema.slug == data.slug) )).scalar()
-    if exists:
+    try:
+        sch = Schema(name=data.name, slug=data.slug)
+        db.add(sch)
+        db.flush()
+    except sqlalchemy.exc.IntegrityError:
         raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
     
-    sch = Schema(name=data.name, slug=data.slug)
-    db.add(sch)
-    db.flush()
     for attr in data.attributes:
         a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
         if a is None:
