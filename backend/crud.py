@@ -72,9 +72,14 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
 
 
 def delete_schema(db: Session, schema_id: int) -> Schema:
-    schema = db.execute(select(Schema).where(Schema.id == schema_id)).scalar()
+    schema = db.execute(
+        select(Schema)
+        .where(Schema.id == schema_id)
+        .where(Schema.deleted == False)
+    ).scalar()
     if schema is None:
-        raise Exception('Should we raise exception here?')
+        raise Exception('Schema doesnt exist or was deleted')
+    
     db.execute(
         update(Entity).where(Entity.schema_id == schema_id).values(deleted=True)
     )
