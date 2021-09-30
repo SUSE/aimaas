@@ -3,3 +3,4 @@ pydantic==1.8.2
 SQLAlchemy==1.4.23
 python-dotenv==0.19.0
 fastapi==0.68.1
+psycopg2==2.9.1
