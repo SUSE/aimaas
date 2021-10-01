@@ -13,6 +13,8 @@ from .models import (
 )
 
 from .schemas import (
+    AttrDefSchema,
+    AttrDefWithAttrDataSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
@@ -44,11 +46,15 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
         raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
     
     for attr in data.attributes:
-        a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
-        if a is None:
-            raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+        if isinstance(attr, AttrDefSchema):
+            a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
+            if a is None:
+                raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+        elif isinstance(attr, AttrDefWithAttrDataSchema):
+            a = create_attribute(db, attr)
+
         ad = AttributeDefinition(
-            attribute_id=attr.attr_id, 
+            attribute_id=a.id, 
             schema_id=sch.id,
             required=attr.required, 
             list=attr.list, 
@@ -118,9 +124,12 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
     db.flush()
     
     for attr in data.add_attributes:
-        a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
-        if a is None:
-            raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+        if isinstance(attr, AttrDefSchema):
+            a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
+            if a is None:
+                raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+        elif isinstance(attr, AttrDefWithAttrDataSchema):
+            a = create_attribute(db, attr)
         
         exists = db.execute(
             select(AttributeDefinition)
@@ -131,7 +140,7 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             raise Exception(f'There is already attribute defined')
 
         ad = AttributeDefinition(
-            attribute_id=attr.attr_id, 
+            attribute_id=a.id, 
             schema_id=sch.id,
             required=attr.required, 
             list=attr.list, 

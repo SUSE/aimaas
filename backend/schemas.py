@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -9,8 +9,8 @@ class AttributeCreateSchema(BaseModel):
     name: str
     type: AttrType
 
-class AttributeDefinitionSchema(BaseModel):
-    attr_id: int
+
+class AttributeDefinitionBase(BaseModel):
     required: bool
     unique: bool
     list: bool
@@ -18,13 +18,23 @@ class AttributeDefinitionSchema(BaseModel):
     description: Optional[str]
     bind_to_schema: Optional[int]
 
-class AttributeDefinitionUpdateSchema(AttributeDefinitionSchema):
+
+class AttrDefSchema(AttributeDefinitionBase):
+    attr_id: int
+
+
+class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
+    pass
+
+
+class AttributeDefinitionUpdateSchema(AttrDefSchema):
     id: int
+
 
 class SchemaCreateSchema(BaseModel):
     name: str
     slug: str
-    attributes: List[AttributeDefinitionSchema]
+    attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
 
 
 class SchemaUpdateSchema(BaseModel):
@@ -32,4 +42,4 @@ class SchemaUpdateSchema(BaseModel):
     slug: str
 
     update_attributes: List[AttributeDefinitionUpdateSchema]
-    add_attributes: List[AttributeDefinitionSchema]
+    add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
