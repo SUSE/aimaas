@@ -134,25 +134,21 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             a = create_attribute(db, attr, commit=False)
             db.flush()
         
-        exists = db.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.attribute_id == a.id)
-            .where(AttributeDefinition.schema_id == schema_id)
-        ).scalar()
-        if exists:
+        try:
+            ad = AttributeDefinition(
+                attribute_id=a.id, 
+                schema_id=sch.id,
+                required=attr.required, 
+                list=attr.list, 
+                unique=attr.unique if not attr.list else False,
+                key=attr.key,
+                description=attr.description
+            )
+            db.add(ad)
+            db.flush()
+        except sqlalchemy.exc.IntegrityError:
             raise Exception(f'There is already attribute defined')
 
-        ad = AttributeDefinition(
-            attribute_id=a.id, 
-            schema_id=sch.id,
-            required=attr.required, 
-            list=attr.list, 
-            unique=attr.unique if not attr.list else False,
-            key=attr.key,
-            description=attr.description
-        )
-        db.add(ad)
-        db.flush()
         if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
                 raise Exception('You need to bind foreign key to some schema')
