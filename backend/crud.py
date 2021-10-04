@@ -21,7 +21,7 @@ from .schemas import (
 )
 
 
-def create_attribute(db: Session, data: AttributeCreateSchema) -> Attribute:
+def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = True) -> Attribute:
     attr = db.execute(
         select(Attribute)
         .where(Attribute.name == data.name)
@@ -32,7 +32,8 @@ def create_attribute(db: Session, data: AttributeCreateSchema) -> Attribute:
 
     a = Attribute(name=data.name, type=data.type)
     db.add(a)
-    db.commit()
+    if commit:
+        db.commit()
     return a
 
 
@@ -51,7 +52,8 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
             if a is None:
                 raise Exception(f'Attribute with id {attr.attr_id} does not exist')
         elif isinstance(attr, AttrDefWithAttrDataSchema):
-            a = create_attribute(db, attr)
+            a = create_attribute(db, attr, commit=False)
+            db.flush()
 
         ad = AttributeDefinition(
             attribute_id=a.id, 
@@ -129,7 +131,8 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             if a is None:
                 raise Exception(f'Attribute with id {attr.attr_id} does not exist')
         elif isinstance(attr, AttrDefWithAttrDataSchema):
-            a = create_attribute(db, attr)
+            a = create_attribute(db, attr, commit=False)
+            db.flush()
         
         exists = db.execute(
             select(AttributeDefinition)
