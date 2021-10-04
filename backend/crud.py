@@ -215,7 +215,11 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
 
 
 def delete_entity(db: Session, entity_id: int) -> Entity:
-    e = db.execute(select(Entity).where(Entity.id == entity_id)).scalar()
+    e = db.execute(
+        select(Entity)
+        .where(Entity.id == entity_id)
+        .where(Entity.deleted == False)
+    ).scalar()
     if e is None:
         raise Exception('Should we raise exception here?')
     e.deleted = True # TODO require a lock?
