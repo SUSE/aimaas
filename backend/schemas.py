@@ -27,7 +27,7 @@ class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
     pass
 
 
-class AttributeDefinitionUpdateSchema(AttrDefSchema):
+class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
     id: int
 
 
