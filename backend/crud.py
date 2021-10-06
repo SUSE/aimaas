@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 from enum import IntFlag
 
 import sqlalchemy
@@ -71,6 +71,7 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     except sqlalchemy.exc.IntegrityError:
         raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
     
+    attr_names = set()
     for attr in data.attributes:
         if isinstance(attr, AttrDefSchema):
             a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
@@ -79,6 +80,10 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
         elif isinstance(attr, AttrDefWithAttrDataSchema):
             a = create_attribute(db, attr, commit=False)
             db.flush()
+        
+        if a.name in attr_names:
+            raise Exception(f'Multiple occurences of attribute found: {a.name}')
+        attr_names.add(a.name)
 
         ad = AttributeDefinition(
             attribute_id=a.id, 
@@ -154,6 +159,7 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         attr_def.description = attr.description
     db.flush()
     
+    attr_names = set()
     for attr in data.add_attributes:
         if isinstance(attr, AttrDefSchema):
             a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
@@ -162,6 +168,10 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         elif isinstance(attr, AttrDefWithAttrDataSchema):
             a = create_attribute(db, attr, commit=False)
             db.flush()
+        
+        if a.name in attr_names:
+            raise Exception(f'Multiple occurences of attribute found: {a.name}')
+        attr_names.add(a.name)
         
         try:
             ad = AttributeDefinition(
@@ -177,7 +187,7 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             db.flush()
         except sqlalchemy.exc.IntegrityError:
             raise Exception(f'There is already attribute defined')
-
+        
         if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
                 raise Exception('You need to bind foreign key to some schema')
