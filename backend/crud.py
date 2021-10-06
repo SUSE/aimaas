@@ -225,15 +225,17 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         except ValueError as e:
             raise # can this even happen with validation done before?
         if attr_def.unique and not attr_def.list:  # TODO this might require a lock
-            exists = db.execute(
+            existing = db.execute(
                 select(model)
                 .where(model.attribute_id == attr.id)
                 .where(Entity.schema_id == schema_id)
                 .where(model.value == values[0])
                 .join(Entity, Entity.id == model.entity_id)
-            ).scalar()
-            if exists:
-                raise Exception('Non-unique value')
+            ).scalars().all()
+            if existing:
+                for val in existing:
+                    if not val.entity.deleted:
+                        raise Exception('Non-unique value')
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
