@@ -191,9 +191,11 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         
         
 def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
-    sch: Schema = db.execute(select(Schema).where(Schema.id == schema_id)).scalar()
+    sch: Schema = db.execute(
+        select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
+    ).scalar()
     if sch is None:
-        raise Exception(f'Schema with id {schema_id} does not exist')
+        raise Exception(f'Schema with id {schema_id} does not exist or was deleted')
     e = Entity(schema_id=schema_id)
     db.add(e)
     db.flush()
