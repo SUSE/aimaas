@@ -82,7 +82,10 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
                 raise Exception(f'Cannot bind to nonexistent schema with id {attr.bind_to_schema}')
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
-    db.commit()
+    try:
+        db.commit()
+    except sqlalchemy.exc.IntegrityError:
+        raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
     return sch
 
 
@@ -170,7 +173,10 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
                 raise Exception(f'Cannot bind to nonexistent schema with id {attr.bind_to_schema}')
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
-    db.commit()
+    try:
+        db.commit()
+    except sqlalchemy.exc.IntegrityError:
+        raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
     return sch
         
         
