@@ -111,9 +111,11 @@ def delete_schema(db: Session, schema_id: int) -> Schema:
 
 
 def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Schema:
-    sch: Schema = db.execute(select(Schema).where(Schema.id == schema_id)).scalar()
+    sch: Schema = db.execute(
+        select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
+    ).scalar()
     if sch is None:
-        raise Exception(f'Schema with id {schema_id} does not exist')
+        raise Exception(f'Schema with id {schema_id} does not exist or was deleted')
     
     schemas = db.execute(select(Schema).where( (Schema.name == data.name) | (Schema.slug == data.slug) )).scalars().all()
     if len(schemas) == 1 and schemas[0].id != schema_id or len(schemas) > 1:
