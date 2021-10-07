@@ -77,9 +77,13 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
             if attr.bind_to_schema == -1:
                 s = sch
             else:
-                s = db.execute(select(Schema).where(Schema.id == attr.bind_to_schema)).scalar()
+                s = db.execute(
+                    select(Schema)
+                    .where(Schema.id == attr.bind_to_schema)
+                    .where(Schema.deleted == False)
+                ).scalar()
             if s is None:
-                raise Exception(f'Cannot bind to nonexistent schema with id {attr.bind_to_schema}')
+                raise Exception(f'Cannot bind to nonexistent or deleted schema with id {attr.bind_to_schema}')
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
@@ -168,9 +172,13 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             if attr.bind_to_schema == -1:
                 s = sch
             else:
-                s = db.execute(select(Schema).where(Schema.id == attr.bind_to_schema)).scalar()
+                s = db.execute(
+                    select(Schema)
+                    .where(Schema.id == attr.bind_to_schema)
+                    .where(Schema.deleted == False)
+                ).scalar()
             if s is None:
-                raise Exception(f'Cannot bind to nonexistent schema with id {attr.bind_to_schema}')
+                raise Exception(f'Cannot bind to nonexistent or deleted schema with id {attr.bind_to_schema}')
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
