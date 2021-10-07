@@ -234,6 +234,23 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
                 values = [caster(value)]
         except ValueError as e:
             raise # can this even happen with validation done before?
+        
+        if attr.type == AttrType.FK:
+            bound_schema_id = db.execute(
+                select(BoundFK.schema_id)
+                .where(BoundFK.attr_def_id == attr_def.id)
+            ).scalar()
+            for id_ in values:
+                entity = db.execute(
+                    select(Entity)
+                    .where(Entity.id == id_)
+                    .where(Entity.deleted == False)
+                ).scalar()
+                if entity is None:
+                    raise Exception(f'Entity with id {id_} does not exist or is deleted')
+                if entity.schema_id != bound_schema_id:
+                    raise Exception(f'Field is bound to schema {bound_schema_id}, while passed entity belongs to schema {entity.schema_id}')
+
         if attr_def.unique and not attr_def.list:  # TODO this might require a lock
             existing = db.execute(
                 select(model)
