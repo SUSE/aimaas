@@ -1,5 +1,4 @@
 from typing import Dict, List
-from enum import IntFlag
 
 import sqlalchemy
 from sqlalchemy.orm import Session
@@ -23,29 +22,7 @@ from .schemas import (
 )
 
 
-class Lock(IntFlag):
-    SCH_CREATE = 1
-    SCH_UPD    = 2
-    SCH_DEL    = 4
-    SCH_GET    = 8
-
-    ENT_CREATE = 16
-    ENT_UPD    = 32
-    ENT_DEL    = 64
-    ENT_GET    = 128
-
-    ATTR_CREATE = 256
-    ATTR_UPD    = 512
-    ATTR_DEL    = 1024
-    ATTR_GET    = 2048
-
-
-def get_lock(db: Session, a: int, b: int = 0):
-    db.execute(select([func.pg_advisory_xact_lock(a, b)])).scalar()
-
-
 def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = True) -> Attribute:
-    get_lock(db, Lock.ATTR_CREATE | Lock.SCH_UPD | Lock.SCH_CREATE)
     attr = db.execute(
         select(Attribute)
         .where(Attribute.name == data.name)
@@ -62,8 +39,6 @@ def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = Tr
 
 
 def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
-    # TODO require lock here and in update?
-    get_lock(db, Lock.SCH_CREATE | Lock.SCH_UPD | Lock.ATTR_CREATE)
     try:
         sch = Schema(name=data.name, slug=data.slug)
         db.add(sch)
@@ -112,7 +87,6 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
 
 
 def delete_schema(db: Session, schema_id: int) -> Schema:
-    get_lock(db, schema_id, Lock.SCH_DEL | Lock.SCH_UPD)
     schema = db.execute(
         select(Schema)
         .where(Schema.id == schema_id)
@@ -121,18 +95,15 @@ def delete_schema(db: Session, schema_id: int) -> Schema:
     if schema is None:
         raise Exception('Schema doesnt exist or was deleted')
     
-    get_lock(db, schema_id, Lock.ENT_CREATE | Lock.ENT_UPD | Lock.ENT_DEL)
     db.execute(
         update(Entity).where(Entity.schema_id == schema_id).values(deleted=True)
     )
-    schema.deleted = True # TODO require locks?
+    schema.deleted = True
     db.commit()
     return schema
 
 
 def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Schema:
-    get_lock(db, schema_id, Lock.SCH_DEL)
-    get_lock(db, Lock.SCH_CREATE | Lock.SCH_UPD | Lock.ATTR_CREATE)
     sch: Schema = db.execute(select(Schema).where(Schema.id == schema_id)).scalar()
     if sch is None:
         raise Exception(f'Schema with id {schema_id} does not exist')
@@ -204,8 +175,6 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         
         
 def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
-    get_lock(db, Lock.SCH_UPD | Lock.SCH_DEL)
-    get_lock(db, schema_id, Lock.ENT_CREATE | Lock.ENT_UPD)
     sch: Schema = db.execute(select(Schema).where(Schema.id == schema_id)).scalar()
     if sch is None:
         raise Exception(f'Schema with id {schema_id} does not exist')
@@ -251,7 +220,7 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
                 if entity.schema_id != bound_schema_id:
                     raise Exception(f'Field is bound to schema {bound_schema_id}, while passed entity belongs to schema {entity.schema_id}')
 
-        if attr_def.unique and not attr_def.list:  # TODO this might require a lock
+        if attr_def.unique and not attr_def.list:
             existing = db.execute(
                 select(model)
                 .where(model.attribute_id == attr.id)
@@ -271,7 +240,6 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
 
 
 def delete_entity(db: Session, entity_id: int) -> Entity:
-    get_lock(db, entity_id, Lock.ENT_DEL)
     e = db.execute(
         select(Entity)
         .where(Entity.id == entity_id)
@@ -279,6 +247,6 @@ def delete_entity(db: Session, entity_id: int) -> Entity:
     ).scalar()
     if e is None:
         raise Exception('There is no entity with provided id or it is already deleted')
-    e.deleted = True # TODO require a lock?
+    e.deleted = True
     db.commit()
     return e
