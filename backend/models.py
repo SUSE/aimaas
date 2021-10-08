@@ -25,6 +25,9 @@ class Value(Base):
     def attribute_id(cls):
         return Column(Integer, ForeignKey('attributes.id'))
 
+    @declared_attr
+    def entity(cls):
+        return relationship('Entity')
 
 class ValueBool(Value):
     __tablename__ = 'values_bool'
