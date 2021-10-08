@@ -20,6 +20,7 @@ from .schemas import (
     SchemaUpdateSchema,
     AttributeCreateSchema
 )
+from .exceptions import *
 
 
 def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = True) -> Attribute:
@@ -44,20 +45,21 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
         db.add(sch)
         db.flush()
     except sqlalchemy.exc.IntegrityError:
-        raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
+        db.rollback()
+        raise SchemaExistsException(name=data.name, slug=data.slug)
     
     attr_names = set()
     for attr in data.attributes:
         if isinstance(attr, AttrDefSchema):
             a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
             if a is None:
-                raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+                raise MissingAttributeException(attr.attr_id)
         elif isinstance(attr, AttrDefWithAttrDataSchema):
             a = create_attribute(db, attr, commit=False)
             db.flush()
         
         if a.name in attr_names:
-            raise Exception(f'Multiple occurences of attribute found: {a.name}')
+            raise MultipleAttributeOccurencesException(a.name)
         attr_names.add(a.name)
 
         ad = AttributeDefinition(
@@ -73,7 +75,7 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
         db.flush()
         if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
-                raise Exception('You need to bind foreign key to some schema')
+                raise NoSchemaToBindException(attr_id=a.id)
             if attr.bind_to_schema == -1:
                 s = sch
             else:
@@ -83,13 +85,14 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
                     .where(Schema.deleted == False)
                 ).scalar()
             if s is None:
-                raise Exception(f'Cannot bind to nonexistent or deleted schema with id {attr.bind_to_schema}')
+                raise MissingSchemaException(obj_id=attr.bind_to_schema)
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
         db.commit()
     except sqlalchemy.exc.IntegrityError:
-        raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
+        db.rollback()
+        raise SchemaExistsException(name=data.name, slug=data.slug)
     return sch
 
 
@@ -100,7 +103,7 @@ def delete_schema(db: Session, schema_id: int) -> Schema:
         .where(Schema.deleted == False)
     ).scalar()
     if schema is None:
-        raise Exception('Schema doesnt exist or was deleted')
+        raise MissingSchemaException(obj_id=schema_id)
     
     db.execute(
         update(Entity).where(Entity.schema_id == schema_id).values(deleted=True)
@@ -115,11 +118,11 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
     ).scalar()
     if sch is None:
-        raise Exception(f'Schema with id {schema_id} does not exist or was deleted')
+        raise MissingSchemaException(obj_id=schema_id)
     
     schemas = db.execute(select(Schema).where( (Schema.name == data.name) | (Schema.slug == data.slug) )).scalars().all()
     if len(schemas) == 1 and schemas[0].id != schema_id or len(schemas) > 1:
-        raise Exception(f'Schemas with name {data.name} and/or slug {data.slug} already exist')
+        raise SchemaExistsException(name=data.name, slug=data.slug)
 
     sch.name = data.name
     sch.slug = data.slug
@@ -127,9 +130,9 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
     for attr in data.update_attributes:
         attr_def = attr_def_ids.get(attr.id)
         if attr_def is None:
-            raise Exception(f'There is no attribute definition with id`{attr.id}` defined for schema')
+            raise AttributeNotDefinedException(attr_id=attr.id, schema_id=sch.id)
         if attr_def.list and not attr.list:
-            raise Exception('Cannot make listed value unlisted')
+            raise ListedToUnlistedException(attr_def_id=attr_def.id)
         if attr.list:
             attr.unique = False
         attr_def.required = attr.required
@@ -144,13 +147,13 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         if isinstance(attr, AttrDefSchema):
             a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
             if a is None:
-                raise Exception(f'Attribute with id {attr.attr_id} does not exist')
+                raise MissingAttributeException(obj_id=attr.attr_id)
         elif isinstance(attr, AttrDefWithAttrDataSchema):
             a = create_attribute(db, attr, commit=False)
             db.flush()
         
         if a.name in attr_names:
-            raise Exception(f'Multiple occurences of attribute found: {a.name}')
+            raise MultipleAttributeOccurencesException(attr_name=a.name)
         attr_names.add(a.name)
         
         try:
@@ -166,11 +169,12 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
             db.add(ad)
             db.flush()
         except sqlalchemy.exc.IntegrityError:
-            raise Exception(f'There is already attribute defined')
+            db.rollback()
+            raise AttributeAlreadyDefinedException(attr_id=a.id, schema_id=sch.id)
         
         if a.type == AttrType.FK:
             if attr.bind_to_schema is None:
-                raise Exception('You need to bind foreign key to some schema')
+                raise NoSchemaToBindException(attr_id=a.id)
             if attr.bind_to_schema == -1:
                 s = sch
             else:
@@ -180,13 +184,14 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
                     .where(Schema.deleted == False)
                 ).scalar()
             if s is None:
-                raise Exception(f'Cannot bind to nonexistent or deleted schema with id {attr.bind_to_schema}')
+                raise MissingSchemaException(obj_id=attr.bind_to_schema)
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
         db.commit()
     except sqlalchemy.exc.IntegrityError:
-        raise Exception(f'Schema with name `{data.name}` or slug `{data.slug}` already exists')
+        db.rollback()
+        raise SchemaExistsException(name=data.name, slug=data.slug)
     return sch
         
         
@@ -195,7 +200,8 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
     ).scalar()
     if sch is None:
-        raise Exception(f'Schema with id {schema_id} does not exist or was deleted')
+        raise MissingSchemaException(obj_id=schema_id)
+
     e = Entity(schema_id=schema_id)
     db.add(e)
     db.flush()
@@ -208,14 +214,14 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
             .join(Attribute, AttributeDefinition.attribute_id == Attribute.id)
         ).scalar()
         if attr_def is None:
-            raise Exception(f'There is no attribute definition for schema id {schema_id} and attribute id {attr.id}')
+            raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
         
         attr: Attribute = attr_def.attribute
         model, caster = attr.type.value
         try:
             if isinstance(value, list):
                 if not attr_def.list:
-                    raise Exception(f'Attribute {attr.name} on schema {sch.name} cannot hold multiple values')
+                    raise NotListedAttributeException(attr_name=attr.name, schema_id=sch.id)
                 values = [caster(i) for i in value]
             else:
                 values = [caster(value)]
@@ -234,9 +240,14 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
                     .where(Entity.deleted == False)
                 ).scalar()
                 if entity is None:
-                    raise Exception(f'Entity with id {id_} does not exist or is deleted')
+                    raise MissingEntityException(obj_id=id_)
                 if entity.schema_id != bound_schema_id:
-                    raise Exception(f'Field is bound to schema {bound_schema_id}, while passed entity belongs to schema {entity.schema_id}')
+                    raise WrongSchemaToBindException(
+                        attr_name=attr.name, 
+                        schema_id=sch.id, 
+                        bound_schema_id=bound_schema_id, 
+                        passed_entity=entity
+                    )
 
         if attr_def.unique and not attr_def.list:
             existing = db.execute(
@@ -249,7 +260,7 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
             if existing:
                 for val in existing:
                     if not val.entity.deleted:
-                        raise Exception('Non-unique value')
+                        raise UniqueValueException(attr_name=attr.name, schema_id=sch.id, value=val.value)
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
@@ -264,7 +275,7 @@ def delete_entity(db: Session, entity_id: int) -> Entity:
         .where(Entity.deleted == False)
     ).scalar()
     if e is None:
-        raise Exception('There is no entity with provided id or it is already deleted')
+        raise MissingEntityException(obj_id=entity_id)
     e.deleted = True
     db.commit()
     return e
