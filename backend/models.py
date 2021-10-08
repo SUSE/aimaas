@@ -153,3 +153,7 @@ class AttributeDefinition(Base):
 
     schema = relationship('Schema', back_populates='attr_defs')
     attribute = relationship('Attribute', back_populates='attr_defs')
+
+    __table_args__ = (
+        UniqueConstraint('schema_id', 'attribute_id'),
+    )
