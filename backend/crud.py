@@ -27,12 +27,12 @@ def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = Tr
     attr = db.execute(
         select(Attribute)
         .where(Attribute.name == data.name)
-        .where(Attribute.type == data.type)
+        .where(Attribute.type == AttrType[data.type.value])
     ).scalar()
     if attr:
         return attr
 
-    a = Attribute(name=data.name, type=data.type)
+    a = Attribute(name=data.name, type=AttrType[data.type.value])
     db.add(a)
     if commit:
         db.commit()  # This may raise IntegrityError if other session commits same data
