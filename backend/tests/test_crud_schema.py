@@ -116,7 +116,7 @@ class TestSchemaCreate:
             attributes=[
                 AttrDefWithAttrDataSchema(
                     name='test1',
-                    type=AttrType.STR,       # both this
+                    type=AttrTypeMapping.STR,
                     required=True,
                     unique=True,
                     list=False,
@@ -125,7 +125,7 @@ class TestSchemaCreate:
                 ),
                 AttrDefWithAttrDataSchema(
                     name='test2',
-                    type=AttrTypeMapping.STR, # and this should be acceptable
+                    type=AttrTypeMapping.STR,
                     required=True,
                     unique=True,
                     list=False,
@@ -239,7 +239,7 @@ class TestSchemaCreate:
             attributes=[
                 AttrDefWithAttrDataSchema(
                     name='test1',
-                    type=AttrType.STR,
+                    type=AttrTypeMapping.STR,
                     required=True,
                     unique=True,
                     list=False,
@@ -248,7 +248,7 @@ class TestSchemaCreate:
                 ),
                 AttrDefWithAttrDataSchema(
                     name='test1',
-                    type=AttrType.INT,
+                    type=AttrTypeMapping.INT,
                     required=True,
                     unique=True,
                     list=False,
@@ -267,7 +267,7 @@ class TestSchemaCreate:
             attributes=[
                 AttrDefWithAttrDataSchema(
                     name='name',
-                    type=AttrType.INT,
+                    type=AttrTypeMapping.INT,
                     required=True,
                     unique=True,
                     list=False,
@@ -387,7 +387,7 @@ class TestSchemaUpdate:
                 ),
                 AttrDefWithAttrDataSchema(
                     name='test',
-                    type=AttrType.FK,
+                    type=AttrTypeMapping.FK,
                     required=False,
                     unique=False,
                     list=False,
@@ -632,7 +632,7 @@ class TestSchemaUpdate:
                 ),
                 AttrDefWithAttrDataSchema(
                     name='age',
-                    type=AttrType.FK,
+                    type=AttrTypeMapping.FK,
                     required=True,
                     unique=True,
                     list=True,
