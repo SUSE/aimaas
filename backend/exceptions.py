@@ -92,3 +92,11 @@ class UniqueValueException(Exception):
 
     def __str__(self) -> str:
         return f'Got non-unique value for field `{self.attr_name}` on schema ({self.schema_id}): {self.value}'
+
+
+class RequiredFieldException(Exception):
+    def __init__(self, field: str):
+        self.field = field
+
+    def __str__(self) -> str:
+        return f'Missing required field: {self.field}'

@@ -142,6 +142,24 @@ class TestEntityCreate:
         with pytest.raises(WrongSchemaToBindException):
             create_entity(dbsession, schema_id=1, data=p1)
 
+    def test_raise_on_name_not_provided(self, dbsession):
+        p1 = {
+            'nickname': 'mike',
+            'age': 10,
+            'friends': [1]
+        }
+        with pytest.raises(RequiredFieldException):
+            create_entity(dbsession, schema_id=1, data=p1)
+
+    def test_raise_on_required_field_not_provided(self, dbsession):
+        p1 = {
+            'name': 'Mike',
+            'age': 10,
+            'friends': [1]
+        }
+        with pytest.raises(RequiredFieldException):
+            create_entity(dbsession, schema_id=1, data=p1)
+
 
 class TestEntityUpdate:
     pass

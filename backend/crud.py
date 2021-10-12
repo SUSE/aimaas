@@ -204,19 +204,20 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
     try:
         name = data.pop('name')
     except KeyError:
-        raise Exception('name not provided')
+        raise RequiredFieldException(field='name')
+
+    attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
+    required = [i for i in attr_defs if attr_defs[i].required]
+    for i in required:
+        if i not in data and i != 'name':
+            raise RequiredFieldException(field=i)
 
     e = Entity(schema_id=schema_id, name=name)
     db.add(e)
     db.flush()
 
     for field, value in data.items():
-        attr_def: AttributeDefinition = db.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == schema_id)
-            .where(Attribute.name == field)
-            .join(Attribute, AttributeDefinition.attribute_id == Attribute.id)
-        ).scalar()
+        attr_def = attr_defs.get(field)
         if attr_def is None:
             raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
         
