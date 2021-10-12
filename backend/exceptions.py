@@ -34,7 +34,7 @@ class MultipleAttributeOccurencesException(Exception):
         self.attr_name = attr_name
     
     def __str__(self) -> str:
-        return f'Found multiple occurences of attribute `{self.attr_name}`'
+        return f'Found multiple occurrences of attribute `{self.attr_name}`'
 
 class NoSchemaToBindException(Exception):
     def __init__(self, attr_id: int):
