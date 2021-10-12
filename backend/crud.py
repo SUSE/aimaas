@@ -120,12 +120,16 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
     if sch is None:
         raise MissingSchemaException(obj_id=schema_id)
     
-    schemas = db.execute(select(Schema).where( (Schema.name == data.name) | (Schema.slug == data.slug) )).scalars().all()
-    if len(schemas) == 1 and schemas[0].id != schema_id or len(schemas) > 1:
+    try:
+        db.execute(
+            update(Schema)
+            .where(Schema.id == schema_id)
+            .values(name=data.name, slug=data.slug)
+        )
+    except:
+        db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
-    sch.name = data.name
-    sch.slug = data.slug
     attr_def_ids: Dict[int, AttributeDefinition] = {i.id: i for i in sch.attr_defs}
     for attr in data.update_attributes:
         attr_def = attr_def_ids.get(attr.id)
