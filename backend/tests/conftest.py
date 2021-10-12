@@ -22,6 +22,7 @@ def populate_db(db: Session):
         born   |  5 | DT
         friends|  6 | FK
         address|  7 | FK
+      nickname |  8 | STR
 
     ### Schemas
       1. Person (person), fields:
@@ -32,6 +33,7 @@ def populate_db(db: Session):
       age    |    3    |     +    |   -    |   -  |  + 
       born   |    5    |     -    |   -    |   -  |  - 
       friends|    6    |     +    |   -    |   +  |  - 
+    nickname |    8    |     +    |   +    |   -  |  -
 
     ### Bound FKs
 
@@ -42,10 +44,10 @@ def populate_db(db: Session):
     ### Entities
       *Person*
 
-      id |  name  | age | born | friends
-      ---|--------|-----|------|--------
-      1  | Jack   | 10  |   -  |   []
-      2  | Jane   | 12  |   -  |   [1]
+      id |  name  | age | born | friends | nickname
+      ---|--------|-----|------|---------|------
+      1  | Jack   | 10  |   -  |   []    | jack
+      2  | Jane   | 12  |   -  |   [1]   | jane
     
     '''
     name = Attribute(name='name', type=AttrType.STR)
@@ -55,7 +57,8 @@ def populate_db(db: Session):
     born = Attribute(name='born', type=AttrType.DT)
     friends = Attribute(name='friends', type=AttrType.FK)
     address = Attribute(name='address', type=AttrType.FK)
-    db.add_all([name, age_float, age_int, age_str, born, friends, address])
+    nickname = Attribute(name='nickname', type=AttrType.STR)
+    db.add_all([name, age_float, age_int, age_str, born, friends, address, nickname])
 
     person = Schema(name='Person', slug='person')
     db.add(person)
@@ -95,25 +98,33 @@ def populate_db(db: Session):
         list=True,
         key=False
     )
-    db.add_all([name_, age_, born_, friends_])
+    nickname_ = AttributeDefinition(
+        schema_id=person.id,
+        attribute_id=nickname.id,
+        required=True,
+        unique=True,
+        list=False,
+        key=False
+    )
+    db.add_all([name_, age_, born_, friends_, nickname_])
     db.flush()
     bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
     db.add(bfk)
 
-    p1 = Entity(schema_id=person.id)
+    p1 = Entity(schema_id=person.id, name='Jack')
     db.add(p1)
     db.flush()
-    p1_name = ValueStr(entity_id=p1.id, attribute_id=name.id, value='Jack')
+    p1_nickname = ValueStr(entity_id=p1.id, attribute_id=nickname.id, value='jack')
     p1_age = ValueInt(entity_id=p1.id, attribute_id=age_int.id, value=10)
 
-    p2 = Entity(schema_id=person.id)
+    p2 = Entity(schema_id=person.id, name='Jane')
     db.add(p2)
     db.flush()
-    p2_name = ValueStr(entity_id=p2.id, attribute_id=name.id, value='Jane')
+    p2_nickname = ValueStr(entity_id=p2.id, attribute_id=nickname.id, value='jane')
     p2_age = ValueInt(entity_id=p2.id, attribute_id=age_int.id, value=12)
     p2_friend = ValueForeignKey(entity_id=p2.id, attribute_id=friends.id, value=p1.id)
 
-    db.add_all([p1_name, p1_age, p2_name, p2_age, p2_friend])
+    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend])
     db.commit()
 
 

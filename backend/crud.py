@@ -201,8 +201,12 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
     ).scalar()
     if sch is None:
         raise MissingSchemaException(obj_id=schema_id)
+    try:
+        name = data.pop('name')
+    except KeyError:
+        raise Exception('name not provided')
 
-    e = Entity(schema_id=schema_id)
+    e = Entity(schema_id=schema_id, name=name)
     db.add(e)
     db.flush()
 
