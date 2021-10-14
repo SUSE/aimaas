@@ -39,7 +39,11 @@ class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
 
 
 class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
-    id: int
+    attr_def_id: int
+
+
+class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
+    name: str
 
 
 class SchemaCreateSchema(BaseModel):
@@ -52,5 +56,5 @@ class SchemaUpdateSchema(BaseModel):
     name: str
     slug: str
 
-    update_attributes: List[AttributeDefinitionUpdateSchema]
+    update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
     add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]

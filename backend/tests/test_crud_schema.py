@@ -295,7 +295,7 @@ class TestSchemaUpdate:
             slug='test', 
             update_attributes=[
                 AttributeDefinitionUpdateSchema(
-                    id=attr_def.id,
+                    attr_def_id=attr_def.id,
                     required=False,
                     unique=False,
                     list=False,
@@ -344,6 +344,33 @@ class TestSchemaUpdate:
         sch = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         assert sch.name == 'Test' and sch.slug == 'test'
 
+    def test_update_attr_def_with_name(self, dbsession):
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            update_attributes=[
+                AttributeDefinitionUpdateWithNameSchema(
+                    name='age',
+                    required=False,
+                    unique=False,
+                    list=False,
+                    key=False,
+                    description='Age of this person'
+                )
+            ], 
+            add_attributes=[]
+        )
+        update_schema(dbsession, schema_id=1, data=upd_schema)
+
+        age_def = dbsession.execute(
+            select(AttributeDefinition)
+            .join(Attribute)
+            .where(Attribute.name == 'age')
+            .where(AttributeDefinition.schema_id == 1)
+        ).scalar()
+        assert age_def is not None
+        assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
+
     def test_update_with_attr_data(self, dbsession):
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
         attr_def = dbsession.execute(
@@ -357,7 +384,7 @@ class TestSchemaUpdate:
             slug='test', 
             update_attributes=[
                 AttributeDefinitionUpdateSchema(
-                    id=attr_def.id,
+                    attr_def_id=attr_def.id,
                     required=False,
                     unique=False,
                     list=False,
@@ -455,8 +482,7 @@ class TestSchemaUpdate:
             slug='test', 
             update_attributes=[
                 AttributeDefinitionUpdateSchema(
-                    id=9999999,
-                    attr_id=1,
+                    attr_def_id=9999999,
                     required=True,
                     unique=True,
                     list=True,
@@ -480,8 +506,7 @@ class TestSchemaUpdate:
             slug='test', 
             update_attributes=[
                 AttributeDefinitionUpdateSchema(
-                    id=attr_def.id,
-                    attr_id=attr.id,
+                    attr_def_id=attr_def.id,
                     required=True,
                     unique=True,
                     list=False,

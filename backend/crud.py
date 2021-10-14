@@ -16,6 +16,7 @@ from .models import (
 from .schemas import (
     AttrDefSchema,
     AttrDefWithAttrDataSchema,
+    AttributeDefinitionUpdateSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
@@ -131,10 +132,15 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
     attr_def_ids: Dict[int, AttributeDefinition] = {i.id: i for i in sch.attr_defs}
+    attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
     for attr in data.update_attributes:
-        attr_def = attr_def_ids.get(attr.id)
+        if isinstance(attr, AttributeDefinitionUpdateSchema):
+            attr_def = attr_def_ids.get(attr.attr_def_id)
+        else:
+            attr_def = attr_def_names.get(attr.name)
+        
         if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr.id, schema_id=sch.id)
+            raise AttributeNotDefinedException(attr_id=attr.attr_def_id, schema_id=sch.id)
         if attr_def.list and not attr.list:
             raise ListedToUnlistedException(attr_def_id=attr_def.id)
         if attr.list:
