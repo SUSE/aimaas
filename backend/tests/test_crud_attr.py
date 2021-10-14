@@ -1,10 +1,12 @@
+import pytest
+
 from ..config import *
 from ..crud import *
 from ..models import *
 from ..schemas import *
 
 
-class TestAttributeCRUD:
+class TestAttributeCreate:
     def test_create(self, dbsession):
         attr = AttributeCreateSchema(name='test', type=AttrTypeMapping.STR)
         attr = create_attribute(dbsession, data=attr)
@@ -42,3 +44,28 @@ class TestAttributeCRUD:
         assert len(attrs) == 1
         assert attr1.id != attr2.id
 
+    def test_raise_on_reserved_attr_name(self, dbsession):
+        for name in RESERVED_ATTR_NAMES:
+            sch = AttributeCreateSchema(name=name, type=AttrTypeMapping.INT)
+            with pytest.raises(ReservedAttributeException):
+                create_attribute(dbsession, data=sch)
+
+
+class TestAttributeRead:
+    def test_get_attribute(self, dbsession):
+        born = dbsession.execute(
+            select(Attribute).where(Attribute.name == 'born')
+        ).scalar()
+        attr = get_attribute(dbsession, attr_id=born.id)
+        assert attr == born
+
+    def test_get_attributes(self, dbsession):
+        attrs = get_attributes(dbsession)
+        assert len(attrs) == 7
+        
+        names = {'age', 'born', 'friends', 'address', 'nickname'}
+        assert set([i.name for i in attrs]) == names
+
+    def test_raise_on_attr_doesnt_exist(self, dbsession):
+        with pytest.raises(MissingAttributeException):
+            get_attribute(dbsession, attr_id=999999999)

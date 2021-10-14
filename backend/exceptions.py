@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 from .models import Entity
 
@@ -100,3 +100,21 @@ class RequiredFieldException(Exception):
 
     def __str__(self) -> str:
         return f'Missing required field: {self.field}'
+
+
+class MismatchingSchemaException(Exception):
+    def __init__(self, entity_id: int, schema_id: int):
+        self.entity_id = entity_id
+        self.schema_id = schema_id
+
+    def __str__(self) -> str:
+        return f"Requested Entity ({self.entity_id}) doesn't belong to specified Schema ({self.schema_id})"
+
+
+class ReservedAttributeException(Exception):
+    def __init__(self, attr_name: str, reserved: List[str]):
+        self.attr_name = attr_name
+        self.reserved = reserved
+
+    def __str__(self) -> str:
+        return f"Can't create attribute `{self.attr_name}`. List of reserved attribute names: {', '.join(self.reserved)}"

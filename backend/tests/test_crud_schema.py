@@ -281,6 +281,49 @@ class TestSchemaCreate:
         with pytest.raises(MultipleAttributeOccurencesException):
             create_schema(dbsession, data=test)
 
+
+class TestSchemaRead:
+    def test_get_schema_by_id_and_slug(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.name == 'Person')).scalar()
+        assert schema == get_schema(dbsession, id_or_slug=schema.id)
+        assert schema == get_schema(dbsession, id_or_slug=schema.slug)
+
+    def test_raise_on_schema_doesnt_exist(self, dbsession):
+        with pytest.raises(MissingSchemaException):
+            get_schema(dbsession, id_or_slug=999999999)
+
+        with pytest.raises(MissingSchemaException):
+            get_schema(dbsession, id_or_slug='qwertyuiop')
+    
+    def test_get_schemas(self, dbsession):
+        # test default behavior: return not deleted schemas
+        test = Schema(name='Test', slug='test', deleted=True)
+        dbsession.add(test)
+        dbsession.flush()
+
+        schema = dbsession.execute(select(Schema).where(Schema.name == 'Person')).scalar()
+        schemas = get_schemas(dbsession)
+        assert len(schemas) == 1
+        assert schemas[0] == schema
+
+    def test_get_all(self, dbsession):
+        test = Schema(name='Test', slug='test', deleted=True)
+        dbsession.add(test)
+        dbsession.flush()
+
+        schemas = get_schemas(dbsession, all=True)
+        assert len(schemas) == 2
+
+    def test_get_deleted_only(self, dbsession):
+        test = Schema(name='Test', slug='test', deleted=True)
+        dbsession.add(test)
+        dbsession.flush()
+
+        schemas = get_schemas(dbsession, deleted_only=True)
+        assert len(schemas) == 1
+        assert schemas[0] == test
+
+
 class TestSchemaUpdate:
     def test_update(self, dbsession):
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()

@@ -161,6 +161,98 @@ class TestEntityCreate:
             create_entity(dbsession, schema_id=1, data=p1)
 
 
+class TestEntityRead:
+    def test_get_entity(self, dbsession):
+        jack = dbsession.execute(select(Entity).where(Entity.name == 'Jack')).scalar()
+        expected = {
+            'id': jack.id,
+            'name': jack.name,
+            'deleted': jack.deleted,
+            'age': 10,
+            'friends': [],
+            'born': None,
+            'nickname': 'jack'
+        }
+        data = get_entity(dbsession, entity_id=jack.id, schema=jack.schema)
+        assert data == expected
+
+    def test_raise_on_entity_doesnt_exist(self, dbsession):
+        with pytest.raises(MissingEntityException):
+            get_entity(dbsession, entity_id=9999999999, schema=Schema())
+
+    def test_raise_on_entity_doesnt_belong_to_schema(self, dbsession):
+        s = Schema(name='test', slug='test')
+        dbsession.add(s)
+        dbsession.flush()
+        with pytest.raises(MismatchingSchemaException):
+            get_entity(dbsession, entity_id=1, schema=s)
+
+    def test_get_entities(self, dbsession):
+        # test default behavior: return not deleted entities
+        e = Entity(name='Test', schema_id=1, deleted=True)
+        dbsession.add(e)
+        dbsession.flush()
+        
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        ents = get_entities(dbsession, schema=schema)
+        
+        assert len(ents) == 2
+
+        default_field_list = {'id', 'name', 'deleted', 'age'}
+        ent = ents[1]
+        assert set(ent.keys()) == default_field_list
+        assert ent['id'] == 2
+        assert ent['name'] == 'Jane'
+        assert ent['deleted'] == False
+        assert ent['age'] == 12
+
+    def test_get_deleted_only(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
+        dbsession.flush()
+
+        ents = get_entities(dbsession, schema=schema, deleted_only=True)
+        assert len(ents) == 1
+        assert ents[0]['id'] == 2
+    
+    def test_get_all(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
+        dbsession.flush()
+
+        ents = get_entities(dbsession, schema=schema, all=True)
+        assert len(ents) == 2
+        assert not ents[0]['deleted'] and ents[1]['deleted']
+
+    def test_get_all_fields(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        ents = get_entities(dbsession, schema=schema, all_fields=True)
+        assert len(ents) == 2
+        
+        ent = ents[1]
+        assert ent['id'] == 2
+        assert ent['name'] == 'Jane'
+        assert ent['deleted'] == False
+        assert ent['age'] == 12
+        assert ent['born'] == None
+        assert ent['friends'] == [1]
+        assert ent['nickname'] == 'jane'
+
+    def test_offset_and_limit(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        
+        ents = get_entities(dbsession, schema=schema, limit=1)
+        assert len(ents) == 1
+        assert ents[0]['id'] == 1
+
+        ents = get_entities(dbsession, schema=schema, limit=1, offset=1)
+        assert len(ents) == 1
+        assert ents[0]['id'] == 2
+
+        ents = get_entities(dbsession, schema=schema, offset=10)
+        assert len(ents) == 0
+
+
 class TestEntityUpdate:
     pass
 
