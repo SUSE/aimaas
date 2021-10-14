@@ -9,23 +9,14 @@ from ..exceptions import *
 
 class TestSchemaCreate:
     def data_for_test(self, db: Session) -> dict:
-        name = db.execute(select(Attribute).where(Attribute.name =='name')).scalar()
         color = Attribute(name='color', type=AttrType.STR)
         max_speed =  Attribute(name='max_speed', type=AttrType.INT)
         release_year = Attribute(name='release_year', type=AttrType.DT)
         owner = Attribute(name='owner', type=AttrType.FK)
 
         db.add_all([color, max_speed, release_year, owner])
-        db.flush()
+        db.commit()
 
-        name_ = AttrDefSchema(
-        attr_id=name.id,
-        required=True,
-        unique=True,
-        list=False,
-        key=True,
-        description='Name of this car'
-        )
         color_ = AttrDefSchema(
             attr_id=color.id,
             required=False,
@@ -58,14 +49,12 @@ class TestSchemaCreate:
         )
         return {
             'attrs': {
-                'name': name,
                 'color': color,
                 'max_speed': max_speed,
                 'release_year': release_year,
                 'owner': owner
             },
             'attr_defs': {
-                'name': name_,
                 'color': color_,
                 'max_speed': max_speed_,
                 'release_year': release_year_,
@@ -84,13 +73,13 @@ class TestSchemaCreate:
         attr_defs = dbsession.execute(select(AttributeDefinition).where(AttributeDefinition.schema_id == car.id)).scalars().all()
         assert sorted([i.attribute.name for i in attr_defs]) == sorted(data['attr_defs'])
 
-        name = dbsession.execute(
+        color = dbsession.execute(
             select(AttributeDefinition)
             .where(AttributeDefinition.schema_id == car.id)
-            .where(AttributeDefinition.attribute_id == data['attrs']['name'].id)
+            .where(AttributeDefinition.attribute_id == data['attrs']['color'].id)
         ).scalar()
-        assert all([name.required, name.unique, not name.list, name.key])
-        assert name.description == 'Name of this car'
+        assert not any([color.required, color.unique, color.list, color.key])
+        assert color.description == 'Color of this car'
 
         ry = dbsession.execute(
             select(AttributeDefinition)
@@ -132,7 +121,7 @@ class TestSchemaCreate:
                     key=True,
                     description='Test 2'
                 ),
-                data['attr_defs']['name']
+                data['attr_defs']['color']
             ]
         )
         create_schema(dbsession, data=test)
@@ -266,15 +255,15 @@ class TestSchemaCreate:
             slug='test',
             attributes=[
                 AttrDefWithAttrDataSchema(
-                    name='name',
+                    name='color',
                     type=AttrTypeMapping.INT,
                     required=True,
                     unique=True,
                     list=False,
                     key=True,
-                    description='Name already exists as STR in db'
+                    description='Color already exists as STR in db'
                 ),
-                data['attr_defs']['name']
+                data['attr_defs']['color']
             ]
         )
         with pytest.raises(MultipleAttributeOccurencesException):
@@ -285,8 +274,8 @@ class TestSchemaCreate:
             name='Test',
             slug='test',
             attributes=[
-                data['attr_defs']['name'],
-                data['attr_defs']['name']
+                data['attr_defs']['color'],
+                data['attr_defs']['color']
             ]
         )
         with pytest.raises(MultipleAttributeOccurencesException):
@@ -523,7 +512,7 @@ class TestSchemaUpdate:
             update_schema(dbsession, schema_id=1, data=upd_schema)
 
     def test_raise_on_attr_def_already_exists(self, dbsession):
-        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'name')).scalar()
+        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'born')).scalar()
         upd_schema = SchemaUpdateSchema(
             name='Test', 
             slug='test', 

@@ -13,16 +13,16 @@ class TestAttributeCRUD:
         assert attr.type == AttrType.STR
 
     def test_create_with_same_name(self, dbsession):
-        str_name = dbsession.execute(select(Attribute).where(Attribute.name == 'name')).scalar()
-        int_name = create_attribute(dbsession, data=AttributeCreateSchema(name='name', type=AttrTypeMapping.INT))
-        assert int_name.id != str_name.id
-        assert int_name.type != str_name.type
-        assert int_name.name == str_name.name
+        str_nickname = dbsession.execute(select(Attribute).where(Attribute.name == 'nickname')).scalar()
+        int_nickname = create_attribute(dbsession, data=AttributeCreateSchema(name='nickname', type=AttrTypeMapping.INT))
+        assert int_nickname.id != str_nickname.id
+        assert int_nickname.type != str_nickname.type
+        assert int_nickname.name == str_nickname.name
 
     def test_return_existing_on_duplicate(self, dbsession):
-        name = dbsession.execute(select(Attribute).where(Attribute.name == 'name')).scalar()
-        attr = create_attribute(dbsession, data=AttributeCreateSchema(name='name', type=AttrTypeMapping[name.type.name]))
-        assert attr.id == name.id
+        nickname = dbsession.execute(select(Attribute).where(Attribute.name == 'nickname')).scalar()
+        attr = create_attribute(dbsession, data=AttributeCreateSchema(name='nickname', type=AttrTypeMapping[nickname.type.name]))
+        assert attr.id == nickname.id
 
     def test_no_commit(self, dbsession):
         attrs = dbsession.execute(select(Attribute).where(Attribute.name == 'test')).scalars().all()

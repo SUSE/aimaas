@@ -15,25 +15,23 @@ def populate_db(db: Session):
 
         name   | id | type
         -------|----|-----
-        name   |  1 | STR
-        age    |  2 | FLOAT
-        age    |  3 | INT
-        age    |  4 | STR
-        born   |  5 | DT
-        friends|  6 | FK
-        address|  7 | FK
-      nickname |  8 | STR
+        age    |  1 | FLOAT
+        age    |  2 | INT
+        age    |  3 | STR
+        born   |  4 | DT
+        friends|  5 | FK
+        address|  6 | FK
+      nickname |  7 | STR
 
     ### Schemas
       1. Person (person), fields:
 
       name   | attr_id | required | unique | list | key
       -------|---------|----------|--------|------|----
-      name   |    1    |     +    |   +    |   -  |  + 
-      age    |    3    |     +    |   -    |   -  |  + 
-      born   |    5    |     -    |   -    |   -  |  - 
-      friends|    6    |     +    |   -    |   +  |  - 
-    nickname |    8    |     +    |   +    |   -  |  -
+      age    |    2    |     +    |   -    |   -  |  + 
+      born   |    4    |     -    |   -    |   -  |  - 
+      friends|    5    |     +    |   -    |   +  |  - 
+    nickname |    7    |     +    |   +    |   -  |  -
 
     ### Bound FKs
 
@@ -44,13 +42,12 @@ def populate_db(db: Session):
     ### Entities
       *Person*
 
-      id |  name  | age | born | friends | nickname
-      ---|--------|-----|------|---------|------
-      1  | Jack   | 10  |   -  |   []    | jack
-      2  | Jane   | 12  |   -  |   [1]   | jane
+      id |  name  | age | born | friends | nickname |
+      ---|--------|-----|------|---------|----------|
+      1  | Jack   | 10  |   -  |   []    | jack     |
+      2  | Jane   | 12  |   -  |   [1]   | jane     |
     
     '''
-    name = Attribute(name='name', type=AttrType.STR)
     age_float = Attribute(name='age', type=AttrType.FLOAT)
     age_int = Attribute(name='age', type=AttrType.INT)
     age_str = Attribute(name='age', type=AttrType.STR)
@@ -58,21 +55,12 @@ def populate_db(db: Session):
     friends = Attribute(name='friends', type=AttrType.FK)
     address = Attribute(name='address', type=AttrType.FK)
     nickname = Attribute(name='nickname', type=AttrType.STR)
-    db.add_all([name, age_float, age_int, age_str, born, friends, address, nickname])
+    db.add_all([age_float, age_int, age_str, born, friends, address, nickname])
 
     person = Schema(name='Person', slug='person')
     db.add(person)
     db.flush()
-
-    name_ = AttributeDefinition(
-        schema_id=person.id,
-        attribute_id=name.id,
-        required=True,
-        unique=True,
-        list=False,
-        key=True,
-        description='Name of this person'
-    )
+    
     age_ = AttributeDefinition(
         schema_id=person.id,
         attribute_id=age_int.id,
@@ -106,7 +94,7 @@ def populate_db(db: Session):
         list=False,
         key=False
     )
-    db.add_all([name_, age_, born_, friends_, nickname_])
+    db.add_all([age_, born_, friends_, nickname_])
     db.flush()
     bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
     db.add(bfk)
