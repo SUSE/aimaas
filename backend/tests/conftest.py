@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from ..models import *
 from ..config import settings as s
 
-from ..main import app, get_db
+# from ..main import app, get_db
 
 def populate_db(db: Session):
     '''Populates DB with following data:

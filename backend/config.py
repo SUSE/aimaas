@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     test_pg_user: Optional[str]
     test_pg_password:  Optional[str]
     test_pg_host:  Optional[str]
-    test_pg_port:  Optional[int]
+    test_pg_port:  Optional[int] = 5432
     test_pg_db:  Optional[str]
 
     class Config:
         env_file = '.env'
 
+
 settings = Settings()
-    
