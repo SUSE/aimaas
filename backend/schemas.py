@@ -1,9 +1,9 @@
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, Field
 
-from .models import AttrType
+from .models import AttrType, AttributeDefinition
 
 class AttrTypeMapping(Enum):
     STR = 'STR'
@@ -28,14 +28,22 @@ class AttributeDefinitionBase(BaseModel):
     key: bool
     description: Optional[str]
     bind_to_schema: Optional[int]
-    
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
 
 class AttrDefSchema(AttributeDefinitionBase):
-    attr_id: int
+    attr_id: int = Field(alias='attribute_id')
 
 
 class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
-    pass
+    @classmethod
+    def from_orm(cls, obj: Any):
+        if isinstance(obj, AttributeDefinition):
+            obj.type = obj.attribute.type.name
+            obj.name = obj.attribute.name
+        return super().from_orm(obj)
 
 
 class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
@@ -58,3 +66,40 @@ class SchemaUpdateSchema(BaseModel):
 
     update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
     add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+
+
+class SchemaBaseSchema(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
+
+
+class SchemaForListSchema(SchemaBaseSchema):
+    pass
+
+
+class SchemaDetailSchema(SchemaBaseSchema):
+    deleted: bool
+    attr_defs: List[AttrDefWithAttrDataSchema] = Field(alias='attributes')
+
+
+class AttributeSchema(BaseModel):
+    id: int
+    name: str
+    type: str
+
+    @validator('type', pre=True)
+    def convert_to_str(cls, v):
+        if isinstance(v, AttrType) or isinstance(v, AttrTypeMapping):
+            return v.name
+        elif isinstance(v, str):
+            return v
+        else:
+            raise ValueError('valid types for type field: str, AttrType, AttrTypeMapping')
+
+    class Config:
+        orm_mode = True
