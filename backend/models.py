@@ -104,13 +104,17 @@ class Schema(Base):
 
 class Entity(Base):
     __tablename__ = 'entities'
-
+    
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(128), nullable=False)
+    slug = Column(String(128), nullable=False)
     schema_id = Column(Integer, ForeignKey('schemas.id'))
     deleted = Column(Boolean, default=False)
 
     schema = relationship('Schema', back_populates='entities')
+
+    __table_args__ = (
+        UniqueConstraint('slug', 'schema_id'),
+    )
 
     def get(self, attr_name: str, db: Session) -> Union[Optional[Value], List[Value]]:
         attr_def: AttributeDefinition = db.execute(

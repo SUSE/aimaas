@@ -11,6 +11,13 @@ class SchemaExistsException(Exception):
     def __str__(self) -> str:
         return f'Schema with name `{self.name}` or slug `{self.slug}` already exists'
 
+class EntityExistsException(Exception):
+    def __init__(self, slug: str):
+        self.slug = slug
+
+    def __str__(self) -> str:
+        return f'Entity with slug `{self.slug}` already exists in this schema'
+
 class MissingObjectException(Exception):
     obj_type: str
 
