@@ -268,12 +268,8 @@ def get_entities(
     ) -> List[dict]:
     
     q = select(Entity).where(Entity.schema_id == schema.id)
-    if all:
-        pass
-    elif deleted_only:
-        q = q.where(Entity.deleted == True)
-    else:
-        q = q.where(Entity.deleted == False)
+    if not all:
+        q = q.where(Entity.deleted == deleted_only)
     entities = db.execute(q.offset(offset).limit(limit)).scalars().all()
 
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key]
