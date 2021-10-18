@@ -1,6 +1,6 @@
 from typing import Optional, List, Union
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from . import crud, schemas, exceptions
@@ -29,10 +29,10 @@ def get_schemas(all: Optional[bool] = False, deleted_only: Optional[bool] = Fals
 
 
 @router.post('/schemas', response_model=schemas.SchemaForListSchema)
-def create_schema(data: schemas.SchemaCreateSchema, db: Session = Depends(get_db)):
+def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db)):
     try:
         schema = crud.create_schema(db=db, data=data)
-        create_dynamic_router(schema=schema, app=router, get_db=get_db)
+        create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
         return schema
     except exceptions.SchemaExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
@@ -55,9 +55,11 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
 
 
 @router.put('/schemas/{id}', response_model=schemas.SchemaDetailSchema)
-def update_schema(data: schemas.SchemaUpdateSchema, id: int, db: Session = Depends(get_db)):
+def update_schema(data: schemas.SchemaUpdateSchema, id: int, request: Request, db: Session = Depends(get_db)):
     try:
-        return crud.update_schema(db=db, schema_id=id, data=data)
+        schema = crud.update_schema(db=db, schema_id=id, data=data)
+        create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
+        return schema
     except exceptions.MissingSchemaException:
         pass
     except exceptions.SchemaExistsException:
