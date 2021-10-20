@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 from typing import List, Optional, Union, Any
 
@@ -33,6 +34,7 @@ class AttributeDefinitionBase(BaseModel):
         orm_mode = True
         allow_population_by_field_name = True
 
+
 class AttrDefSchema(AttributeDefinitionBase):
     attr_id: int = Field(alias='attribute_id')
 
@@ -54,10 +56,18 @@ class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
     name: str
 
 
+def validate_slug(cls, slug: str):
+    if re.match('^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$', slug) is None:
+        raise ValueError(f'`{slug}` is invalid value for slug field')
+    return slug
+
+
 class SchemaCreateSchema(BaseModel):
     name: str
     slug: str
     attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+
+    slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
 
 class SchemaUpdateSchema(BaseModel):
@@ -67,11 +77,15 @@ class SchemaUpdateSchema(BaseModel):
     update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
     add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
 
+    slug_validator = validator('slug', allow_reuse=True)(validate_slug)
+
 
 class SchemaBaseSchema(BaseModel):
     id: int
     name: str
     slug: str
+
+    slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
     class Config:
         orm_mode = True
