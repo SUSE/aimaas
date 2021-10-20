@@ -31,7 +31,7 @@ def populate_db(db: Session):
       age    |    2    |     +    |   -    |   -  |  + 
       born   |    4    |     -    |   -    |   -  |  - 
       friends|    5    |     +    |   -    |   +  |  - 
-    nickname |    7    |     +    |   +    |   -  |  -
+    nickname |    7    |     -    |   +    |   -  |  -
 
     ### Bound FKs
 
@@ -89,7 +89,7 @@ def populate_db(db: Session):
     nickname_ = AttributeDefinition(
         schema_id=person.id,
         attribute_id=nickname.id,
-        required=True,
+        required=False,
         unique=True,
         list=False,
         key=False

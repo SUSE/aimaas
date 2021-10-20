@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import pydantic
 
 import pytest
@@ -25,7 +25,7 @@ class TestEntityCreate:
             'nickname': 'john',
             'age': 10,
             'friends': [p1.id, 1],
-            'born': born.timestamp()
+            'born': born
         }
         p2 = create_entity(dbsession, schema_id=1, data=p2)
 
@@ -173,7 +173,6 @@ class TestEntityCreate:
     def test_raise_on_required_field_not_provided(self, dbsession):
         p1 = {
             'slug': 'Mike',
-            'age': 10,
             'friends': [1]
         }
         with pytest.raises(RequiredFieldException):
@@ -273,7 +272,118 @@ class TestEntityRead:
 
 
 class TestEntityUpdate:
-    pass
+    def test_update(self, dbsession):
+        time = datetime.now()
+        data = {
+            'slug': 'test',
+            'nickname': None,
+            'born': time,
+            'friends': [1, 2],
+        }
+        update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+        e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
+        assert e.slug == 'test'
+        assert e.get('age', dbsession).value == 10
+        assert e.get('born', dbsession).value == time
+        assert [i.value for i in e.get('friends', dbsession)] == [1, 2]
+        assert e.get('nickname', dbsession) == None
+        nicknames = dbsession.execute(
+            select(ValueStr)
+            .where(Attribute.name == 'nickname')
+            .join(Attribute)
+        ).scalars().all()
+        assert len(nicknames) == 1, "nickname for entity 1 wasn't deleted from database"
+
+        data = {
+            'slug': 'test2',
+            'nickname': 'test'
+        }
+        update_entity(dbsession, slug_or_id='Jane', schema_id=1, data=data)
+        e = dbsession.execute(select(Entity).where(Entity.id == 2)).scalar()
+        assert e.slug == 'test2'
+        assert e.get('nickname', dbsession).value == 'test'
+        nicknames = dbsession.execute(
+            select(ValueStr)
+            .where(Attribute.name == 'nickname')
+            .join(Attribute)
+        ).scalars().all()
+        assert len(nicknames) == 1, "nickname for entity 2 wasn't deleted from database"
+
+    def test_raise_on_entity_doesnt_exist(self, dbsession):
+        with pytest.raises(MissingEntityException):
+            update_entity(dbsession, slug_or_id=9999, schema_id=1, data={})
+
+        with pytest.raises(MissingEntityException):
+            update_entity(dbsession, slug_or_id='qwertyuiop', schema_id=1, data={})
+
+        s = Schema(name='test', slug='test')
+        e = Entity(slug='test', schema=s)
+        dbsession.add_all([s, e])
+        dbsession.flush()
+        with pytest.raises(MissingEntityException):
+            update_entity(dbsession, slug_or_id='test', schema_id=1, data={})
+
+    def test_raise_on_schema_is_deleted(self, dbsession):
+        dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
+        with pytest.raises(MissingSchemaException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data={})
+
+    def test_raise_on_entity_already_exists(self, dbsession):
+        data = {'slug': 'Jane'}
+        with pytest.raises(EntityExistsException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_no_raise_on_changing_to_same_slug(self, dbsession):
+        data = {'slug': 'Jack'}
+        update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_raise_on_attribute_not_defined_on_schema(self, dbsession):
+        data = {'not_existing_attr': 50000}
+        with pytest.raises(AttributeNotDefinedException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+        dbsession.rollback()
+        
+        data = {'address': 1234}
+        with pytest.raises(AttributeNotDefinedException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+
+    def test_raise_on_deleting_required_value(self, dbsession):
+        data = {'age': None}
+        with pytest.raises(RequiredFieldException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_raise_on_passing_list_for_not_listed_attr(self, dbsession):
+        data = {'age': [1, 2, 3, 4, 5]}
+        with pytest.raises(NotListedAttributeException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_raise_on_fk_entity_doesnt_exist(self, dbsession):
+        data = {'friends': [9999999999]}
+        with pytest.raises(MissingEntityException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_raise_on_fk_entity_is_from_wrong_schema(self, dbsession):
+        s = Schema(name='test', slug='test')
+        e = Entity(slug='test', schema=s)
+        dbsession.add_all([s, e])
+        dbsession.flush()
+
+        data = {'friends': [e.id]}
+        with pytest.raises(WrongSchemaToBindException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_raise_on_non_unique_value(self, dbsession):
+        data = {'nickname': 'jane'}
+        with pytest.raises(UniqueValueException):
+            update_entity(dbsession, slug_or_id=1, schema_id=1, data=data)
+
+    def test_no_raise_on_non_unique_if_existing_is_deleted(self, dbsession):
+        dbsession.execute(update(Entity).where(Entity.slug == 'Jane').values(deleted=True))
+        data = {'nickname': 'jane'}
+        update_entity(dbsession, slug_or_id='Jack', schema_id=1, data=data)
+        e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
+        assert e.get('nickname', dbsession).value == 'jane'
 
 
 class TestEntityDelete:

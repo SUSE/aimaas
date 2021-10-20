@@ -1,8 +1,9 @@
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 import sqlalchemy
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
+from sqlalchemy.sql.expression import delete
 
 from .models import (
     AttrType,
@@ -11,6 +12,7 @@ from .models import (
     BoundFK,
     Entity,
     Schema,
+    Value
 )
 
 from .schemas import (
@@ -289,7 +291,51 @@ def get_entity(db: Session, entity_id: int, schema: Schema) -> dict:
     attrs = [i.attribute.name for i in schema.attr_defs]
     return _get_entity_data(db=db, entity=e, attr_names=attrs)
 
-        
+
+def _convert_values(attr_def: AttributeDefinition, value: Any, caster: Callable) -> List[Any]:
+    if isinstance(value, list):
+        if not attr_def.list:
+            raise NotListedAttributeException(attr_name=attr_def.attribute.name, schema_id=attr_def.schema_id)
+        return [caster(i) for i in value]
+    else:
+        return [caster(value)]
+
+
+def _check_fk_value(db: Session, attr_def: AttributeDefinition, entity_ids: List[int]):
+    bound_schema_id = db.execute(
+        select(BoundFK.schema_id)
+        .where(BoundFK.attr_def_id == attr_def.id)
+    ).scalar()
+    for id_ in entity_ids:
+        entity = db.execute(
+            select(Entity)
+            .where(Entity.id == id_)
+            .where(Entity.deleted == False)
+        ).scalar()
+        if entity is None:
+            raise MissingEntityException(obj_id=id_)
+        if entity.schema_id != bound_schema_id:
+            raise WrongSchemaToBindException(
+                attr_name=attr_def.attribute.name, 
+                schema_id=attr_def.schema_id, 
+                bound_schema_id=bound_schema_id, 
+                passed_entity=entity
+            )
+
+def _check_unique_value(db: Session, attr_def: AttributeDefinition, model: Value, value: Any):
+    existing = db.execute(
+        select(model)
+        .where(model.attribute_id == attr_def.attribute_id)
+        .where(Entity.schema_id == attr_def.schema_id)
+        .where(model.value == value)
+        .join(Entity, Entity.id == model.entity_id)
+    ).scalars().all()
+    if existing:
+        for val in existing:
+            if not val.entity.deleted:
+                raise UniqueValueException(attr_name=attr_def.attribute.name, schema_id=attr_def.schema_id, value=val.value)
+
+
 def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
     sch: Schema = db.execute(
         select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
@@ -318,55 +364,70 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         attr_def = attr_defs.get(field)
         if attr_def is None:
             raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
-        
+
         attr: Attribute = attr_def.attribute
         model, caster = attr.type.value
-        try:
-            if isinstance(value, list):
-                if not attr_def.list:
-                    raise NotListedAttributeException(attr_name=attr.name, schema_id=sch.id)
-                values = [caster(i) for i in value]
-            else:
-                values = [caster(value)]
-        except ValueError as e:
-            raise # can this even happen with validation done before?
-        
+        values = _convert_values(attr_def=attr_def, value=value, caster=caster)
         if attr.type == AttrType.FK:
-            bound_schema_id = db.execute(
-                select(BoundFK.schema_id)
-                .where(BoundFK.attr_def_id == attr_def.id)
-            ).scalar()
-            for id_ in values:
-                entity = db.execute(
-                    select(Entity)
-                    .where(Entity.id == id_)
-                    .where(Entity.deleted == False)
-                ).scalar()
-                if entity is None:
-                    raise MissingEntityException(obj_id=id_)
-                if entity.schema_id != bound_schema_id:
-                    raise WrongSchemaToBindException(
-                        attr_name=attr.name, 
-                        schema_id=sch.id, 
-                        bound_schema_id=bound_schema_id, 
-                        passed_entity=entity
-                    )
-
+            _check_fk_value(db=db, attr_def=attr_def, entity_ids=values)
         if attr_def.unique and not attr_def.list:
-            existing = db.execute(
-                select(model)
-                .where(model.attribute_id == attr.id)
-                .where(Entity.schema_id == schema_id)
-                .where(model.value == values[0])
-                .join(Entity, Entity.id == model.entity_id)
-            ).scalars().all()
-            if existing:
-                for val in existing:
-                    if not val.entity.deleted:
-                        raise UniqueValueException(attr_name=attr.name, schema_id=sch.id, value=val.value)
+            _check_unique_value(db=db, attr_def=attr_def, model=model, value=values[0])
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
+    db.commit()
+    return e
+
+
+def update_entity(db: Session, slug_or_id: Union[str, int], schema_id: int, data: dict) -> Entity:
+    q = select(Entity).where(Entity.schema_id == schema_id)
+    q = q.where(Entity.id == slug_or_id) if isinstance(slug_or_id, int) else q.where(Entity.slug == slug_or_id)
+    e = db.execute(q).scalar()
+    if e is None:
+        raise MissingEntityException(obj_id=slug_or_id)
+    if e.schema.deleted:
+        raise MissingSchemaException(obj_id=e.schema.id)
+    
+    slug = data.pop('slug', e.slug)
+    try:
+        db.execute(update(Entity).where(Entity.id == e.id).values(slug=slug))
+    except sqlalchemy.exc.IntegrityError:
+        db.rollback()
+        raise EntityExistsException(slug=slug)
+
+    attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in e.schema.attr_defs}
+    for field, value in data.items():
+        attr_def = attr_defs.get(field)
+        if attr_def is None:
+            raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
+        
+        attr: Attribute = attr_def.attribute
+        model, caster = attr.type.value
+        if value is None:
+            if attr_def.required:
+                raise RequiredFieldException(field=field)
+            db.execute(
+                delete(model)
+                .where(model.entity_id == e.id)
+                .where(model.attribute_id == attr_def.attribute_id)
+            )
+            continue
+        
+        values = _convert_values(attr_def=attr_def, value=value, caster=caster)
+        if attr.type == AttrType.FK:
+            _check_fk_value(db=db, attr_def=attr_def, entity_ids=values)
+        if attr_def.unique and not attr_def.list:
+            _check_unique_value(db=db, attr_def=attr_def, model=model, value=values[0])
+        
+        db.execute(
+            delete(model)
+            .where(model.entity_id == e.id)
+            .where(model.attribute_id == attr_def.attribute_id)
+        )
+        for val in values:
+            v = model(value=val, entity_id=e.id, attribute_id=attr.id)
+            db.add(v)
+
     db.commit()
     return e
 

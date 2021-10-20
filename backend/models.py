@@ -70,7 +70,7 @@ class AttrType(enum.Enum):
     INT = Mapping(ValueInt, int)
     FLOAT = Mapping(ValueFloat, float)
     FK = Mapping(ValueForeignKey, int)
-    DT = Mapping(ValueDatetime, datetime.fromtimestamp)
+    DT = Mapping(ValueDatetime, lambda x: x)
 
 
 class BoundFK(Base):
