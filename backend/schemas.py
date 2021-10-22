@@ -117,3 +117,12 @@ class AttributeSchema(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class EntityBaseSchema(BaseModel):
+    id: int
+    slug: str
+    
+    slug_validator = validator('slug', allow_reuse=True)(validate_slug)
+    class Config:
+        orm_mode = True

@@ -1,6 +1,6 @@
 from typing import Optional, List, Union
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 
 from . import crud, schemas, exceptions
@@ -10,12 +10,20 @@ from .dynamic_routes import create_dynamic_router
 
 router = APIRouter()
 
-@router.get('/attributes', response_model=List[schemas.AttributeSchema])
+@router.get(
+    '/attributes', 
+    response_model=List[schemas.AttributeSchema],
+    tags=['General routes']
+)
 def get_attributes(db: Session = Depends(get_db)):
     return crud.get_attributes(db)
 
 
-@router.get('/attributes/{attr_id}', response_model=schemas.AttributeSchema)
+@router.get(
+    '/attributes/{attr_id}', 
+    response_model=schemas.AttributeSchema,
+    tags=['General routes']
+)
 def get_attribute(attr_id: int, db: Session = Depends(get_db)):
     try:
         return crud.get_attribute(db=db, attr_id=attr_id)
@@ -23,12 +31,24 @@ def get_attribute(attr_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-@router.get('/schemas', response_model=List[schemas.SchemaForListSchema])
-def get_schemas(all: Optional[bool] = False, deleted_only: Optional[bool] = False, db: Session = Depends(get_db)):
+@router.get(
+    '/schemas', 
+    response_model=List[schemas.SchemaForListSchema],
+    tags=['General routes']
+)
+def get_schemas(
+    all: Optional[bool] = Query(False, description='If true, returns both deleted and not deleted schemas'), 
+    deleted_only: Optional[bool] = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
+    db: Session = Depends(get_db)
+):
     return crud.get_schemas(db=db, all=all, deleted_only=deleted_only)
 
 
-@router.post('/schemas', response_model=schemas.SchemaForListSchema)
+@router.post(
+    '/schemas', 
+    response_model=schemas.SchemaForListSchema,
+    tags=['General routes']
+)
 def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db)):
     try:
         schema = crud.create_schema(db=db, data=data)
@@ -46,33 +66,43 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-@router.get('/schemas/{id_or_slug}', response_model=schemas.SchemaDetailSchema)
+@router.get(
+    '/schemas/{id_or_slug}', 
+    response_model=schemas.SchemaDetailSchema,
+    tags=['General routes']
+)
 def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
     try:
         return crud.get_schema(db=db, id_or_slug=id_or_slug)
-    except exceptions.MissingSchemaException:
-        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    except exceptions.MissingSchemaException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-@router.put('/schemas/{id}', response_model=schemas.SchemaDetailSchema)
-def update_schema(data: schemas.SchemaUpdateSchema, id: int, request: Request, db: Session = Depends(get_db)):
+@router.put(
+    '/schemas/{id_or_slug}', 
+    response_model=schemas.SchemaDetailSchema,
+    tags=['General routes']
+)
+def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str], request: Request, db: Session = Depends(get_db)):
     try:
-        schema = crud.update_schema(db=db, schema_id=id, data=data)
+        schema = crud.update_schema(db=db, id_or_slug=id_or_slug, data=data)
         create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
         return schema
-    except exceptions.MissingSchemaException:
-        pass
-    except exceptions.SchemaExistsException:
-        pass
-    except exceptions.AttributeNotDefinedException:
-        pass
-    except exceptions.ListedToUnlistedException:
-        pass
-    except exceptions.MultipleAttributeOccurencesException:
-        pass
-    except exceptions.AttributeAlreadyDefinedException:
-        pass
-    except exceptions.NoSchemaToBindException:
-        pass
+    except exceptions.MissingAttributeException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingSchemaException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.SchemaExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.AttributeNotDefinedException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.ListedToUnlistedException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.MultipleAttributeOccurencesException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.AttributeAlreadyDefinedException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.NoSchemaToBindException as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
        
 

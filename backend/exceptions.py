@@ -58,7 +58,7 @@ class WrongSchemaToBindException(Exception):
         self.passed_entity = passed_entity
 
     def __str__(self) -> str:
-        return f'Attribute `f{self.attr_name}` defined on schema ({self.schema_id}) is bound to schema ({self.bound_schema_id}); got instead entity ({self.passed_entity.id}) from schema ({self.passed_entity.schema_id})'
+        return f'Attribute `{self.attr_name}` defined on schema ({self.schema_id}) is bound to schema ({self.bound_schema_id}); got instead entity ({self.passed_entity.id}) from schema ({self.passed_entity.schema_id})'
 
 class AttributeAlreadyDefinedException(Exception):
     def __init__(self, attr_id: int, schema_id: int):
