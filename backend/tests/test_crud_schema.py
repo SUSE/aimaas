@@ -150,6 +150,12 @@ class TestSchemaCreate:
         assert not attr_def.list
         assert attr_def.description == 'Test 1'
 
+    def test_raise_on_reserved_slug(self, dbsession):
+        for i in RESERVED_SCHEMA_SLUGS:
+            sch = SchemaCreateSchema(name='Person', slug=i, attributes=[])
+            with pytest.raises(ReservedSchemaSlugException):
+                create_schema(dbsession, data=sch)
+
     def test_raise_on_duplicate_name_or_slug(self, dbsession):
         sch = SchemaCreateSchema(name='Person', slug='test', attributes=[])
         with pytest.raises(SchemaExistsException):
@@ -492,7 +498,18 @@ class TestSchemaUpdate:
             .where(BoundFK.attr_def_id == test_def.id)
         ).scalar()
         assert bfk
-    
+
+    def test_raise_on_reserved_slig(self, dbsession):
+        for i in RESERVED_SCHEMA_SLUGS:
+            upd_schema = SchemaUpdateSchema(
+                name='Test', 
+                slug=i, 
+                update_attributes=[], 
+                add_attributes=[]
+            )
+            with pytest.raises(ReservedSchemaSlugException):
+                update_schema(dbsession, id_or_slug=1, data=upd_schema)
+
     def test_raise_on_schema_doesnt_exist(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 

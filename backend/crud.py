@@ -27,6 +27,7 @@ from .exceptions import *
 
 
 RESERVED_ATTR_NAMES = ['id', 'slug', 'deleted', 'name']
+RESERVED_SCHEMA_SLUGS = ['schemas', 'attributes']
 
 
 def get_attributes(db: Session) -> List[Attribute]:
@@ -84,6 +85,8 @@ def get_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
 
 
 def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
+    if data.slug in RESERVED_SCHEMA_SLUGS:
+        raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
     try:
         sch = Schema(name=data.name, slug=data.slug)
         db.add(sch)
@@ -158,6 +161,9 @@ def delete_schema(db: Session, schema_id: int) -> Schema:
 
 
 def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema) -> Schema:
+    if data.slug in RESERVED_SCHEMA_SLUGS:
+        raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
+    
     q = select(Schema).where(Schema.deleted == False)
     if isinstance(id_or_slug, int):
         q = q.where(Schema.id == id_or_slug)

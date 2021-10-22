@@ -125,3 +125,12 @@ class ReservedAttributeException(Exception):
 
     def __str__(self) -> str:
         return f"Can't create attribute `{self.attr_name}`. List of reserved attribute names: {', '.join(self.reserved)}"
+
+
+class ReservedSchemaSlugException(Exception):
+    def __init__(self, slug: str, reserved: List[str]):
+        self.slug = slug
+        self.reserved = reserved
+
+    def __str__(self) -> str:
+        return f"Can't create schema with slug `{self.slug}`. List of reserved schema slugs: {', '.join(self.reserved)}"

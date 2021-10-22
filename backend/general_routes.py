@@ -54,6 +54,8 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
         schema = crud.create_schema(db=db, data=data)
         create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
         return schema
+    except exceptions.ReservedSchemaSlugException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.SchemaExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingAttributeException as e:
@@ -89,6 +91,8 @@ def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str],
         schema = crud.update_schema(db=db, id_or_slug=id_or_slug, data=data)
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
         return schema
+    except exceptions.ReservedSchemaSlugException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingAttributeException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except exceptions.MissingSchemaException as e:

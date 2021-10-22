@@ -2,6 +2,8 @@ from typing import List
 
 from sqlalchemy import update
 
+from backend.crud import RESERVED_SCHEMA_SLUGS
+
 from ..models import *
 
 
@@ -268,6 +270,17 @@ class TestRouteSchemaCreate:
         assert all([attr_def.required, attr_def.unique, attr_def.key])
         assert not attr_def.list
         assert attr_def.description == 'Test 1'
+
+    def test_raise_on_reserved_slug(self, dbsession, client):
+        for i in RESERVED_SCHEMA_SLUGS:
+            data = {
+                'name': 'Person',
+                'slug': i,
+                'attributes': []
+            }
+            response = client.post('/schemas', json=data)
+            assert response.status_code == 409
+            assert "Can't create schema with slug" in response.json()['detail']
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession, client):
         data = {
@@ -803,6 +816,17 @@ class TestRouteSchemaUpdate:
         ).scalar()
         assert bfk
 
+    def test_raise_on_reserved_slug(self, dbsession, client):
+        for i in RESERVED_SCHEMA_SLUGS:
+            data = {
+                'name': 'Person',
+                'slug': i,
+                'update_attributes': [],
+                'add_attributes': []
+            }
+            response = client.put('/schemas/1', json=data)
+            assert response.status_code == 409
+            assert "Can't create schema with slug" in response.json()['detail']
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, client):
         data = {
