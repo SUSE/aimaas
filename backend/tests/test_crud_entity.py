@@ -13,6 +13,7 @@ class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30)
         p1 = {
+            'name': 'Mike',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -20,6 +21,7 @@ class TestEntityCreate:
         }
         p1 = create_entity(dbsession, schema_id=1, data=p1)
         p2 = {
+            'name': 'John',
             'slug': 'John',
             'nickname': 'john',
             'age': 10,
@@ -30,6 +32,7 @@ class TestEntityCreate:
 
         persons = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
         assert len(persons) == 4
+        assert persons[-1].name == 'John'
         assert persons[-1].slug == 'John'
         assert persons[-1].get('nickname', dbsession).value == 'john'
         assert persons[-1].get('age', dbsession).value == 10
@@ -39,6 +42,7 @@ class TestEntityCreate:
     
     def test_raise_on_non_unique_slug(self, dbsession):
         p1 = {
+            'name': 'Jack',
             'slug': 'Jack', 
             'nickname': 'test',
             'age': 10,
@@ -52,11 +56,12 @@ class TestEntityCreate:
         dbsession.add(s)
         dbsession.flush()
 
-        data = {'slug': 'Jack'}
+        data = {'slug': 'Jack', 'name': 'Jack'}
         create_entity(dbsession, schema_id=s.id, data=data)
 
     def test_raise_on_non_unique_field(self, dbsession):
         p1 = {
+            'name': 'Jack',
             'slug': 'Jake', 
             'nickname': 'jack',  # <-- already exists in db
             'age': 10,
@@ -71,6 +76,7 @@ class TestEntityCreate:
 
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         p1 = {
+            'name': 'Jack',
             'slug': 'Jackie',  
             'nickname': 'jack', # <-- already exists in db, but for deleted entity
             'age': 10,
@@ -83,6 +89,7 @@ class TestEntityCreate:
 
     def test_raise_on_schema_doesnt_exist(self, dbsession):
         p = {
+            'name': 'somename',
             'slug': 'Some Name',
             'nickname': 'somename',
             'age': 10,
@@ -93,7 +100,8 @@ class TestEntityCreate:
 
     def test_raise_on_attr_doesnt_exist(self, dbsession):
         p = {
-            'slug': 'Some name',
+            'name': 'somename',
+            'slug': 'SomeName',
             'nickname': 'somename',
             'age': 10,
             'friends': [1],
@@ -104,7 +112,8 @@ class TestEntityCreate:
 
     def test_raise_on_value_cast(self, dbsession):
         p = {
-            'slug': 'Some name',
+            'name': 'somename',
+            'slug': 'SomeName',
             'nickname': 'somename',
             'age': 'INVALID VALUE',
             'friends': [1],
@@ -114,7 +123,8 @@ class TestEntityCreate:
 
     def test_raise_on_passed_list_for_single_value_attr(self, dbsession):
         p = {
-            'slug': 'Some name',
+            'name': 'somename',
+            'slug': 'Somename',
             'nickname': 'somename',
             'age': [1, 2, 3],
             'friends': [1],
@@ -124,6 +134,7 @@ class TestEntityCreate:
 
     def test_raise_on_fk_entity_doesnt_exist(self, dbsession):
         p1 = {
+            'name': 'mike',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -135,6 +146,7 @@ class TestEntityCreate:
     def test_raise_on_fk_entity_is_deleted(self, dbsession):
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         p1 = {
+            'name': 'mike',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -147,11 +159,12 @@ class TestEntityCreate:
         schema = Schema(name='Test', slug='test')
         dbsession.add(schema)
         dbsession.flush()
-        entity = Entity(schema_id=schema.id, slug='test')
+        entity = Entity(schema_id=schema.id, slug='test', name='test')
         dbsession.add(entity)
         dbsession.flush()
 
         p1 = {
+            'name': 'mike',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -172,6 +185,7 @@ class TestEntityCreate:
     def test_raise_on_required_field_not_provided(self, dbsession):
         p1 = {
             'slug': 'Mike',
+            'name': 'mike',
             'friends': [1]
         }
         with pytest.raises(RequiredFieldException):
@@ -183,6 +197,7 @@ class TestEntityRead:
         jack = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         expected = {
             'id': jack.id,
+            'name': jack.name,
             'slug': jack.slug,
             'deleted': jack.deleted,
             'age': 10,
@@ -209,7 +224,7 @@ class TestEntityRead:
 
     def test_get_entities(self, dbsession):
         # test default behavior: return not deleted entities
-        e = Entity(slug='Test', schema_id=1, deleted=True)
+        e = Entity(slug='Test', name='test', schema_id=1, deleted=True)
         dbsession.add(e)
         dbsession.flush()
 
@@ -218,7 +233,7 @@ class TestEntityRead:
         
         assert len(ents) == 2
 
-        default_field_list = {'id', 'slug', 'deleted', 'age'}
+        default_field_list = {'id', 'slug', 'deleted', 'age', 'name'}
         ent = ents[1]
         assert set(ent.keys()) == default_field_list
         assert ent['id'] == 2
@@ -252,6 +267,7 @@ class TestEntityRead:
         ent = ents[1]
         assert ent['id'] == 2
         assert ent['slug'] == 'Jane'
+        assert ent['name'] == 'Jane'
         assert ent['deleted'] == False
         assert ent['age'] == 12
         assert ent['born'] == None
@@ -319,7 +335,7 @@ class TestEntityUpdate:
             update_entity(dbsession, id_or_slug='qwertyuiop', schema_id=1, data={})
 
         s = Schema(name='test', slug='test')
-        e = Entity(slug='test', schema=s)
+        e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([s, e])
         dbsession.flush()
         with pytest.raises(MissingEntityException):
@@ -366,7 +382,7 @@ class TestEntityUpdate:
 
     def test_raise_on_fk_entity_is_from_wrong_schema(self, dbsession):
         s = Schema(name='test', slug='test')
-        e = Entity(slug='test', schema=s)
+        e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([s, e])
         dbsession.flush()
 

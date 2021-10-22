@@ -42,10 +42,10 @@ def populate_db(db: Session):
     ### Entities
       *Person*
 
-      id |  slug  | age | born | friends | nickname |
-      ---|--------|-----|------|---------|----------|
-      1  | Jack   | 10  |   -  |   []    | jack     |
-      2  | Jane   | 12  |   -  |   [1]   | jane     |
+      id |  slug  | age | born | friends | nickname | name
+      ---|--------|-----|------|---------|----------|-----
+      1  | Jack   | 10  |   -  |   []    | jack     | Jack
+      2  | Jane   | 12  |   -  |   [1]   | jane     | Jane
     
     '''
     age_float = Attribute(name='age', type=AttrType.FLOAT)
@@ -99,13 +99,13 @@ def populate_db(db: Session):
     bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
     db.add(bfk)
 
-    p1 = Entity(schema_id=person.id, slug='Jack')
+    p1 = Entity(schema_id=person.id, slug='Jack', name='Jack')
     db.add(p1)
     db.flush()
     p1_nickname = ValueStr(entity_id=p1.id, attribute_id=nickname.id, value='jack')
     p1_age = ValueInt(entity_id=p1.id, attribute_id=age_int.id, value=10)
 
-    p2 = Entity(schema_id=person.id, slug='Jane')
+    p2 = Entity(schema_id=person.id, slug='Jane', name='Jane')
     db.add(p2)
     db.flush()
     p2_nickname = ValueStr(entity_id=p2.id, attribute_id=nickname.id, value='jane')

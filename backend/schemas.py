@@ -122,6 +122,7 @@ class AttributeSchema(BaseModel):
 class EntityBaseSchema(BaseModel):
     id: int
     slug: str
+    name: str
     
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
     class Config:

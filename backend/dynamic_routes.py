@@ -29,7 +29,7 @@ def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
 
     Model includes all entity attributes, which are all marked as `Optional`,
     and their descriptions, if defined in `AttributeDefinition`.
-    Also includes fields `id`, `slug` and `deleted`.
+    Also includes fields `id`, `slug`, `name` and `deleted`.
 
     Why attributes are `Optional`: currently, if we add new requried
     field to schema, which already holds some entities, values for this
@@ -48,7 +48,8 @@ def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
     default_fields = {
         'id': (int, Field(description='ID of this entity')),
         'deleted': (bool, Field(description='Indicates whether this entity is marked as deleted')),
-        'slug': (str, Field(description='Slug for this entity'))
+        'slug': (str, Field(description='Slug for this entity')),
+        'name': (str, Field(description='Name of this entity'))
     }
     model = create_model(
         name,
@@ -150,7 +151,8 @@ def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
 
     Model includes all entity attributes, which are marked as `Optional`
     if defined so in `AttributeDefinition`,
-    plus required `slug` field with custom validator for it.
+    plus required `slug` field with custom validator for it and required
+    `name` field.
 
     This model will raise exception if passed fields that don't
     belong to it.
@@ -166,6 +168,7 @@ def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
         f"{schema.slug.capitalize().replace('-', '_')}Create",
         **fields_types,
         slug=(str, Field(description='Slug of this entity')),
+        name=(str, Field(description='Name of this entity')),
         __config__=Config,
         __validators__={'slug_validator': validator('slug', allow_reuse=True)(schemas.validate_slug)}
     )
@@ -229,7 +232,8 @@ def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
 
     Model includes all entity attributes as `Optional` fields,
     with descriptions taken from `AttributeDefinition`,
-    plus `Optional` `slug` field with custom validator for it.
+    plus `Optional` `slug` field with custom validator for it
+    and `Optional` `name` field.
 
     This model will raise exception if passed fields that don't
     belong to it.
@@ -245,6 +249,7 @@ def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
         f"{schema.slug.capitalize().replace('-', '_')}Update",
         **fields_types,
         slug=(Optional[str], Field(description='Slug of this entity')),
+        name=(Optional[str], Field(description='Name of this entity')),
         __config__=Config,
         __validators__={'slug_validator': validator('slug', allow_reuse=True)(schemas.validate_slug)}
     )

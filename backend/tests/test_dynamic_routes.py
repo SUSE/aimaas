@@ -33,6 +33,7 @@ class TestRouteGetEntity:
         data = {
             'id': 1,
             'slug': 'Jack',
+            'name': 'Jack',
             'deleted': False,
             'age': 10,
             'friends': [],
@@ -54,7 +55,7 @@ class TestRouteGetEntity:
 
     def test_raise_on_entity_doesnt_belong_to_schema(self, dbsession, client):
         s = Schema(name='test', slug='test')
-        e = Entity(slug='test', schema=s)
+        e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([e, s])
         dbsession.commit()
         
@@ -65,8 +66,8 @@ class TestRouteGetEntity:
 class TestRouteGetEntities:
     def test_get_entities(self, dbsession, client):
         data = [
-            {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack'}, 
-            {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane'}
+            {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}, 
+            {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
         ]
         response = client.get(f'/person/')
         assert response.status_code == 200
@@ -76,7 +77,7 @@ class TestRouteGetEntities:
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.commit()
 
-        data = [{'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane'}]
+        data = [{'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}]
         response = client.get(f'/person?deleted_only=True')
         assert response.status_code == 200
         assert response.json() == data
@@ -86,8 +87,8 @@ class TestRouteGetEntities:
         dbsession.commit()
 
         data = [
-            {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack'}, 
-            {'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane'}
+            {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}, 
+            {'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}
         ]
         response = client.get(f'/person?all=True')
         assert response.status_code == 200
@@ -106,7 +107,8 @@ class TestRouteGetEntities:
                 'nickname': 'jack', 
                 'id': 1, 
                 'deleted': False, 
-                'slug': 'Jack'
+                'slug': 'Jack',
+                'name': 'Jack'
             }, 
             {
                 'age': 12, 
@@ -114,7 +116,8 @@ class TestRouteGetEntities:
                 'friends': [1], 
                 'nickname': 'jane', 
                 'id': 2, 'deleted': False, 
-                'slug': 'Jane'
+                'slug': 'Jane', 
+                'name': 'Jane'
              }
         ]
         response = client.get(f'/person?all_fields=True')
@@ -122,8 +125,8 @@ class TestRouteGetEntities:
         assert response.json() == data
 
     def test_offset_and_limit(self, dbsession, client):
-        jack = {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack'}
-        jane = {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane'}
+        jack = {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}
+        jane = {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
 
         response = client.get(f'/person?limit=1')
         assert response.status_code == 200
@@ -141,13 +144,14 @@ class TestRouteGetEntities:
 class TestRouteCreateEntity:
     def test_create(self, dbsession, client):
         p1 = {
+            'name': 'mike',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
             'friends': [],
         }
         response = client.post(f'/person', json=p1)
-        assert response.json() == {'id': 3, 'slug': 'Mike'}
+        assert response.json() == {'id': 3, 'slug': 'Mike', 'name': 'mike'}
         
         mike = dbsession.execute(select(Entity).where(Entity.id == 3)).scalar()
         assert mike.get('nickname', dbsession).value == 'mike'
@@ -155,6 +159,7 @@ class TestRouteCreateEntity:
         assert mike.get('friends', dbsession) == []
 
         p2 = {
+            'name': 'john',
             'slug': 'John',
             'nickname': 'john',
             'age': 10,
@@ -162,7 +167,7 @@ class TestRouteCreateEntity:
             'born': '2021-10-20T13:52:17'
         }
         response = client.post(f'/person', json=p2)
-        assert response.json() == {'id': 4, 'slug': 'John'}
+        assert response.json() == {'id': 4, 'slug': 'John', 'name': 'john'}
 
         john = dbsession.execute(select(Entity).where(Entity.id == 4)).scalar()
         assert john.get('nickname', dbsession).value == 'john'
@@ -172,6 +177,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_non_unique_slug(self, dbsession, client):
         p1 = {
+            'name': 'name',
             'slug': 'Jack', 
             'nickname': 'test',
             'age': 10,
@@ -189,7 +195,7 @@ class TestRouteCreateEntity:
         from .conftest import client_
         client = client_(engine=dbsession.get_bind())
 
-        data = {'slug': 'Jack'}
+        data = {'slug': 'Jack', 'name': 'name'}
         response = client.post(f'/test', json=data)
         assert response.status_code == 200
 
@@ -206,6 +212,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_non_unique_field(self, dbsession, client):
         p1 = {
+            'name': 'name',
             'slug': 'Jake', 
             'nickname': 'jack',  # <-- already exists in db
             'age': 10,
@@ -223,6 +230,7 @@ class TestRouteCreateEntity:
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         dbsession.commit()
         p1 = {
+            'name': 'name',
             'slug': 'Jackie',  
             'nickname': 'jack', # <-- already exists in db, but for deleted entity
             'age': 10,
@@ -233,6 +241,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_attr_doesnt_exist(self, dbsession, client):
         p = {
+            'name': 'name',
             'slug': 'SomeName',
             'nickname': 'somename',
             'age': 10,
@@ -245,6 +254,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_value_cast(self, dbsession, client):
         p = {
+            'name': 'name',
             'slug': 'SomeName',
             'nickname': 'somename',
             'age': 'INVALID VALUE',
@@ -256,6 +266,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_passed_list_for_single_value_attr(self, dbsession, client):
         p = {
+            'name': 'name',
             'slug': 'Some name',
             'nickname': 'somename',
             'age': [1, 2, 3],
@@ -267,6 +278,7 @@ class TestRouteCreateEntity:
 
     def test_raise_on_fk_entity_doesnt_exist(self, dbsession, client):
         p1 = {
+            'name': 'name',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -280,6 +292,7 @@ class TestRouteCreateEntity:
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         dbsession.commit()
         p1 = {
+            'name': 'name',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -291,11 +304,12 @@ class TestRouteCreateEntity:
 
     def test_raise_on_fk_entity_from_wrong_schema(self, dbsession, client):
         schema = Schema(name='Test', slug='test')
-        entity = Entity(schema=schema, slug='test')
+        entity = Entity(schema=schema, slug='test', name='test')
         dbsession.add_all([schema, entity])
         dbsession.commit()
 
         p1 = {
+            'name': 'name',
             'slug': 'Mike',
             'nickname': 'mike',
             'age': 10,
@@ -329,6 +343,7 @@ class TestRouteUpdateEntity:
     def test_update(self, dbsession, client):
         time = datetime.now()
         data = {
+            'name': 'test',
             'slug': 'test',
             'nickname': None,
             'born': '2021-10-20T13:52:17',
@@ -336,9 +351,10 @@ class TestRouteUpdateEntity:
         }
         response = client.put('person/1', json=data)
         assert response.status_code == 200
-        assert response.json() == {'id': 1, 'slug': 'test'}
+        assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test'}
 
         e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
+        assert e.name == 'test'
         assert e.slug == 'test'
         assert e.get('age', dbsession).value == 10
         assert e.get('born', dbsession).value == datetime(2021, 10, 20, 13, 52, 17)
@@ -357,10 +373,11 @@ class TestRouteUpdateEntity:
         }
         response = client.put('person/Jane', json=data)
         assert response.status_code == 200
-        assert response.json() == {'id': 2, 'slug': 'test2'}
+        assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane'}
         
         e = dbsession.execute(select(Entity).where(Entity.id == 2)).scalar()
         assert e.slug == 'test2'
+        assert e.name == 'Jane'
         assert e.get('nickname', dbsession).value == 'test'
         nicknames = dbsession.execute(
             select(ValueStr)
@@ -379,7 +396,7 @@ class TestRouteUpdateEntity:
         assert "doesn't exist or was deleted" in response.json()['detail']
         
         s = Schema(name='test', slug='test')
-        e = Entity(slug='test', schema=s)
+        e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([s, e])
         dbsession.commit()
         response = client.put('person/test', json={})
@@ -443,7 +460,7 @@ class TestRouteUpdateEntity:
 
     def test_raise_on_fk_entity_is_from_wrong_schema(self, dbsession, client):
         s = Schema(name='test', slug='test')
-        e = Entity(slug='test', schema=s)
+        e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([s, e])
         dbsession.commit()
         

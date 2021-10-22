@@ -106,6 +106,7 @@ class Entity(Base):
     __tablename__ = 'entities'
     
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
     slug = Column(String(128), nullable=False)
     schema_id = Column(Integer, ForeignKey('schemas.id'))
     deleted = Column(Boolean, default=False)

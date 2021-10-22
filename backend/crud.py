@@ -26,7 +26,7 @@ from .schemas import (
 from .exceptions import *
 
 
-RESERVED_ATTR_NAMES = ['id', 'slug', 'deleted']
+RESERVED_ATTR_NAMES = ['id', 'slug', 'deleted', 'name']
 
 
 def get_attributes(db: Session) -> List[Attribute]:
@@ -256,7 +256,7 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
 
 
 def _get_entity_data(db: Session, entity: Entity, attr_names: List[str]) -> Dict[str, Any]:
-    data = {'id': entity.id, 'slug': entity.slug, 'deleted': entity.deleted}
+    data = {'id': entity.id, 'slug': entity.slug, 'deleted': entity.deleted, 'name': entity.name}
     for attr in attr_names:
         val_obj = entity.get(attr, db)
         try:
@@ -357,6 +357,10 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         slug = data.pop('slug')
     except KeyError:
         raise RequiredFieldException(field='slug')
+    try:
+        name = data.pop('name')
+    except KeyError:
+        raise RequiredFieldException(field='name')
 
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
     required = [i for i in attr_defs if attr_defs[i].required]
@@ -364,7 +368,7 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         if i not in data:
             raise RequiredFieldException(field=i)
 
-    e = Entity(schema_id=schema_id, slug=slug)
+    e = Entity(schema_id=schema_id, slug=slug, name=name)
     db.add(e)
     try:
         db.flush()
@@ -400,8 +404,9 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
         raise MissingSchemaException(obj_id=e.schema.id)
     
     slug = data.pop('slug', e.slug)
+    name = data.pop('name', e.name)
     try:
-        db.execute(update(Entity).where(Entity.id == e.id).values(slug=slug))
+        db.execute(update(Entity).where(Entity.id == e.id).values(slug=slug, name=name))
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise EntityExistsException(slug=slug)
