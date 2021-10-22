@@ -540,6 +540,9 @@ class TestRouteSchemaUpdate:
         response = client.put('/schemas/1', json=data)
         assert response.status_code == 200
         assert response.json() == result
+        routes = [i.path for i in client.app.routes]
+        assert '/test' in routes
+        assert '/person' not in routes
 
         dbsession.expire_all()
         age_def = dbsession.execute(

@@ -311,5 +311,13 @@ def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable):
     route_create_entity(router=router, schema=schema, get_db=get_db)
     route_update_entity(router=router, schema=schema, get_db=get_db)
 
+    router_routes = [(r.path, r.methods) for r in router.routes]
+    routes_to_remove = []
+    for route in app.routes:
+        if (route.path, route.methods) in router_routes:
+            routes_to_remove.append(route)
+    for route in routes_to_remove:
+        app.routes.remove(route)
+
     app.include_router(router, prefix='')
     app.openapi_schema = None
