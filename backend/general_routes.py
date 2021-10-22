@@ -85,8 +85,9 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
 )
 def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str], request: Request, db: Session = Depends(get_db)):
     try:
+        old_slug = crud.get_schema(db=db, id_or_slug=id_or_slug).slug
         schema = crud.update_schema(db=db, id_or_slug=id_or_slug, data=data)
-        create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
+        create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
         return schema
     except exceptions.MissingAttributeException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))

@@ -303,7 +303,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) 
 
 
-def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable):
+def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable, old_slug: str = None):
     router = APIRouter()
     
     route_get_entity(router=router, schema=schema, get_db=get_db)
@@ -315,6 +315,8 @@ def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable):
     routes_to_remove = []
     for route in app.routes:
         if (route.path, route.methods) in router_routes:
+            routes_to_remove.append(route)
+        elif old_slug and (route.path.startswith(f'/{old_slug}/') or route.path == f'/{old_slug}'):
             routes_to_remove.append(route)
     for route in routes_to_remove:
         app.routes.remove(route)

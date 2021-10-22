@@ -173,6 +173,8 @@ class TestRouteSchemaCreate:
         response = client.post('/schemas', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 2, 'name': 'Car', 'slug': 'car'}
+        assert '/car' in [i.path for i in client.app.routes]
+
 
         car = dbsession.execute(select(Schema).where(Schema.name == 'Car')).scalar()
         assert car is not None and car.id == 2 and car.slug == 'car'
