@@ -288,12 +288,16 @@ def get_entities(
     return data
 
 
-def get_entity(db: Session, entity_id: int, schema: Schema) -> dict:
-    e = db.execute(select(Entity).where(Entity.id == entity_id)).scalar()
+def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:
+    if isinstance(id_or_slug, int):
+        e = db.execute(select(Entity).where(Entity.id == id_or_slug)).scalar()
+    else:
+        e = db.execute(select(Entity).where(Entity.slug == id_or_slug)).scalar()
+    
     if e is None:
-        raise MissingEntityException(obj_id=entity_id)
+        raise MissingEntityException(obj_id=id_or_slug)
     if e.schema_id != schema.id:
-        raise MismatchingSchemaException(entity_id=entity_id, schema_id=schema.id)
+        raise MismatchingSchemaException(entity_id=id_or_slug, schema_id=schema.id)
 
     attrs = [i.attribute.name for i in schema.attr_defs]
     return _get_entity_data(db=db, entity=e, attr_names=attrs)
@@ -386,12 +390,12 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
     return e
 
 
-def update_entity(db: Session, slug_or_id: Union[str, int], schema_id: int, data: dict) -> Entity:
+def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data: dict) -> Entity:
     q = select(Entity).where(Entity.schema_id == schema_id)
-    q = q.where(Entity.id == slug_or_id) if isinstance(slug_or_id, int) else q.where(Entity.slug == slug_or_id)
+    q = q.where(Entity.id == id_or_slug) if isinstance(id_or_slug, int) else q.where(Entity.slug == id_or_slug)
     e = db.execute(q).scalar()
     if e is None:
-        raise MissingEntityException(obj_id=slug_or_id)
+        raise MissingEntityException(obj_id=id_or_slug)
     if e.schema.deleted:
         raise MissingSchemaException(obj_id=e.schema.id)
     
