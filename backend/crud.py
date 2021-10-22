@@ -207,6 +207,9 @@ def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Sche
         
         if a.name in attr_names:
             raise MultipleAttributeOccurencesException(attr_name=a.name)
+        elif a.name in attr_def_names:
+            raise AttributeAlreadyDefinedException(attr_id=a.id, schema_id=sch.id)
+
         attr_names.add(a.name)
         
         try:

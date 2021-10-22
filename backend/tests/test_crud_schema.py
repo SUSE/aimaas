@@ -596,8 +596,27 @@ class TestSchemaUpdate:
             ]
         )
         with pytest.raises(AttributeAlreadyDefinedException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
+        dbsession.rollback()
 
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            update_attributes=[], 
+            add_attributes=[
+                AttrDefWithAttrDataSchema(
+                    name='nickname',
+                    type=AttrTypeMapping.DT,
+                    required=True,
+                    unique=True,
+                    list=True,
+                    key=True
+                )
+            ]
+        )
+        with pytest.raises(AttributeAlreadyDefinedException):
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
+            
     def test_raise_on_nonexistent_schema_when_binding(self, dbsession):
         attr = dbsession.execute(
             select(Attribute)
@@ -644,10 +663,10 @@ class TestSchemaUpdate:
             update_schema(dbsession, schema_id=1, data=upd_schema)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
-        ages = dbsession.execute(
+        address = dbsession.execute(
             select(Attribute)
-            .where(Attribute.name == 'age')
-        ).scalars().all()
+            .where(Attribute.name == 'address')
+        ).scalar()
 
         upd_schema = SchemaUpdateSchema(
             name='Test', 
@@ -655,41 +674,15 @@ class TestSchemaUpdate:
             update_attributes=[], 
             add_attributes=[
                 AttrDefSchema(
-                    attr_id=ages[0].id,
+                    attr_id=address.id,
                     required=True,
                     unique=True,
                     list=True,
                     key=True,
+                    bind_to_schema=-1
                 ),
                 AttrDefSchema(
-                    attr_id=ages[1].id,
-                    required=True,
-                    unique=True,
-                    list=True,
-                    key=True,
-                )
-            ]
-        )
-        with pytest.raises(MultipleAttributeOccurencesException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
-        dbsession.rollback()
-
-
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
-                AttrDefSchema(
-                    attr_id=ages[0].id,
-                    required=True,
-                    unique=True,
-                    list=True,
-                    key=True,
-                ),
-                AttrDefWithAttrDataSchema(
-                    name='age',
-                    type=AttrTypeMapping.FK,
+                    attr_id=address.id,
                     required=True,
                     unique=True,
                     list=True,
@@ -699,7 +692,35 @@ class TestSchemaUpdate:
             ]
         )
         with pytest.raises(MultipleAttributeOccurencesException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
+        dbsession.rollback()
+
+
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            update_attributes=[], 
+            add_attributes=[
+                AttrDefSchema(
+                    attr_id=address.id,
+                    required=True,
+                    unique=True,
+                    list=True,
+                    key=True,
+                    bind_to_schema=-1
+                ),
+                AttrDefWithAttrDataSchema(
+                    name='address',
+                    type=AttrTypeMapping.DT,
+                    required=True,
+                    unique=True,
+                    list=True,
+                    key=True,
+                )
+            ]
+        )
+        with pytest.raises(MultipleAttributeOccurencesException):
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
    
 
 class TestSchemaDelete:
