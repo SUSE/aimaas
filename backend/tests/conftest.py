@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from ..models import *
 from ..config import settings as s
+from .. import database
 
-# from ..main import app, get_db
 
 def populate_db(db: Session):
     '''Populates DB with following data:
@@ -142,16 +142,24 @@ def dbsession(engine, tables):
     session.close()
 
 
-@pytest.fixture
-def client(engine):
+def client_(engine):
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     def override_get_db():
         try:
-            TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             db = TestingSessionLocal()
             yield db
         finally:
             db.close()
-        
-    app.dependency_overrides[get_db] = override_get_db
+            
+    database.get_db = override_get_db
+    database.SessionLocal = TestingSessionLocal
+    from .. import create_app
+    app = create_app()
+
     client = TestClient(app)
-    yield client
+    return client
+    
+@pytest.fixture
+def client(engine):
+    yield client_(engine)
+
