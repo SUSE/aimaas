@@ -357,7 +357,7 @@ class TestSchemaUpdate:
                 )
             ]
         )
-        update_schema(dbsession, schema_id=1, data=upd_schema)
+        update_schema(dbsession, id_or_slug='person', data=upd_schema)
 
         age_def = dbsession.execute(
             select(AttributeDefinition)
@@ -403,7 +403,7 @@ class TestSchemaUpdate:
             ], 
             add_attributes=[]
         )
-        update_schema(dbsession, schema_id=1, data=upd_schema)
+        update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
         age_def = dbsession.execute(
             select(AttributeDefinition)
@@ -414,7 +414,7 @@ class TestSchemaUpdate:
         assert age_def is not None
         assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
 
-    def test_update_with_attr_data(self, dbsession):
+    def test_update_with_attr_data(self, dbsession, engine):
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
         attr_def = dbsession.execute(
             select(AttributeDefinition)
@@ -456,7 +456,7 @@ class TestSchemaUpdate:
                 )
             ]
         )
-        update_schema(dbsession, schema_id=1, data=upd_schema)
+        update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
         address_def = dbsession.execute(
             select(AttributeDefinition)
@@ -501,7 +501,7 @@ class TestSchemaUpdate:
             add_attributes=[]
         )
         with pytest.raises(MissingSchemaException):
-            update_schema(dbsession, schema_id=99999999, data=upd_schema)
+            update_schema(dbsession, id_or_slug=99999999, data=upd_schema)
 
     def test_raise_on_existing_slug_or_name(self, dbsession):
         new_sch = Schema(name='Test', slug='test')
@@ -510,14 +510,14 @@ class TestSchemaUpdate:
         
         upd_schema = SchemaUpdateSchema(name='Person', slug='test', update_attributes=[], add_attributes=[])
         with pytest.raises(SchemaExistsException):
-            update_schema(dbsession, schema_id=new_sch.id, data=upd_schema)
+            update_schema(dbsession, id_or_slug=new_sch.id, data=upd_schema)
         dbsession.rollback()
         dbsession.add(new_sch)
         dbsession.flush()
 
         upd_schema = SchemaUpdateSchema(name='Test', slug='person', update_attributes=[], add_attributes=[])
         with pytest.raises(SchemaExistsException):
-            update_schema(dbsession, schema_id=new_sch.id, data=upd_schema)
+            update_schema(dbsession, id_or_slug=new_sch.id, data=upd_schema)
 
     def test_raise_on_attr_def_doesnt_exist(self, dbsession):
         upd_schema = SchemaUpdateSchema(
@@ -535,7 +535,7 @@ class TestSchemaUpdate:
             add_attributes=[]
         )
         with pytest.raises(AttributeNotDefinedException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_convert_list_to_single(self, dbsession):
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'friends')).scalar()
@@ -559,7 +559,7 @@ class TestSchemaUpdate:
             add_attributes=[]
         )
         with pytest.raises(ListedToUnlistedException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_attr_doesnt_exist(self, dbsession):
         upd_schema = SchemaUpdateSchema(
@@ -577,7 +577,7 @@ class TestSchemaUpdate:
             ]
         )
         with pytest.raises(MissingAttributeException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_attr_def_already_exists(self, dbsession):
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'born')).scalar()
@@ -638,7 +638,7 @@ class TestSchemaUpdate:
             ]
         )
         with pytest.raises(MissingSchemaException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_schema_not_passed_when_binding(self, dbsession):
         attr = dbsession.execute(
@@ -660,7 +660,7 @@ class TestSchemaUpdate:
             ]
         )
         with pytest.raises(NoSchemaToBindException):
-            update_schema(dbsession, schema_id=1, data=upd_schema)
+            update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
         address = dbsession.execute(

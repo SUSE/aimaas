@@ -157,20 +157,24 @@ def delete_schema(db: Session, schema_id: int) -> Schema:
     return schema
 
 
-def update_schema(db: Session, schema_id: int, data: SchemaUpdateSchema) -> Schema:
-    sch: Schema = db.execute(
-        select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
-    ).scalar()
+def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema) -> Schema:
+    q = select(Schema).where(Schema.deleted == False)
+    if isinstance(id_or_slug, int):
+        q = q.where(Schema.id == id_or_slug)
+    else:
+        q = q.where(Schema.slug == id_or_slug)
+
+    sch: Schema = db.execute(q).scalar()
     if sch is None:
-        raise MissingSchemaException(obj_id=schema_id)
+        raise MissingSchemaException(obj_id=id_or_slug)
     
     try:
         db.execute(
             update(Schema)
-            .where(Schema.id == schema_id)
+            .where(Schema.id == sch.id)
             .values(name=data.name, slug=data.slug)
         )
-    except:
+    except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
