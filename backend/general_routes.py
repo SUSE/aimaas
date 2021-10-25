@@ -109,5 +109,16 @@ def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str],
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.NoSchemaToBindException as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-       
 
+
+@router.delete(
+    '/schemas/{id_or_slug}', 
+    response_model=schemas.SchemaDetailSchema,
+    response_model_exclude=['attributes', 'attr_defs'],
+    tags=['General routes']
+)
+def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
+    try:
+        return crud.delete_schema(db=db, id_or_slug=id_or_slug)
+    except exceptions.MissingSchemaException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))

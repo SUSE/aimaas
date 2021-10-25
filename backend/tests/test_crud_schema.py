@@ -741,8 +741,9 @@ class TestSchemaUpdate:
    
 
 class TestSchemaDelete:
-    def test_delete(self, dbsession):
-        delete_schema(dbsession, schema_id=1)
+    @pytest.mark.parametrize('id_or_slug', [1, 'person'])
+    def test_delete(self, dbsession, id_or_slug):
+        delete_schema(dbsession, id_or_slug=id_or_slug)
 
         schemas = dbsession.execute(select(Schema)).scalars().all()
         assert len(schemas) == 1
@@ -751,15 +752,15 @@ class TestSchemaDelete:
         entities = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
         assert len(entities) == 2
         assert all([i.deleted for i in entities])
-
+    
     def test_raise_on_already_deleted(self, dbsession):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
         with pytest.raises(MissingSchemaException):
-            delete_schema(dbsession, schema_id=1)
+            delete_schema(dbsession, id_or_slug=1)
 
     def test_raise_on_delete_nonexistent(self, dbsession):
         with pytest.raises(MissingSchemaException):
-            delete_schema(dbsession, schema_id=999999999)
+            delete_schema(dbsession, id_or_slug=999999999)
 
     
 

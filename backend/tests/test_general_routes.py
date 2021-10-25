@@ -1,9 +1,9 @@
 from typing import List
 
 from sqlalchemy import update
+import pytest
 
-from backend.crud import RESERVED_SCHEMA_SLUGS
-
+from ..crud import RESERVED_SCHEMA_SLUGS
 from ..models import *
 
 
@@ -1074,3 +1074,32 @@ class TestRouteSchemaUpdate:
         response = client.put('/schemas/1', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
+
+
+
+class TestRouteSchemaDelete:
+    @pytest.mark.parametrize('id_or_slug', [1, 'person'])
+    def test_delete(self, dbsession, client, id_or_slug):
+        response = client.delete(f'/schemas/{id_or_slug}')
+        assert response.status_code == 200
+        assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True}
+
+        schemas = dbsession.execute(select(Schema)).scalars().all()
+        assert len(schemas) == 1
+        assert schemas[0].deleted
+
+        entities = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
+        assert len(entities) == 2
+        assert all([i.deleted for i in entities])
+
+    @pytest.mark.parametrize('id_or_slug', [1, 'person'])
+    def test_raise_on_already_deleted(self, dbsession, client, id_or_slug):
+        dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
+        dbsession.commit()
+        response = client.delete(f'/schemas/{id_or_slug}')
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize('id_or_slug', [1234567, 'qwerty'])
+    def test_raise_on_delete_nonexistent(self, dbsession, client, id_or_slug):
+        response = client.delete(f'/schemas/{id_or_slug}')
+        assert response.status_code == 404

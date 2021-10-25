@@ -143,17 +143,19 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     return sch
 
 
-def delete_schema(db: Session, schema_id: int) -> Schema:
-    schema = db.execute(
-        select(Schema)
-        .where(Schema.id == schema_id)
-        .where(Schema.deleted == False)
-    ).scalar()
+def delete_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
+    q = select(Schema).where(Schema.deleted == False)
+    if isinstance(id_or_slug, int):
+        q = q.where(Schema.id == id_or_slug)
+    else:
+        q = q.where(Schema.slug == id_or_slug)
+    
+    schema = db.execute(q).scalar()
     if schema is None:
-        raise MissingSchemaException(obj_id=schema_id)
+        raise MissingSchemaException(obj_id=id_or_slug)
     
     db.execute(
-        update(Entity).where(Entity.schema_id == schema_id).values(deleted=True)
+        update(Entity).where(Entity.schema_id == schema.id).values(deleted=True)
     )
     schema.deleted = True
     db.commit()
