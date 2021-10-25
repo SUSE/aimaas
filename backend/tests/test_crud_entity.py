@@ -404,21 +404,23 @@ class TestEntityUpdate:
 
 
 class TestEntityDelete:
-    def test_delete(self, dbsession):
-        e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
-        delete_entity(dbsession, entity_id=e.id)
+    @pytest.mark.parametrize('id_or_slug', [1, 'Jack'])
+    def test_delete(self, dbsession, id_or_slug):
+        delete_entity(dbsession, id_or_slug=id_or_slug, schema_id=1)
         
         entities = dbsession.execute(select(Entity)).scalars().all()
         assert len(entities) == 2
         e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
         assert e.deleted
 
-    def test_raise_on_entity_doesnt_exist(self, dbsession):
+    @pytest.mark.parametrize('id_or_slug', [1234567, 'qwertyu'])
+    def test_raise_on_entity_doesnt_exist(self, dbsession, id_or_slug):
         with pytest.raises(MissingEntityException):
-            delete_entity(dbsession, entity_id=9999999999)
+            delete_entity(dbsession, id_or_slug=id_or_slug, schema_id=1)
 
-    def test_raise_on_already_deleted(self, dbsession):
+    @pytest.mark.parametrize('id_or_slug', [1, 'Jack'])
+    def test_raise_on_already_deleted(self, dbsession, id_or_slug):
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         with pytest.raises(MissingEntityException):
-            delete_entity(dbsession, entity_id=1)
+            delete_entity(dbsession, id_or_slug=id_or_slug, schema_id=1)
         

@@ -456,14 +456,15 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     return e
 
 
-def delete_entity(db: Session, entity_id: int) -> Entity:
-    e = db.execute(
-        select(Entity)
-        .where(Entity.id == entity_id)
-        .where(Entity.deleted == False)
-    ).scalar()
+def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int) -> Entity:
+    q = select(Entity).where(Entity.deleted == False).where(Entity.schema_id == schema_id)
+    if isinstance(id_or_slug, int):
+        q = q.where(Entity.id == id_or_slug)
+    else:
+        q = q.where(Entity.slug == id_or_slug)
+    e = db.execute(q).scalar()
     if e is None:
-        raise MissingEntityException(obj_id=entity_id)
+        raise MissingEntityException(obj_id=id_or_slug)
     e.deleted = True
     db.commit()
     return e
