@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pytest
 from sqlalchemy import select, update
 
 from ..models import *
@@ -151,7 +152,7 @@ class TestRouteCreateEntity:
             'friends': [],
         }
         response = client.post(f'/person', json=p1)
-        assert response.json() == {'id': 3, 'slug': 'Mike', 'name': 'mike'}
+        assert response.json() == {'id': 3, 'slug': 'Mike', 'name': 'mike', 'deleted': False}
         
         mike = dbsession.execute(select(Entity).where(Entity.id == 3)).scalar()
         assert mike.get('nickname', dbsession).value == 'mike'
@@ -164,10 +165,10 @@ class TestRouteCreateEntity:
             'nickname': 'john',
             'age': 10,
             'friends': [3, 1],
-            'born': '2021-10-20T13:52:17'
+            'born': '2021-10-20T13:52:17',
         }
         response = client.post(f'/person', json=p2)
-        assert response.json() == {'id': 4, 'slug': 'John', 'name': 'john'}
+        assert response.json() == {'id': 4, 'slug': 'John', 'name': 'john', 'deleted': False}
 
         john = dbsession.execute(select(Entity).where(Entity.id == 4)).scalar()
         assert john.get('nickname', dbsession).value == 'john'
@@ -351,7 +352,7 @@ class TestRouteUpdateEntity:
         }
         response = client.put('person/1', json=data)
         assert response.status_code == 200
-        assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test'}
+        assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test', 'deleted': False}
 
         e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
         assert e.name == 'test'
@@ -373,7 +374,7 @@ class TestRouteUpdateEntity:
         }
         response = client.put('person/Jane', json=data)
         assert response.status_code == 200
-        assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane'}
+        assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane', 'deleted': False}
         
         e = dbsession.execute(select(Entity).where(Entity.id == 2)).scalar()
         assert e.slug == 'test2'

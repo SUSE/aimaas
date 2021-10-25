@@ -123,7 +123,8 @@ class EntityBaseSchema(BaseModel):
     id: int
     slug: str
     name: str
-    
+    deleted: bool
+
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
     class Config:
         orm_mode = True
