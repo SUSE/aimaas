@@ -308,13 +308,33 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) 
 
 
+def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
+    @router.delete(
+        f'/{schema.slug}/{{id_or_slug}}',
+        response_model=schemas.EntityBaseSchema,
+        tags=[schema.name],
+        summary=f'Delete {schema.name} entity',
+        responses={
+            404: {
+                'description': "entity with provided id/slug doesn't exist on current schema"
+            }
+        }
+    )
+    def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
+        try:
+            return crud.delete_entity(db=db, id_or_slug=id_or_slug, schema_id=schema.id)
+        except exceptions.MissingEntityException as e:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+        
+
 def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable, old_slug: str = None):
     router = APIRouter()
     
-    route_get_entity(router=router, schema=schema, get_db=get_db)
     route_get_entities(router=router, schema=schema, get_db=get_db)
+    route_get_entity(router=router, schema=schema, get_db=get_db)
     route_create_entity(router=router, schema=schema, get_db=get_db)
     route_update_entity(router=router, schema=schema, get_db=get_db)
+    route_delete_entity(router=router, schema=schema, get_db=get_db)
 
     router_routes = [(r.path, r.methods) for r in router.routes]
     routes_to_remove = []

@@ -486,3 +486,27 @@ class TestRouteUpdateEntity:
         
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
+
+
+class TestRouteDeleteEntity:
+    @pytest.mark.parametrize('entity', [1, 'Jack'])
+    def test_delete(self, dbsession, client, entity):
+        response = client.delete(f'/person/{entity}')
+        assert response.json() == {'id': 1, 'slug': 'Jack', 'name': 'Jack', 'deleted': True}
+
+        entities = dbsession.execute(select(Entity)).scalars().all()
+        assert len(entities) == 2
+        e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
+        assert e.deleted
+
+    @pytest.mark.parametrize('entity', [1234567, 'qwertyu'])
+    def test_raise_on_entity_doesnt_exist(self, dbsession, client, entity):
+        response = client.delete(f'/person/{entity}')
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize('entity', [1, 'Jack'])
+    def test_raise_on_already_deleted(self, dbsession, client, entity):
+        dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
+        dbsession.commit()
+        response = client.delete(f'/person/{entity}')
+        assert response.status_code == 404
