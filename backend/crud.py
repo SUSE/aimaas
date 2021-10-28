@@ -1,9 +1,11 @@
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Tuple, Union
+from collections import defaultdict
 
 import sqlalchemy
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
-from sqlalchemy.sql.expression import delete
+from sqlalchemy.sql.expression import delete, intersect
+from sqlalchemy.sql.selectable import CompoundSelect
 
 from .models import (
     AttrType,
@@ -274,6 +276,124 @@ def _get_entity_data(db: Session, entity: Entity, attr_names: List[str]) -> Dict
     return data
 
 
+def _get_attr_values_batch(db: Session, entities: List[Entity], attrs_to_include: List[AttributeDefinition]) -> List[dict]:
+    '''Gets attr. values for list of entities by splitting attrs in
+    groups by type to select multiple attributes for all entities
+    in one query
+    '''
+    results_map = {
+        entity.id: {
+            'id': entity.id, 
+            'slug': entity.slug, 
+            'deleted': entity.deleted, 
+            'name': entity.name
+        } 
+        for entity in entities
+    }
+
+    for i in results_map.values():
+        for attr_def in attrs_to_include:
+            if attr_def.list:
+                i.update({attr_def.attribute.name: []})
+            else:
+                i.update({attr_def.attribute.name: None})
+
+    attr_groups: Dict[str, List[Attribute]] = defaultdict(list)
+    attributes = [i.attribute for i in attrs_to_include]
+    for attr in attributes:
+        attr_groups[attr.type.name].append(attr)
+    
+    ent_ids = [i.id for i in entities]
+    attr_map = {i.attribute.id: i.attribute.name for i in attrs_to_include}
+    for group, attrs in attr_groups.items():
+        value_model: Value = AttrType[group].value.model
+        q = (
+            select(value_model)
+            .where(value_model.entity_id.in_(ent_ids))
+            .where(value_model.attribute_id.in_([i.id for i in attrs]))
+        )
+        rows = db.execute(q).scalars().all()
+        for r in rows:
+            ent: dict = results_map[r.entity_id]
+            attr: str = attr_map[r.attribute_id]
+            if isinstance(ent[attr], list):
+                ent[attr].append(r.value)
+            else:
+                ent[attr] = r.value
+    
+    results = list(results_map.values())  
+    return results
+
+
+FILTER_MAP = {
+    'eq': '__eq__',
+    'lt':'__lt__',
+    'gt': '__gt__',
+    'le': '__le__',
+    'ge': '__ge__',
+    'ne': '__ne__'
+}
+
+ALLOWED_FILTERS = {
+    AttrType.STR: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.INT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.FLOAT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.DT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.BOOL: ['eq', 'ne']
+}
+
+
+def _parse_filters(filters: dict, attrs: List[str]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    '''Returns tuple of two `dict`s like `{attr_name: {op1: value, op2: value}}`.
+    First `dict` is for attribute filters, second is for `Entity.name` filters
+    '''
+    attrs_filters = defaultdict(dict)
+    name_filters = {}
+    for f, v in filters.items():
+        split = f.split('.')
+        attr = '.'.join(split[:-1]) if len(split) > 1 else split[0]
+        filter = 'eq' if len(split) == 1 else split[-1]
+        if attr == 'name':
+            name_filters[filter] = v
+            continue
+        elif attr not in attrs or filter not in FILTER_MAP:
+            continue
+        attrs_filters[attr][FILTER_MAP[filter]] = v
+    
+    name_filters = {k: v for k,v in name_filters.items() if k in FILTER_MAP and k in ALLOWED_FILTERS[AttrType.STR]}
+    return attrs_filters, name_filters
+
+
+def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False, deleted_only: bool = False) -> CompoundSelect:
+    '''Returns intersection query of several queries with filters
+    to get entities that satisfy all conditions from `filters`
+    '''
+    
+    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs}
+    attrs_filters, name_filters = _parse_filters(filters=filters, attrs=list(attrs))
+    selects = []
+
+    if name_filters: # since `name` is defined in `Entity`, not in `Value` tables, we need to query it separately
+        q = select(Entity).where(Entity.schema_id == schema.id)
+        if not all:
+            q = q.where(Entity.deleted == deleted_only)
+        for f, v in name_filters.items():
+            q = q.where(getattr(Entity.name, FILTER_MAP[f])(v))
+        selects.append(q)
+
+    for attr_name, filters in attrs_filters.items():
+        attr = attrs[attr_name]
+        value_model = attr.type.value.model
+        q = select(Entity).where(Entity.schema_id == schema.id).join(value_model)
+        if not all:
+            q = q.where(Entity.deleted == deleted_only)
+        for filter, value in filters.items():
+            q = q.where(getattr(value_model.value, filter)(value))
+        q = q.where(value_model.attribute_id == attr.id)
+        selects.append(q)
+    return intersect(*selects)
+
+
 def get_entities(
         db: Session, 
         schema: Schema,
@@ -281,19 +401,21 @@ def get_entities(
         offset: int = None,
         all: bool = False, 
         deleted_only: bool = False, 
-        all_fields: bool = False
+        all_fields: bool = False,
+        filters: dict = None
     ) -> List[dict]:
     
-    q = select(Entity).where(Entity.schema_id == schema.id)
-    if not all:
-        q = q.where(Entity.deleted == deleted_only)
-    entities = db.execute(q.offset(offset).limit(limit)).scalars().all()
+    if filters:
+        q = _query_entity_with_filters(filters=filters, schema=schema, all=all, deleted_only=deleted_only)
+    else:
+        q = select(Entity).where(Entity.schema_id == schema.id)
+        if not all:
+            q = q.where(Entity.deleted == deleted_only)
+    q = q.offset(offset).limit(limit).order_by(Entity.id)
+    entities = db.execute(select(Entity).from_statement(q)).scalars().all()
 
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key]
-    data = []
-    for e in entities:
-        data.append(_get_entity_data(db, entity=e, attr_names=[i.attribute.name for i in attr_defs]))
-    return data
+    return _get_attr_values_batch(db, entities, attr_defs)
 
 
 def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:

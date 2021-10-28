@@ -1,4 +1,5 @@
 from typing import List, Callable, Optional, Union
+from dataclasses import make_dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.applications import FastAPI
@@ -6,7 +7,7 @@ from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
 from pydantic.main import ModelMetaclass
 
-from .models import Schema, AttributeDefinition
+from .models import AttrType, Schema, AttributeDefinition
 from . import crud, exceptions, schemas
 
 
@@ -114,10 +115,38 @@ def _description_for_get_entities(schema: Schema) -> str:
     return description
 
 
+def _filters_request_model(schema: Schema):
+    '''Creates a dataclass that will be used to
+    capture filters like `<attr_name>.<operator>=<value>`
+    in entity listing queries
+    '''
+    fields = []
+
+    fields.append(('name', Optional[str], Query(None)))
+    for filter in crud.ALLOWED_FILTERS[AttrType.STR]:
+        fields.append((f'name_{filter}', Optional[str], Query(None, alias=f'name.{filter}')))
+
+    for attr_def in schema.attr_defs:
+        attr = attr_def.attribute
+        if attr.type not in crud.ALLOWED_FILTERS or attr_def.list:
+            continue
+
+        type_ = (attr.type  # Attribute.type -> AttrType
+            .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
+            .value.property.columns[0].type.python_type)  # get python type of value column in Value child
+        # default filter {attr.name} which works as {attr.name}.eq, i.e. for equality filtering
+        fields.append((attr.name, Optional[type_], Query(None, alias=attr.name)))
+        for filter in crud.ALLOWED_FILTERS[attr.type]:
+            fields.append((f'{attr.name}_{filter}', Optional[type_], Query(None, alias=f'{attr.name}.{filter}')))
+
+    filter_model = make_dataclass(f"{schema.slug.capitalize().replace('-', '_')}Filters", fields=fields)
+    return filter_model
+
+
 def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
     entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
     description = _description_for_get_entities(schema=schema)
-
+    filter_model = _filters_request_model(schema=schema)
     @router.get(
         f'/{schema.slug}',
         response_model=List[entity_schema],
@@ -132,8 +161,17 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
         all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
         deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
         all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'), 
+        filters: filter_model = Depends(),
         db: Session = Depends(get_db)
     ):
+        filters = {k: v for k, v in filters.__dict__.items() if v is not None}
+        new_filters = {}
+        for k, v in filters.items():
+            split = k.split('_')
+            attr = '_'.join(split[:-1]) if len(split) > 1 else split[0]
+            filter = split[-1] if len(split) > 1 else 'eq'
+            new_filters[f'{attr}.{filter}'] = v
+
         return crud.get_entities(
             db=db, 
             schema=schema,
@@ -141,7 +179,8 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
             offset=offset,
             all=all,
             deleted_only=deleted_only,
-            all_fields=all_fields
+            all_fields=all_fields,
+            filters=new_filters
         )
        
 

@@ -65,6 +65,18 @@ class TestRouteGetEntity:
         assert "doesn't belong to specified Schema" in response.json()['detail']
 
 class TestRouteGetEntities:
+    @pytest.fixture
+    def jack(self):
+        return {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}
+    
+    @pytest.fixture
+    def jane(self):
+        return {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
+
+    @pytest.fixture
+    def jack_del(self):
+        return {'age': 10, 'id': 1, 'deleted': True, 'slug': 'Jack', 'name': 'Jack'}
+
     def test_get_entities(self, dbsession, client):
         data = [
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}, 
@@ -141,6 +153,79 @@ class TestRouteGetEntities:
         assert response.status_code == 200
         assert response.json() == []
 
+    
+    @pytest.mark.parametrize(['q', 'resp'], [
+        ('age=10',           ['jack']),
+        ('age.lt=10',        []),
+        ('age.eq=10',        ['jack']),
+        ('age.gt=10',        ['jane']),
+        ('age.le=10',        ['jack']),
+        ('age.ne=10',        ['jane']),
+        ('age.ge=10',        ['jack', 'jane']),
+        ('name=Jane',        ['jane']),
+        ('nickname=jane',    ['jane']),
+        ('nickname.ne=jack', ['jane']),
+    ])
+    def test_get_with_filter(self, dbsession, client, request, q, resp):
+        resp = [request.getfixturevalue(i) for i in resp]
+        response = client.get(f'/person?{q}')
+        assert response.json() == resp
+
+    def test_get_with_multiple_filters_for_same_attr(self, dbsession, client, jane):
+        response = client.get('/person?age.gt=9&age.ne=10')
+        assert response.json() == [jane]
+
+        response = client.get('/person?age.gt=9&age.ne=10&age.lt=12')
+        assert response.json() == []
+
+    @pytest.mark.parametrize(['q', 'resp'], [
+        ('age.gt=9&name.ne=Jack',               ['jane']),
+        ('name=Jack&name.ne=Jack',              []),
+        ('nickname.ne=jane&name.ne=Jack',       []),
+        ('age.gt=9&age.ne=10&nickname.ne=jane', [])
+    ])
+    def test_get_with_multiple_filters(self, dbsession, client, request, q, resp):
+        resp = [request.getfixturevalue(i) for i in resp]
+        response = client.get(f'/person?{q}')
+        assert response.json() == resp
+
+    def test_get_with_filters_and_offset_limit(self, dbsession, client, jack, jane):
+        response = client.get('/person?age.gt=0&age.lt=20&limit=1')
+        assert response.json() == [jack]
+
+        response = client.get('/person?age.gt=0&age.lt=20&limit=1&offset=1')
+        assert response.json() == [jane]
+
+        response = client.get('/person?age.gt=0&age.lt=20&offset=2')
+        assert response.json() == []
+
+    @pytest.mark.parametrize(['q', 'resp'], [
+        ('age.gt=0&age.lt=20',                            ['jane']),
+        ('offset=1&age.gt=0&age.lt=20',                   []),
+        ('all=True&age.gt=0&age.lt=20',                   ['jack_del', 'jane']),
+        ('deleted_only=True&age.gt=0&age.lt=20',          ['jack_del']),
+        ('deleted_only=true&offset=1&age.gt=0&age.lt=20', []),
+    ])
+    def test_get_with_filters_and_deleted(self, dbsession, client, request, q, resp):
+        dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
+        dbsession.commit()
+        resp = [request.getfixturevalue(i) for i in resp]
+        response = client.get(f'/person?{q}')
+        assert response.json() == resp
+
+    def test_ignore_nonexistent_filter(self, dbsession, client, jack, jane):
+        response = client.get('/person?age.gt=0&age.lt=20&qwe.rty=123')
+        assert response.json() == [jack, jane]
+
+        response = client.get('/person?age.gt=0&age.lt=20&age.qwe=1234')
+        assert response.json() == [jack, jane]
+
+        response = client.get('/person?age.qwe=1234')
+        assert response.json() == [jack, jane]
+
+    def test_ignore_filters_for_list_and_fk(self, dbsession, client, jack, jane):
+        response = client.get('/person?friends=1')
+        assert response.json() == [jack, jane]
 
 class TestRouteCreateEntity:
     def test_create(self, dbsession, client):

@@ -289,6 +289,89 @@ class TestEntityRead:
         assert len(ents) == 0
 
 
+    @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
+        ({'age': 10},             1, ['Jack']),
+        ({'age.eq': 10},          1, ['Jack']),
+        ({'age.ge': 10},          2, ['Jack', 'Jane']),
+        ({'age.gt': 10},          1, ['Jane']),
+        ({'age.le': 10},          1, ['Jack']),
+        ({'age.lt': 10},          0, []),
+        ({'age.ne': 10},          1, ['Jane']),
+        ({'name': 'Jane'},        1, ['Jane']),
+        ({'nickname': 'jane'},    1, ['Jane']),
+        ({'nickname.ne': 'jack'}, 1, ['Jane']),
+    ])
+    def test_get_with_filter(self, dbsession, filters, ent_len, slugs):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == ent_len
+        assert [i['slug'] for i in ents] == slugs
+
+    def test_get_with_multiple_filters_for_same_attr(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+
+        filters = {'age.gt': 9, 'age.ne': 10}
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
+
+        filters = {'age.gt': 9, 'age.ne': 10, 'age.lt': 12}
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == 0
+
+    @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
+        ({'age.gt': 9, 'name.ne': 'Jack'},                   1, ['Jane']),
+        ({'name': 'Jack', 'name.ne': 'Jack'},                0, []),
+        ({'nickname.ne': 'jane', 'name.ne': 'Jack'},         0, []),
+        ({'age.gt': 9, 'age.ne': 10, 'nickname.ne': 'jane'}, 0, []),
+    ])
+    def test_get_with_multiple_filters(self, dbsession, filters, ent_len, slugs):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == ent_len
+        assert [i['slug'] for i in ents] == slugs
+   
+    
+    def test_get_with_filters_and_offset_limit(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        
+        filters = {'age.gt': 0, 'age.lt': 20}
+        ents = get_entities(dbsession, schema=schema, limit=1, filters=filters)
+        assert len(ents) == 1 and ents[0]['slug'] == 'Jack'
+
+        ents = get_entities(dbsession, schema=schema, limit=1, offset=1, filters=filters)
+        assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
+
+        ents = get_entities(dbsession, schema=schema, offset=2, filters=filters)
+        assert len(ents) == 0
+
+    @pytest.mark.parametrize(['params', 'ent_len', 'slugs'], [
+        ({},                                  1, ['Jane']),
+        ({'all': True},                       2, ['Jack', 'Jane']),
+        ({'offset': 1},                       0, []),
+        ({'deleted_only': True},              1, ['Jack']),
+        ({'deleted_only': True, 'offset': 1}, 0, [])
+    ])
+    def test_get_with_filters_and_deleted(self, dbsession, params, ent_len, slugs):
+        dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+        filters = {'age.gt': 0, 'age.lt': 20}
+        ents = get_entities(dbsession, schema=schema, filters=filters, **params)
+        assert len(ents) == ent_len
+        assert [i['slug'] for i in ents] == slugs
+
+    def test_ignore_nonexistent_filter(self, dbsession):
+        schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
+
+        filters = {'age.gt': 0, 'age.lt': 20, 'qwer.qwrt': 2323}
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == 2
+
+        filters = {'age.gt': 0, 'age.lt': 20, 'age.qwertyu': 3104}
+        ents = get_entities(dbsession, schema=schema, filters=filters)
+        assert len(ents) == 2
+
+
 class TestEntityUpdate:
     def test_update(self, dbsession):
         time = datetime.now()
