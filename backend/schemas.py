@@ -128,3 +128,8 @@ class EntityBaseSchema(BaseModel):
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
     class Config:
         orm_mode = True
+
+
+class EntityListSchema(BaseModel):
+    total: int
+    entities: List[dict]

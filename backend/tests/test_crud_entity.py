@@ -229,7 +229,7 @@ class TestEntityRead:
         dbsession.flush()
 
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        ents = get_entities(dbsession, schema=schema)
+        ents = get_entities(dbsession, schema=schema).entities
         
         assert len(ents) == 2
 
@@ -246,7 +246,7 @@ class TestEntityRead:
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.flush()
 
-        ents = get_entities(dbsession, schema=schema, deleted_only=True)
+        ents = get_entities(dbsession, schema=schema, deleted_only=True).entities
         assert len(ents) == 1
         assert ents[0]['id'] == 2
     
@@ -255,13 +255,13 @@ class TestEntityRead:
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.flush()
 
-        ents = get_entities(dbsession, schema=schema, all=True)
+        ents = get_entities(dbsession, schema=schema, all=True).entities
         assert len(ents) == 2
         assert not ents[0]['deleted'] and ents[1]['deleted']
 
     def test_get_all_fields(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        ents = get_entities(dbsession, schema=schema, all_fields=True)
+        ents = get_entities(dbsession, schema=schema, all_fields=True).entities
         assert len(ents) == 2
         
         ent = ents[1]
@@ -277,16 +277,22 @@ class TestEntityRead:
     def test_offset_and_limit(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         
-        ents = get_entities(dbsession, schema=schema, limit=1)
+        res = get_entities(dbsession, schema=schema, limit=1)
+        total, ents = res.total, res.entities
         assert len(ents) == 1
         assert ents[0]['id'] == 1
+        assert total == 2
 
-        ents = get_entities(dbsession, schema=schema, limit=1, offset=1)
+        res = get_entities(dbsession, schema=schema, limit=1, offset=1)
+        total, ents = res.total, res.entities
         assert len(ents) == 1
         assert ents[0]['id'] == 2
+        assert total == 2
 
-        ents = get_entities(dbsession, schema=schema, offset=10)
+        res = get_entities(dbsession, schema=schema, offset=10)
+        total, ents = res.total, res.entities
         assert len(ents) == 0
+        assert total == 2
 
 
     @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
@@ -303,19 +309,20 @@ class TestEntityRead:
     ])
     def test_get_with_filter(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        ents = get_entities(dbsession, schema=schema, filters=filters)
-        assert len(ents) == ent_len
+        res = get_entities(dbsession, schema=schema, filters=filters)
+        total, ents = res.total, res.entities
+        assert len(ents) == ent_len == total
         assert [i['slug'] for i in ents] == slugs
 
     def test_get_with_multiple_filters_for_same_attr(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
         filters = {'age.gt': 9, 'age.ne': 10}
-        ents = get_entities(dbsession, schema=schema, filters=filters)
+        ents = get_entities(dbsession, schema=schema, filters=filters).entities
         assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
 
         filters = {'age.gt': 9, 'age.ne': 10, 'age.lt': 12}
-        ents = get_entities(dbsession, schema=schema, filters=filters)
+        ents = get_entities(dbsession, schema=schema, filters=filters).entities
         assert len(ents) == 0
 
     @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
@@ -327,7 +334,7 @@ class TestEntityRead:
     def test_get_with_multiple_filters(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
-        ents = get_entities(dbsession, schema=schema, filters=filters)
+        ents = get_entities(dbsession, schema=schema, filters=filters).entities
         assert len(ents) == ent_len
         assert [i['slug'] for i in ents] == slugs
    
@@ -336,13 +343,13 @@ class TestEntityRead:
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         
         filters = {'age.gt': 0, 'age.lt': 20}
-        ents = get_entities(dbsession, schema=schema, limit=1, filters=filters)
+        ents = get_entities(dbsession, schema=schema, limit=1, filters=filters).entities
         assert len(ents) == 1 and ents[0]['slug'] == 'Jack'
 
-        ents = get_entities(dbsession, schema=schema, limit=1, offset=1, filters=filters)
+        ents = get_entities(dbsession, schema=schema, limit=1, offset=1, filters=filters).entities
         assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
 
-        ents = get_entities(dbsession, schema=schema, offset=2, filters=filters)
+        ents = get_entities(dbsession, schema=schema, offset=2, filters=filters).entities
         assert len(ents) == 0
 
     @pytest.mark.parametrize(['params', 'ent_len', 'slugs'], [
@@ -356,7 +363,7 @@ class TestEntityRead:
         dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         filters = {'age.gt': 0, 'age.lt': 20}
-        ents = get_entities(dbsession, schema=schema, filters=filters, **params)
+        ents = get_entities(dbsession, schema=schema, filters=filters, **params).entities
         assert len(ents) == ent_len
         assert [i['slug'] for i in ents] == slugs
 
@@ -364,11 +371,11 @@ class TestEntityRead:
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
         filters = {'age.gt': 0, 'age.lt': 20, 'qwer.qwrt': 2323}
-        ents = get_entities(dbsession, schema=schema, filters=filters)
+        ents = get_entities(dbsession, schema=schema, filters=filters).entities
         assert len(ents) == 2
 
         filters = {'age.gt': 0, 'age.lt': 20, 'age.qwertyu': 3104}
-        ents = get_entities(dbsession, schema=schema, filters=filters)
+        ents = get_entities(dbsession, schema=schema, filters=filters).entities
         assert len(ents) == 2
 
 

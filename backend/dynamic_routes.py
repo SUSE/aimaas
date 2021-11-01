@@ -147,9 +147,14 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
     entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
     description = _description_for_get_entities(schema=schema)
     filter_model = _filters_request_model(schema=schema)
+    response_model = create_model(
+        f'Get{entity_schema.__name__}', 
+        total=(int, Field(description='Total number of entities satisfying conditions')),
+        entities=(List[entity_schema], Field(description='List of returned entities'))
+    )
     @router.get(
         f'/{schema.slug}',
-        response_model=List[entity_schema],
+        response_model=response_model,
         tags=[schema.name],
         summary=f'List {schema.name} entities',
         description=description,

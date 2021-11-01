@@ -84,7 +84,7 @@ class TestRouteGetEntities:
         ]
         response = client.get(f'/person/')
         assert response.status_code == 200
-        assert response.json() == data
+        assert response.json()['entities'] == data
 
     def test_get_deleted_only(self, dbsession, client):
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
@@ -93,16 +93,16 @@ class TestRouteGetEntities:
         data = [{'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}]
         response = client.get(f'/person?deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == data
+        assert response.json()['entities'] == data
 
     def test_get_all(self, dbsession, client):
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.commit()
 
-        data = [
+        data = {'total': 2, 'entities': [
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}, 
             {'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}
-        ]
+        ]}
         response = client.get(f'/person?all=True')
         assert response.status_code == 200
         assert response.json() == data
@@ -112,7 +112,7 @@ class TestRouteGetEntities:
         assert response.json() == data
 
     def test_get_all_fields(self, dbsession, client):
-        data = [
+        data =  {'total': 2, 'entities': [
             {
                 'age': 10, 
                 'born': None, 
@@ -132,7 +132,7 @@ class TestRouteGetEntities:
                 'slug': 'Jane', 
                 'name': 'Jane'
              }
-        ]
+        ]}
         response = client.get(f'/person?all_fields=True')
         assert response.status_code == 200
         assert response.json() == data
@@ -143,15 +143,15 @@ class TestRouteGetEntities:
 
         response = client.get(f'/person?limit=1')
         assert response.status_code == 200
-        assert response.json() == [jack]
+        assert response.json() ==  {'total': 2, 'entities': [jack]}
 
         response = client.get(f'/person?limit=1&offset=1')
         assert response.status_code == 200
-        assert response.json() == [jane]
+        assert response.json() ==  {'total': 2, 'entities': [jane]}
 
         response = client.get(f'/person?offset=10')
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json() ==  {'total': 2, 'entities': []}
 
     
     @pytest.mark.parametrize(['q', 'resp'], [
@@ -167,16 +167,17 @@ class TestRouteGetEntities:
         ('nickname.ne=jack', ['jane']),
     ])
     def test_get_with_filter(self, dbsession, client, request, q, resp):
-        resp = [request.getfixturevalue(i) for i in resp]
+        ents = [request.getfixturevalue(i) for i in resp]
+        resp =  {'total': len(ents), 'entities': ents}
         response = client.get(f'/person?{q}')
         assert response.json() == resp
 
     def test_get_with_multiple_filters_for_same_attr(self, dbsession, client, jane):
         response = client.get('/person?age.gt=9&age.ne=10')
-        assert response.json() == [jane]
+        assert response.json()['entities'] == [jane]
 
         response = client.get('/person?age.gt=9&age.ne=10&age.lt=12')
-        assert response.json() == []
+        assert response.json()['entities'] == []
 
     @pytest.mark.parametrize(['q', 'resp'], [
         ('age.gt=9&name.ne=Jack',               ['jane']),
@@ -187,17 +188,17 @@ class TestRouteGetEntities:
     def test_get_with_multiple_filters(self, dbsession, client, request, q, resp):
         resp = [request.getfixturevalue(i) for i in resp]
         response = client.get(f'/person?{q}')
-        assert response.json() == resp
+        assert response.json()['entities'] == resp
 
     def test_get_with_filters_and_offset_limit(self, dbsession, client, jack, jane):
         response = client.get('/person?age.gt=0&age.lt=20&limit=1')
-        assert response.json() == [jack]
+        assert response.json()['entities'] == [jack]
 
         response = client.get('/person?age.gt=0&age.lt=20&limit=1&offset=1')
-        assert response.json() == [jane]
+        assert response.json()['entities'] == [jane]
 
         response = client.get('/person?age.gt=0&age.lt=20&offset=2')
-        assert response.json() == []
+        assert response.json()['entities'] == []
 
     @pytest.mark.parametrize(['q', 'resp'], [
         ('age.gt=0&age.lt=20',                            ['jane']),
@@ -211,21 +212,21 @@ class TestRouteGetEntities:
         dbsession.commit()
         resp = [request.getfixturevalue(i) for i in resp]
         response = client.get(f'/person?{q}')
-        assert response.json() == resp
+        assert response.json()['entities'] == resp
 
     def test_ignore_nonexistent_filter(self, dbsession, client, jack, jane):
         response = client.get('/person?age.gt=0&age.lt=20&qwe.rty=123')
-        assert response.json() == [jack, jane]
+        assert response.json()['entities'] == [jack, jane]
 
         response = client.get('/person?age.gt=0&age.lt=20&age.qwe=1234')
-        assert response.json() == [jack, jane]
+        assert response.json()['entities'] == [jack, jane]
 
         response = client.get('/person?age.qwe=1234')
-        assert response.json() == [jack, jane]
+        assert response.json()['entities'] == [jack, jane]
 
     def test_ignore_filters_for_list_and_fk(self, dbsession, client, jack, jane):
         response = client.get('/person?friends=1')
-        assert response.json() == [jack, jane]
+        assert response.json()['entities'] == [jack, jane]
 
 class TestRouteCreateEntity:
     def test_create(self, dbsession, client):

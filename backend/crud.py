@@ -2,6 +2,7 @@ from typing import Callable, Dict, List, Tuple, Union
 from collections import defaultdict
 
 import sqlalchemy
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from sqlalchemy.sql.expression import delete, intersect
@@ -21,6 +22,7 @@ from .schemas import (
     AttrDefSchema,
     AttrDefWithAttrDataSchema,
     AttributeDefinitionUpdateSchema,
+    EntityListSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
@@ -403,7 +405,7 @@ def get_entities(
         deleted_only: bool = False, 
         all_fields: bool = False,
         filters: dict = None
-    ) -> List[dict]:
+    ) -> EntityListSchema:
     
     if filters:
         q = _query_entity_with_filters(filters=filters, schema=schema, all=all, deleted_only=deleted_only)
@@ -411,11 +413,12 @@ def get_entities(
         q = select(Entity).where(Entity.schema_id == schema.id)
         if not all:
             q = q.where(Entity.deleted == deleted_only)
+    total = db.execute(select(func.count('id')).select_from(q.subquery())).scalar()
     q = q.offset(offset).limit(limit).order_by(Entity.id)
     entities = db.execute(select(Entity).from_statement(q)).scalars().all()
 
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key]
-    return _get_attr_values_batch(db, entities, attr_defs)
+    return EntityListSchema(total=total, entities=_get_attr_values_batch(db, entities, attr_defs))
 
 
 def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:
