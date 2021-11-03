@@ -66,12 +66,8 @@ def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = Tr
 
 def get_schemas(db: Session, all: bool = False, deleted_only: bool = False) -> List[Schema]:
     q = select(Schema)
-    if all:
-        pass
-    elif deleted_only:
-        q = q.where(Schema.deleted == True)
-    else:
-        q = q.where(Schema.deleted == False)
+    if not all:
+        q = q.where(Schema.deleted == deleted_only)
     return db.execute(q).scalars().all()
 
 
@@ -329,7 +325,7 @@ def _get_attr_values_batch(db: Session, entities: List[Entity], attrs_to_include
 
 FILTER_MAP = {
     'eq': '__eq__',
-    'lt':'__lt__',
+    'lt': '__lt__',
     'gt': '__gt__',
     'le': '__le__',
     'ge': '__ge__',
@@ -352,8 +348,8 @@ def _parse_filters(filters: dict, attrs: List[str]) -> Tuple[Dict[str, Dict[str,
     attrs_filters = defaultdict(dict)
     name_filters = {}
     for f, v in filters.items():
-        split = f.split('.')
-        attr = '.'.join(split[:-1]) if len(split) > 1 else split[0]
+        split = f.rsplit('.', maxsplit=1)
+        attr = split[0]
         filter = 'eq' if len(split) == 1 else split[-1]
         if attr == 'name':
             name_filters[filter] = v

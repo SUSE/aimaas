@@ -172,8 +172,8 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
         filters = {k: v for k, v in filters.__dict__.items() if v is not None}
         new_filters = {}
         for k, v in filters.items():
-            split = k.split('_')
-            attr = '_'.join(split[:-1]) if len(split) > 1 else split[0]
+            split = k.rsplit('_', maxsplit=1)
+            attr = split[0]
             filter = split[-1] if len(split) > 1 else 'eq'
             new_filters[f'{attr}.{filter}'] = v
 
