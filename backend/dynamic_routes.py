@@ -176,17 +176,21 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
             attr = split[0]
             filter = split[-1] if len(split) > 1 else 'eq'
             new_filters[f'{attr}.{filter}'] = v
-
-        return crud.get_entities(
-            db=db, 
-            schema=schema,
-            limit=limit,
-            offset=offset,
-            all=all,
-            deleted_only=deleted_only,
-            all_fields=all_fields,
-            filters=new_filters
-        )
+        try:
+            return crud.get_entities(
+                db=db, 
+                schema=schema,
+                limit=limit,
+                offset=offset,
+                all=all,
+                deleted_only=deleted_only,
+                all_fields=all_fields,
+                filters=new_filters
+            )  # these two exceptions are not supposed to be ever raised
+        except exceptions.InvalidFilterAttributeException as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        except exceptions.InvalidFilterOperatorException as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
        
 
 def _create_entity_request_model(schema: Schema) -> ModelMetaclass:

@@ -354,8 +354,10 @@ def _parse_filters(filters: dict, attrs: List[str]) -> Tuple[Dict[str, Dict[str,
         if attr == 'name':
             name_filters[filter] = v
             continue
-        elif attr not in attrs or filter not in FILTER_MAP:
-            continue
+        elif attr not in attrs:
+            raise InvalidFilterAttributeException(attr=attr, allowed_attrs=attrs)
+        elif filter not in FILTER_MAP:
+            raise InvalidFilterOperatorException(attr=attr, filter=filter)
         attrs_filters[attr][FILTER_MAP[filter]] = v
     
     name_filters = {k: v for k,v in name_filters.items() if k in FILTER_MAP and k in ALLOWED_FILTERS[AttrType.STR]}
@@ -367,7 +369,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
     to get entities that satisfy all conditions from `filters`
     '''
     
-    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs}
+    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if not i.list and i.attribute.type in ALLOWED_FILTERS}
     attrs_filters, name_filters = _parse_filters(filters=filters, attrs=list(attrs))
     selects = []
 

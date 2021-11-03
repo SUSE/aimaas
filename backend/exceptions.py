@@ -134,3 +134,21 @@ class ReservedSchemaSlugException(Exception):
 
     def __str__(self) -> str:
         return f"Can't create schema with slug `{self.slug}`. List of reserved schema slugs: {', '.join(self.reserved)}"
+
+
+class InvalidFilterOperatorException(Exception):
+    def __init__(self, attr: str, filter: str):
+        self.attr = attr
+        self.filter = filter
+
+    def __str__(self) -> str:
+        return f'`{self.filter}` is invalid filter for attribute {self.attr}'
+
+
+class InvalidFilterAttributeException(Exception):
+    def __init__(self, attr: str, allowed_attrs: List[str]):
+        self.attr = attr
+        self.allowed_attrs = allowed_attrs
+
+    def __str__(self) -> str:
+        return f"Can't filter current schema by attribute `{self.attr}`. Allowed attributes: {', '.join(self.allowed_attrs)}"

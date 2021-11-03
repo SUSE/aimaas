@@ -367,16 +367,20 @@ class TestEntityRead:
         assert len(ents) == ent_len
         assert [i['slug'] for i in ents] == slugs
 
-    def test_ignore_nonexistent_filter(self, dbsession):
+    def test_raise_on_invalid_filters(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
         filters = {'age.gt': 0, 'age.lt': 20, 'qwer.qwrt': 2323}
-        ents = get_entities(dbsession, schema=schema, filters=filters).entities
-        assert len(ents) == 2
+        with pytest.raises(InvalidFilterAttributeException):
+            get_entities(dbsession, schema=schema, filters=filters).entities
 
         filters = {'age.gt': 0, 'age.lt': 20, 'age.qwertyu': 3104}
-        ents = get_entities(dbsession, schema=schema, filters=filters).entities
-        assert len(ents) == 2
+        with pytest.raises(InvalidFilterOperatorException):
+            get_entities(dbsession, schema=schema, filters=filters).entities
+
+        filters = {'age.gt': 0, 'friends.lt': 20}  # we can't filter friends because it's a listed type
+        with pytest.raises(InvalidFilterAttributeException):
+            get_entities(dbsession, schema=schema, filters=filters).entities
 
 
 class TestEntityUpdate:

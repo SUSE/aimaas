@@ -214,11 +214,11 @@ class TestRouteGetEntities:
         response = client.get(f'/person?{q}')
         assert response.json()['entities'] == resp
 
-    def test_ignore_nonexistent_filter(self, dbsession, client, jack, jane):
+    def test_ignore_invalid_filter(self, dbsession, client, jack, jane):
         response = client.get('/person?age.gt=0&age.lt=20&qwe.rty=123')
         assert response.json()['entities'] == [jack, jane]
 
-        response = client.get('/person?age.gt=0&age.lt=20&age.qwe=1234')
+        response = client.get('/person?age.gt=0&age.lt=20&friends.lt=1234')
         assert response.json()['entities'] == [jack, jane]
 
         response = client.get('/person?age.qwe=1234')
