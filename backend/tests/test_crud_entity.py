@@ -296,16 +296,18 @@ class TestEntityRead:
 
 
     @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
-        ({'age': 10},             1, ['Jack']),
-        ({'age.eq': 10},          1, ['Jack']),
-        ({'age.ge': 10},          2, ['Jack', 'Jane']),
-        ({'age.gt': 10},          1, ['Jane']),
-        ({'age.le': 10},          1, ['Jack']),
-        ({'age.lt': 10},          0, []),
-        ({'age.ne': 10},          1, ['Jane']),
-        ({'name': 'Jane'},        1, ['Jane']),
-        ({'nickname': 'jane'},    1, ['Jane']),
-        ({'nickname.ne': 'jack'}, 1, ['Jane']),
+        ({'age': 10},                 1, ['Jack']),
+        ({'age.eq': 10},              1, ['Jack']),
+        ({'age.ge': 10},              2, ['Jack', 'Jane']),
+        ({'age.gt': 10},              1, ['Jane']),
+        ({'age.le': 10},              1, ['Jack']),
+        ({'age.lt': 10},              0, []),
+        ({'age.ne': 10},              1, ['Jane']),
+        ({'name': 'Jane'},            1, ['Jane']),
+        ({'nickname': 'jane'},        1, ['Jane']),
+        ({'nickname.ne': 'jack'},     1, ['Jane']),
+        ({'nickname.regexp': '^ja'},  2, ['Jack', 'Jane']),
+        ({'nickname.contains': 'ne'}, 1, ['Jane']),
     ])
     def test_get_with_filter(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()

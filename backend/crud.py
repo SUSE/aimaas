@@ -329,11 +329,13 @@ FILTER_MAP = {
     'gt': '__gt__',
     'le': '__le__',
     'ge': '__ge__',
-    'ne': '__ne__'
+    'ne': '__ne__',
+    'contains': 'contains',
+    'regexp': 'regexp_match'
 }
 
 ALLOWED_FILTERS = {
-    AttrType.STR: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.STR: ['eq', 'lt', 'gt', 'le', 'ge', 'ne', 'contains', 'regexp_match'],
     AttrType.INT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
     AttrType.FLOAT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
     AttrType.DT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],

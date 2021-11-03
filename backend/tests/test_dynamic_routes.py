@@ -155,16 +155,18 @@ class TestRouteGetEntities:
 
     
     @pytest.mark.parametrize(['q', 'resp'], [
-        ('age=10',           ['jack']),
-        ('age.lt=10',        []),
-        ('age.eq=10',        ['jack']),
-        ('age.gt=10',        ['jane']),
-        ('age.le=10',        ['jack']),
-        ('age.ne=10',        ['jane']),
-        ('age.ge=10',        ['jack', 'jane']),
-        ('name=Jane',        ['jane']),
-        ('nickname=jane',    ['jane']),
-        ('nickname.ne=jack', ['jane']),
+        ('age=10',               ['jack']),
+        ('age.lt=10',            []),
+        ('age.eq=10',            ['jack']),
+        ('age.gt=10',            ['jane']),
+        ('age.le=10',            ['jack']),
+        ('age.ne=10',            ['jane']),
+        ('age.ge=10',            ['jack', 'jane']),
+        ('name=Jane',            ['jane']),
+        ('nickname=jane',        ['jane']),
+        ('nickname.ne=jack',     ['jane']),
+        ('nickname.regexp=^ja',  ['jack', 'jane']),
+        ('nickname.contains=ne', ['jane'])
     ])
     def test_get_with_filter(self, dbsession, client, request, q, resp):
         ents = [request.getfixturevalue(i) for i in resp]
