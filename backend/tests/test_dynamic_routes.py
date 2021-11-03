@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 
 import pytest
 from sqlalchemy import select, update
@@ -262,7 +262,7 @@ class TestRouteCreateEntity:
         assert john.get('nickname', dbsession).value == 'john'
         assert john.get('age', dbsession).value == 10
         assert [i.value for i in john.get('friends', dbsession)] == [3, 1]
-        assert john.get('born', dbsession).value == datetime(2021, 10, 20, 13, 52, 17)
+        assert john.get('born', dbsession).value == datetime(2021, 10, 20, 13, 52, 17, tzinfo=timezone.utc)
 
     def test_raise_on_non_unique_slug(self, dbsession, client):
         p1 = {
@@ -430,12 +430,11 @@ class TestRouteCreateEntity:
     
 class TestRouteUpdateEntity:
     def test_update(self, dbsession, client):
-        time = datetime.now()
         data = {
             'name': 'test',
             'slug': 'test',
             'nickname': None,
-            'born': '2021-10-20T13:52:17',
+            'born': '2021-10-20T13:52:17+03',
             'friends': [1, 2],
         }
         response = client.put('person/1', json=data)
@@ -446,7 +445,7 @@ class TestRouteUpdateEntity:
         assert e.name == 'test'
         assert e.slug == 'test'
         assert e.get('age', dbsession).value == 10
-        assert e.get('born', dbsession).value == datetime(2021, 10, 20, 13, 52, 17)
+        assert e.get('born', dbsession).value == datetime(2021, 10, 20, 10, 52, 17, tzinfo=timezone.utc)
         assert [i.value for i in e.get('friends', dbsession)] == [1, 2]
         assert e.get('nickname', dbsession) == None
         nicknames = dbsession.execute(

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -11,7 +11,7 @@ from ..exceptions import *
 
 class TestEntityCreate:
     def test_create(self, dbsession):
-        born = datetime(1990, 6, 30)
+        born = datetime(1990, 6, 30, tzinfo=timezone.utc)
         p1 = {
             'name': 'Mike',
             'slug': 'Mike',
@@ -387,7 +387,7 @@ class TestEntityRead:
 
 class TestEntityUpdate:
     def test_update(self, dbsession):
-        time = datetime.now()
+        time = datetime.now(timezone.utc)
         data = {
             'slug': 'test',
             'nickname': None,

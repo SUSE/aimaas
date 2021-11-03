@@ -56,7 +56,7 @@ class ValueStr(Value):
 
 class ValueDatetime(Value):
     __tablename__ = 'values_datetime'
-    value = Column(DateTime)
+    value = Column(DateTime(timezone=True))
 
 
 class Mapping(NamedTuple):
