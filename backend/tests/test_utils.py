@@ -15,9 +15,9 @@ slugs = [
     ('hello-$-world', False),
     ('hello-456-world4', True),
     ('hello-456-wWorld', True),
-    ('456-hello', True),
-    ('456-World', True),
-    ('456', True)
+    ('456-hello', False),
+    ('456-World', False),
+    ('456', False)
 ]
 
 

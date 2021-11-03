@@ -57,7 +57,7 @@ class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
 
 
 def validate_slug(cls, slug: str):
-    if re.match('^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$', slug) is None:
+    if re.match('^[a-zA-Z]+[0-9]*(-[a-zA-Z0-9]+)*$', slug) is None:
         raise ValueError(f'`{slug}` is invalid value for slug field')
     return slug
 
