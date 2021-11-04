@@ -2,7 +2,7 @@ from typing import Callable, Dict, List, Tuple, Union
 from collections import defaultdict
 
 import sqlalchemy
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from sqlalchemy.sql.expression import delete, intersect
@@ -413,7 +413,7 @@ def get_entities(
         q = select(Entity).where(Entity.schema_id == schema.id)
         if not all:
             q = q.where(Entity.deleted == deleted_only)
-    total = db.execute(select(func.count('id')).select_from(q.subquery())).scalar()
+    total = db.execute(select(func.count(distinct(column('id')))).select_from(q.subquery())).scalar()
     q = q.offset(offset).limit(limit).order_by(Entity.id)
     entities = db.execute(select(Entity).from_statement(q)).scalars().all()
 
