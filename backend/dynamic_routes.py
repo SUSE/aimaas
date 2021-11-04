@@ -115,6 +115,18 @@ def _description_for_get_entities(schema: Schema) -> str:
     return description
 
 
+FILTER_DESCRIPTION = {
+    'eq': 'equal to',
+    'lt': 'less than',
+    'gt': 'greater than',
+    'le': 'less than or equal to',
+    'ge': 'greater than or equal to',
+    'ne': 'not equal to',
+    'contains': 'contains substring',
+    'regexp': 'matches regular expression'
+}
+
+
 def _filters_request_model(schema: Schema):
     '''Creates a dataclass that will be used to
     capture filters like `<attr_name>.<operator>=<value>`
@@ -122,9 +134,9 @@ def _filters_request_model(schema: Schema):
     '''
     fields = []
 
-    fields.append(('name', Optional[str], Query(None)))
+    fields.append(('name', Optional[str], Query(None, description=FILTER_DESCRIPTION['eq'])))
     for filter in crud.ALLOWED_FILTERS[AttrType.STR]:
-        fields.append((f'name_{filter}', Optional[str], Query(None, alias=f'name.{filter}')))
+        fields.append((f'name_{filter}', Optional[str], Query(None, alias=f'name.{filter}', description=FILTER_DESCRIPTION[filter])))
 
     for attr_def in schema.attr_defs:
         attr = attr_def.attribute
@@ -135,9 +147,9 @@ def _filters_request_model(schema: Schema):
             .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
             .value.property.columns[0].type.python_type)  # get python type of value column in Value child
         # default filter {attr.name} which works as {attr.name}.eq, i.e. for equality filtering
-        fields.append((attr.name, Optional[type_], Query(None, alias=attr.name)))
+        fields.append((attr.name, Optional[type_], Query(None, alias=attr.name, description=FILTER_DESCRIPTION['eq'])))
         for filter in crud.ALLOWED_FILTERS[attr.type]:
-            fields.append((f'{attr.name}_{filter}', Optional[type_], Query(None, alias=f'{attr.name}.{filter}')))
+            fields.append((f'{attr.name}_{filter}', Optional[type_], Query(None, alias=f'{attr.name}.{filter}', description=FILTER_DESCRIPTION[filter])))
 
     filter_model = make_dataclass(f"{schema.slug.capitalize().replace('-', '_')}Filters", fields=fields)
     return filter_model
