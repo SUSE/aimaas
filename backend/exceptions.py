@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 from .models import Entity
 
@@ -10,6 +10,13 @@ class SchemaExistsException(Exception):
 
     def __str__(self) -> str:
         return f'Schema with name `{self.name}` or slug `{self.slug}` already exists'
+
+class EntityExistsException(Exception):
+    def __init__(self, slug: str):
+        self.slug = slug
+
+    def __str__(self) -> str:
+        return f'Entity with slug `{self.slug}` already exists in this schema'
 
 class MissingObjectException(Exception):
     obj_type: str
@@ -51,7 +58,7 @@ class WrongSchemaToBindException(Exception):
         self.passed_entity = passed_entity
 
     def __str__(self) -> str:
-        return f'Attribute `f{self.attr_name}` defined on schema ({self.schema_id}) is bound to schema ({self.bound_schema_id}); got instead entity ({self.passed_entity.id}) from schema ({self.passed_entity.schema_id})'
+        return f'Attribute `{self.attr_name}` defined on schema ({self.schema_id}) is bound to schema ({self.bound_schema_id}); got instead entity ({self.passed_entity.id}) from schema ({self.passed_entity.schema_id})'
 
 class AttributeAlreadyDefinedException(Exception):
     def __init__(self, attr_id: int, schema_id: int):
@@ -100,3 +107,48 @@ class RequiredFieldException(Exception):
 
     def __str__(self) -> str:
         return f'Missing required field: {self.field}'
+
+
+class MismatchingSchemaException(Exception):
+    def __init__(self, entity_id: int, schema_id: int):
+        self.entity_id = entity_id
+        self.schema_id = schema_id
+
+    def __str__(self) -> str:
+        return f"Requested Entity ({self.entity_id}) doesn't belong to specified Schema ({self.schema_id})"
+
+
+class ReservedAttributeException(Exception):
+    def __init__(self, attr_name: str, reserved: List[str]):
+        self.attr_name = attr_name
+        self.reserved = reserved
+
+    def __str__(self) -> str:
+        return f"Can't create attribute `{self.attr_name}`. List of reserved attribute names: {', '.join(self.reserved)}"
+
+
+class ReservedSchemaSlugException(Exception):
+    def __init__(self, slug: str, reserved: List[str]):
+        self.slug = slug
+        self.reserved = reserved
+
+    def __str__(self) -> str:
+        return f"Can't create schema with slug `{self.slug}`. List of reserved schema slugs: {', '.join(self.reserved)}"
+
+
+class InvalidFilterOperatorException(Exception):
+    def __init__(self, attr: str, filter: str):
+        self.attr = attr
+        self.filter = filter
+
+    def __str__(self) -> str:
+        return f'`{self.filter}` is invalid filter for attribute {self.attr}'
+
+
+class InvalidFilterAttributeException(Exception):
+    def __init__(self, attr: str, allowed_attrs: List[str]):
+        self.attr = attr
+        self.allowed_attrs = allowed_attrs
+
+    def __str__(self) -> str:
+        return f"Can't filter current schema by attribute `{self.attr}`. Allowed attributes: {', '.join(self.allowed_attrs)}"

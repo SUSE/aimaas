@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from ..models import *
 from ..config import settings as s
+from .. import database
 
-# from ..main import app, get_db
 
 def populate_db(db: Session):
     '''Populates DB with following data:
@@ -15,25 +15,25 @@ def populate_db(db: Session):
 
         name   | id | type
         -------|----|-----
-        name   |  1 | STR
-        age    |  2 | FLOAT
-        age    |  3 | INT
-        age    |  4 | STR
-        born   |  5 | DT
-        friends|  6 | FK
-        address|  7 | FK
-      nickname |  8 | STR
+        age    |  1 | FLOAT
+        age    |  2 | INT
+        age    |  3 | STR
+        born   |  4 | DT
+        friends|  5 | FK
+        address|  6 | FK
+      nickname |  7 | STR
+      fav_color|  8 | STR
 
     ### Schemas
       1. Person (person), fields:
 
       name   | attr_id | required | unique | list | key
       -------|---------|----------|--------|------|----
-      name   |    1    |     +    |   +    |   -  |  + 
-      age    |    3    |     +    |   -    |   -  |  + 
-      born   |    5    |     -    |   -    |   -  |  - 
-      friends|    6    |     +    |   -    |   +  |  - 
-    nickname |    8    |     +    |   +    |   -  |  -
+      age    |    2    |     +    |   -    |   -  |  + 
+      born   |    4    |     -    |   -    |   -  |  - 
+      friends|    5    |     +    |   -    |   +  |  - 
+    nickname |    7    |     -    |   +    |   -  |  -
+    fav_color|    8    |     -    |   -    |   +  |  -
 
     ### Bound FKs
 
@@ -44,13 +44,12 @@ def populate_db(db: Session):
     ### Entities
       *Person*
 
-      id |  name  | age | born | friends | nickname
-      ---|--------|-----|------|---------|------
-      1  | Jack   | 10  |   -  |   []    | jack
-      2  | Jane   | 12  |   -  |   [1]   | jane
+      id |  slug  | age | born | friends | nickname | name | fav_color
+      ---|--------|-----|------|---------|----------|------|----------
+      1  | Jack   | 10  |   -  |   []    | jack     | Jack | red, blue
+      2  | Jane   | 12  |   -  |   [1]   | jane     | Jane | red, black
     
     '''
-    name = Attribute(name='name', type=AttrType.STR)
     age_float = Attribute(name='age', type=AttrType.FLOAT)
     age_int = Attribute(name='age', type=AttrType.INT)
     age_str = Attribute(name='age', type=AttrType.STR)
@@ -58,21 +57,13 @@ def populate_db(db: Session):
     friends = Attribute(name='friends', type=AttrType.FK)
     address = Attribute(name='address', type=AttrType.FK)
     nickname = Attribute(name='nickname', type=AttrType.STR)
-    db.add_all([name, age_float, age_int, age_str, born, friends, address, nickname])
+    fav_color = Attribute(name='fav_color', type=AttrType.STR)
+    db.add_all([age_float, age_int, age_str, born, friends, address, nickname, fav_color])
 
     person = Schema(name='Person', slug='person')
     db.add(person)
     db.flush()
-
-    name_ = AttributeDefinition(
-        schema_id=person.id,
-        attribute_id=name.id,
-        required=True,
-        unique=True,
-        list=False,
-        key=True,
-        description='Name of this person'
-    )
+    
     age_ = AttributeDefinition(
         schema_id=person.id,
         attribute_id=age_int.id,
@@ -101,30 +92,42 @@ def populate_db(db: Session):
     nickname_ = AttributeDefinition(
         schema_id=person.id,
         attribute_id=nickname.id,
-        required=True,
+        required=False,
         unique=True,
         list=False,
         key=False
     )
-    db.add_all([name_, age_, born_, friends_, nickname_])
+    fav_color_ = AttributeDefinition(
+        schema_id=person.id,
+        attribute_id=fav_color.id,
+        required=False,
+        unique=False,
+        list=True,
+        key=False
+    )
+    db.add_all([age_, born_, friends_, nickname_, fav_color_])
     db.flush()
     bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
     db.add(bfk)
 
-    p1 = Entity(schema_id=person.id, name='Jack')
+    p1 = Entity(schema_id=person.id, slug='Jack', name='Jack')
     db.add(p1)
     db.flush()
     p1_nickname = ValueStr(entity_id=p1.id, attribute_id=nickname.id, value='jack')
     p1_age = ValueInt(entity_id=p1.id, attribute_id=age_int.id, value=10)
+    p1_fav_color_1 = ValueStr(value='red', entity_id=p1.id, attribute_id=fav_color.id)
+    p1_fav_color_2 = ValueStr(value='blue', entity_id=p1.id, attribute_id=fav_color.id)
 
-    p2 = Entity(schema_id=person.id, name='Jane')
+    p2 = Entity(schema_id=person.id, slug='Jane', name='Jane')
     db.add(p2)
     db.flush()
     p2_nickname = ValueStr(entity_id=p2.id, attribute_id=nickname.id, value='jane')
     p2_age = ValueInt(entity_id=p2.id, attribute_id=age_int.id, value=12)
     p2_friend = ValueForeignKey(entity_id=p2.id, attribute_id=friends.id, value=p1.id)
+    p2_fav_color_1 = ValueStr(value='red', entity_id=p2.id, attribute_id=fav_color.id)
+    p2_fav_color_2 = ValueStr(value='black', entity_id=p2.id, attribute_id=fav_color.id)
 
-    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend])
+    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2, p2_fav_color_1, p2_fav_color_2])
     db.commit()
 
 
@@ -154,16 +157,24 @@ def dbsession(engine, tables):
     session.close()
 
 
-@pytest.fixture
-def client(engine):
+def client_(engine):
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     def override_get_db():
         try:
-            TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             db = TestingSessionLocal()
             yield db
         finally:
             db.close()
-        
-    app.dependency_overrides[get_db] = override_get_db
+            
+    database.get_db = override_get_db
+    database.SessionLocal = TestingSessionLocal
+    from .. import create_app
+    app = create_app()
+
     client = TestClient(app)
-    yield client
+    return client
+    
+@pytest.fixture
+def client(engine):
+    yield client_(engine)
+

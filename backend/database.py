@@ -9,3 +9,12 @@ SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{s.pg_user}:{s.pg_password}@{s
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
+def get_db():
+    '''Database dependency for FastAPI'''
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
