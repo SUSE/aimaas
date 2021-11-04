@@ -2,7 +2,7 @@ from typing import Callable, Dict, List, Tuple, Union
 from collections import defaultdict
 
 import sqlalchemy
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, column
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from sqlalchemy.sql.expression import delete, intersect
@@ -371,7 +371,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
     to get entities that satisfy all conditions from `filters`
     '''
     
-    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if not i.list and i.attribute.type in ALLOWED_FILTERS}
+    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type in ALLOWED_FILTERS}
     attrs_filters, name_filters = _parse_filters(filters=filters, attrs=list(attrs))
     selects = []
 

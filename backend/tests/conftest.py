@@ -22,6 +22,7 @@ def populate_db(db: Session):
         friends|  5 | FK
         address|  6 | FK
       nickname |  7 | STR
+      fav_color|  8 | STR
 
     ### Schemas
       1. Person (person), fields:
@@ -32,6 +33,7 @@ def populate_db(db: Session):
       born   |    4    |     -    |   -    |   -  |  - 
       friends|    5    |     +    |   -    |   +  |  - 
     nickname |    7    |     -    |   +    |   -  |  -
+    fav_color|    8    |     -    |   -    |   +  |  -
 
     ### Bound FKs
 
@@ -42,10 +44,10 @@ def populate_db(db: Session):
     ### Entities
       *Person*
 
-      id |  slug  | age | born | friends | nickname | name
-      ---|--------|-----|------|---------|----------|-----
-      1  | Jack   | 10  |   -  |   []    | jack     | Jack
-      2  | Jane   | 12  |   -  |   [1]   | jane     | Jane
+      id |  slug  | age | born | friends | nickname | name | fav_color
+      ---|--------|-----|------|---------|----------|------|----------
+      1  | Jack   | 10  |   -  |   []    | jack     | Jack | red, blue
+      2  | Jane   | 12  |   -  |   [1]   | jane     | Jane | red, black
     
     '''
     age_float = Attribute(name='age', type=AttrType.FLOAT)
@@ -55,7 +57,8 @@ def populate_db(db: Session):
     friends = Attribute(name='friends', type=AttrType.FK)
     address = Attribute(name='address', type=AttrType.FK)
     nickname = Attribute(name='nickname', type=AttrType.STR)
-    db.add_all([age_float, age_int, age_str, born, friends, address, nickname])
+    fav_color = Attribute(name='fav_color', type=AttrType.STR)
+    db.add_all([age_float, age_int, age_str, born, friends, address, nickname, fav_color])
 
     person = Schema(name='Person', slug='person')
     db.add(person)
@@ -94,7 +97,15 @@ def populate_db(db: Session):
         list=False,
         key=False
     )
-    db.add_all([age_, born_, friends_, nickname_])
+    fav_color_ = AttributeDefinition(
+        schema_id=person.id,
+        attribute_id=fav_color.id,
+        required=False,
+        unique=False,
+        list=True,
+        key=False
+    )
+    db.add_all([age_, born_, friends_, nickname_, fav_color_])
     db.flush()
     bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
     db.add(bfk)
@@ -104,6 +115,8 @@ def populate_db(db: Session):
     db.flush()
     p1_nickname = ValueStr(entity_id=p1.id, attribute_id=nickname.id, value='jack')
     p1_age = ValueInt(entity_id=p1.id, attribute_id=age_int.id, value=10)
+    p1_fav_color_1 = ValueStr(value='red', entity_id=p1.id, attribute_id=fav_color.id)
+    p1_fav_color_2 = ValueStr(value='blue', entity_id=p1.id, attribute_id=fav_color.id)
 
     p2 = Entity(schema_id=person.id, slug='Jane', name='Jane')
     db.add(p2)
@@ -111,8 +124,10 @@ def populate_db(db: Session):
     p2_nickname = ValueStr(entity_id=p2.id, attribute_id=nickname.id, value='jane')
     p2_age = ValueInt(entity_id=p2.id, attribute_id=age_int.id, value=12)
     p2_friend = ValueForeignKey(entity_id=p2.id, attribute_id=friends.id, value=p1.id)
+    p2_fav_color_1 = ValueStr(value='red', entity_id=p2.id, attribute_id=fav_color.id)
+    p2_fav_color_2 = ValueStr(value='black', entity_id=p2.id, attribute_id=fav_color.id)
 
-    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend])
+    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2, p2_fav_color_1, p2_fav_color_2])
     db.commit()
 
 

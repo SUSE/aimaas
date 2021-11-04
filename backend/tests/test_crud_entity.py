@@ -203,7 +203,8 @@ class TestEntityRead:
             'age': 10,
             'friends': [],
             'born': None,
-            'nickname': 'jack'
+            'nickname': 'jack',
+            'fav_color': ['red', 'blue']
         }
         data = get_entity(dbsession, id_or_slug=jack.id, schema=jack.schema)
         assert data == expected
@@ -308,6 +309,9 @@ class TestEntityRead:
         ({'nickname.ne': 'jack'},     1, ['Jane']),
         ({'nickname.regexp': '^ja'},  2, ['Jack', 'Jane']),
         ({'nickname.contains': 'ne'}, 1, ['Jane']),
+        ({'fav_color.contains': 'b'}, 2, ['Jack', 'Jane']),
+        ({'fav_color.eq': 'black'},   1, ['Jane']),
+        ({'fav_color.ne': 'black'},   2, ['Jack', 'Jane'])  # still returns both even though Jane has black fav_color, but also has red
     ])
     def test_get_with_filter(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()

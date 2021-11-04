@@ -140,7 +140,7 @@ def _filters_request_model(schema: Schema):
 
     for attr_def in schema.attr_defs:
         attr = attr_def.attribute
-        if attr.type not in crud.ALLOWED_FILTERS or attr_def.list:
+        if attr.type not in crud.ALLOWED_FILTERS:
             continue
 
         type_ = (attr.type  # Attribute.type -> AttrType

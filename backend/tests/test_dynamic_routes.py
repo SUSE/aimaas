@@ -39,7 +39,8 @@ class TestRouteGetEntity:
             'age': 10,
             'friends': [],
             'born': None,
-            'nickname': 'jack'
+            'nickname': 'jack',
+            'fav_color': ['red', 'blue']
         }
         response = client.get('/person/1')
         assert response.status_code == 200
@@ -121,7 +122,8 @@ class TestRouteGetEntities:
                 'id': 1, 
                 'deleted': False, 
                 'slug': 'Jack',
-                'name': 'Jack'
+                'name': 'Jack',
+                'fav_color': ['red', 'blue']
             }, 
             {
                 'age': 12, 
@@ -130,7 +132,8 @@ class TestRouteGetEntities:
                 'nickname': 'jane', 
                 'id': 2, 'deleted': False, 
                 'slug': 'Jane', 
-                'name': 'Jane'
+                'name': 'Jane',
+                'fav_color': ['red', 'black']
              }
         ]}
         response = client.get(f'/person?all_fields=True')
@@ -166,7 +169,9 @@ class TestRouteGetEntities:
         ('nickname=jane',        ['jane']),
         ('nickname.ne=jack',     ['jane']),
         ('nickname.regexp=^ja',  ['jack', 'jane']),
-        ('nickname.contains=ne', ['jane'])
+        ('nickname.contains=ne', ['jane']),
+        ('fav_color.eq=black',   ['jane']),
+        ('fav_color.ne=black',   ['jack', 'jane'])  # still returns both even though Jane has black fav_color, but also has red
     ])
     def test_get_with_filter(self, dbsession, client, request, q, resp):
         ents = [request.getfixturevalue(i) for i in resp]

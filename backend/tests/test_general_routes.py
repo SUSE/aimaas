@@ -16,7 +16,8 @@ class TestRouteAttributes:
             {'id': 4, 'name': 'born', 'type': 'DT'},
             {'id': 5, 'name': 'friends', 'type': 'FK'},
             {'id': 6, 'name': 'address', 'type': 'FK'},
-            {'id': 7, 'name': 'nickname', 'type': 'STR'}
+            {'id': 7, 'name': 'nickname', 'type': 'STR'},
+            {'id': 8, 'name': 'fav_color', 'type': 'STR'}
         ]
         response = client.get('/attributes')
         assert response.json() == attrs
@@ -100,6 +101,15 @@ class TestRouteSchemasGet:
                  'required': False,
                  'type': 'STR',
                  'unique': True
+                 },
+                 {'bind_to_schema': None,
+                 'description': None,
+                 'key': False,
+                 'list': True,
+                 'name': 'fav_color',
+                 'required': False,
+                 'type': 'STR',
+                 'unique': False
                  }
             ],
             'deleted': False,
@@ -538,6 +548,16 @@ class TestRouteSchemaUpdate:
                 {
                     'bind_to_schema': None,
                     'description': None,
+                    'key': False,
+                    'list': True,
+                    'name': 'fav_color',
+                    'required': False,
+                    'type': 'STR',
+                    'unique': False
+                },
+                {
+                    'bind_to_schema': None,
+                    'description': None,
                     'key': True,
                     'list': True,
                     'name': 'address',
@@ -644,6 +664,16 @@ class TestRouteSchemaUpdate:
                     'required': False,
                     'type': 'STR',
                     'unique': True
+                },
+                {
+                    'bind_to_schema': None,
+                    'description': None,
+                    'key': False,
+                    'list': True,
+                    'name': 'fav_color',
+                    'required': False,
+                    'type': 'STR',
+                    'unique': False
                 }
             ],
             'deleted': False,
@@ -753,6 +783,16 @@ class TestRouteSchemaUpdate:
                 {
                     'bind_to_schema': None,
                     'description': None,
+                    'key': False,
+                    'list': True,
+                    'name': 'fav_color',
+                    'required': False,
+                    'type': 'STR',
+                    'unique': False
+                },
+                {
+                    'bind_to_schema': None,
+                    'description': None,
                     'key': True,
                     'list': True,
                     'name': 'address',
@@ -761,7 +801,7 @@ class TestRouteSchemaUpdate:
                     'unique': False
                 },
                 {
-                        'bind_to_schema': None,
+                    'bind_to_schema': None,
                     'description': 'test',
                     'key': False,
                     'list': False,

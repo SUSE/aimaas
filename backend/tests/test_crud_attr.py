@@ -61,9 +61,9 @@ class TestAttributeRead:
 
     def test_get_attributes(self, dbsession):
         attrs = get_attributes(dbsession)
-        assert len(attrs) == 7
+        assert len(attrs) == 8
         
-        names = {'age', 'born', 'friends', 'address', 'nickname'}
+        names = {'age', 'born', 'friends', 'address', 'nickname', 'fav_color'}
         assert set([i.name for i in attrs]) == names
 
     def test_raise_on_attr_doesnt_exist(self, dbsession):
