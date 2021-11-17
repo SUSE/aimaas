@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.applications import FastAPI
 from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
-from pydantic.main import ModelMetaclass
+from pydantic.main import BaseModel, ModelMetaclass
 
 from .models import AttrType, Schema, AttributeDefinition
 from . import crud, exceptions, schemas
@@ -13,7 +13,7 @@ from . import crud, exceptions, schemas
 
 def _make_type(attr_def: AttributeDefinition, optional: bool = False) -> tuple:
     '''Given `AttributeDefinition` returns a type that will be for type annotations in Pydantic model'''
-    
+    kwargs = {'description': attr_def.description, 'alias': attr_def.attribute.name}
     type_ = (attr_def.attribute.type  # AttributeDefinition.Attribute.type -> AttrType
             .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
             .value.property.columns[0].type.python_type)  # get python type of value column in Value child
@@ -21,7 +21,14 @@ def _make_type(attr_def: AttributeDefinition, optional: bool = False) -> tuple:
         type_ = List[type_]
     if not attr_def.required or optional:
         type_ = Optional[type_]
-    return (type_, Field(description=attr_def.description))
+    return (type_, Field(**kwargs))
+
+
+def _fieldname_for_schema(name: str):
+    """Returns modified version of `name` if it shadows member of `pydantic.BaseModel`"""
+    if name in dir(BaseModel):
+        return name + '__'
+    return name
 
 
 def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
@@ -42,7 +49,7 @@ def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
     in response in any case, it is advised to provide documentation
     in API that will list all fields and mark them as required/optional.
     '''
-    field_names = [i.attribute.name for i in schema.attr_defs]
+    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
     types = [_make_type(i, optional=True) for i in schema.attr_defs]
     fields_types = dict(zip(field_names, types))
 
@@ -217,7 +224,7 @@ def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
     This model will raise exception if passed fields that don't
     belong to it.
     '''
-    field_names = [i.attribute.name for i in schema.attr_defs]
+    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
     types = [_make_type(i) for i in schema.attr_defs]
     fields_types = dict(zip(field_names, types))
     
@@ -298,7 +305,7 @@ def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
     This model will raise exception if passed fields that don't
     belong to it.
     '''
-    field_names = [i.attribute.name for i in schema.attr_defs]
+    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
     types = [_make_type(i, optional=True) for i in schema.attr_defs]
     fields_types = dict(zip(field_names, types))
     

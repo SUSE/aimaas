@@ -16,10 +16,16 @@ class AttrTypeMapping(Enum):
 
 assert set(AttrType.__members__.keys()) == set(AttrTypeMapping.__members__.keys())
 
+def validate_attribute_name(cls, v: str):
+        if v.isidentifier() and re.match('(^_.*)|(.*_$)', v) is None:
+            return v
+        raise ValueError('Attribute name must be a valid Python identifier and must not start/end with underscore')
 
 class AttributeCreateSchema(BaseModel):
     name: str
     type: AttrTypeMapping
+
+    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
 
 class AttributeDefinitionBase(BaseModel):
@@ -54,6 +60,8 @@ class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
 
 class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
     name: str
+
+    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
 
 def validate_slug(cls, slug: str):
@@ -114,6 +122,8 @@ class AttributeSchema(BaseModel):
             return v
         else:
             raise ValueError('valid types for type field: str, AttrType, AttrTypeMapping')
+
+    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
     class Config:
         orm_mode = True

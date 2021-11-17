@@ -2,6 +2,7 @@ from typing import List
 
 from sqlalchemy import update
 import pytest
+from pydantic import BaseModel
 
 from ..crud import RESERVED_SCHEMA_SLUGS
 from ..models import *
@@ -468,6 +469,66 @@ class TestRouteSchemaCreate:
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
+    @pytest.mark.parametrize(['symbol'], [i for i in '!@"`~#№;$%^&?:,.*()-=+/\\<>'])
+    def test_raise_on_invalid_attr_name(self, dbsession, client, symbol):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'attributes': [
+                {
+                    'name': f'abc{symbol}abc',
+                    'type': 'STR',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        }
+        response = client.post('/schemas', json=data)
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize(['name'], [(i,) for i in ['_i', 'i_', '_i_', '__i__', '___i___', '__dict__']])
+    def test_raise_on_dunder_attr(self, dbsession, client, name):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'attributes': [
+                {
+                    'name': name,
+                    'type': 'STR',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        }
+        response = client.post('/schemas', json=data)
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize(['attr'], [
+        ('abc', ), 
+        ('abc123', ), 
+        ('ąbć', )  # we are not limited to letters from English alphabet
+    ] + [(i, ) for i in dir(BaseModel) if not i.startswith('_') and not i.endswith('_')])
+    def test_no_raise_on_valid_attr_name(self, dbsession, client, attr):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'attributes': [
+                {
+                    'name': attr,
+                    'type': 'STR',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        }
+        response = client.post('/schemas', json=data)
+        assert response.status_code == 200
 
 class TestRouteSchemaUpdate:
     def test_update(self, dbsession, client):
@@ -1115,7 +1176,72 @@ class TestRouteSchemaUpdate:
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
+    @pytest.mark.parametrize(['symbol'], [i for i in '!@"`~#№;$%^&?:,.*()-=+/\\<>'])
+    def test_raise_on_invalid_attr_name(self, dbsession, client, symbol):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'update_attributes': [],
+            'add_attributes': [
+                {
+                    'name': f'abc{symbol}abc',
+                    'type': 'STR',
+                    'required':False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                    'bind_to_schema': -1
+                }
+            ]
+        } 
+        response = client.put('/schemas/1', json=data)
+        assert response.status_code == 422
 
+    @pytest.mark.parametrize(['name'], [(i,) for i in ['_i', 'i_', '_i_', '__i__', '___i___', '__dict__']])
+    def test_raise_on_dunder_attr(self, dbsession, client, name):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'update_attributes': [],
+            'add_attributes': [
+                {
+                    'name': name,
+                    'type': 'STR',
+                    'required':False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                    'bind_to_schema': -1
+                }
+            ]
+        } 
+        response = client.put('/schemas/person', json=data)
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize(['attr'], [
+        ('abc', ), 
+        ('abc123', ), 
+        ('ąbć', )  # we are not limited to letters from English alphabet
+    ] + [(i, ) for i in dir(BaseModel) if not i.startswith('_') and not i.endswith('_')])
+    def test_no_raise_on_valid_attr_name(self, dbsession, client, attr):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'update_attributes': [],
+            'add_attributes': [
+                {
+                    'name': attr,
+                    'type': 'STR',
+                    'required':False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                    'bind_to_schema': -1
+                }
+            ]
+        } 
+        response = client.put('/schemas/person', json=data)
+        assert response.status_code == 200
 
 class TestRouteSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
