@@ -406,9 +406,15 @@ def get_entities(
         all: bool = False, 
         deleted_only: bool = False, 
         all_fields: bool = False,
-        filters: dict = None
+        filters: dict = None,
+        order_by: str = 'name',
+        ascending: bool = True,
     ) -> EntityListSchema:
-    
+    if order_by != 'name':
+        attrs = [i for i in schema.attr_defs if i.attribute.name == order_by]
+        if not attrs:
+            raise AttributeNotDefinedException(order_by, schema.id)
+
     if filters:
         q = _query_entity_with_filters(filters=filters, schema=schema, all=all, deleted_only=deleted_only)
     else:
@@ -416,11 +422,17 @@ def get_entities(
         if not all:
             q = q.where(Entity.deleted == deleted_only)
     total = db.execute(select(func.count(distinct(column('id')))).select_from(q.subquery())).scalar()
-    q = q.offset(offset).limit(limit).order_by(Entity.id)
+    q = q.offset(offset).limit(limit)
+    if order_by == 'name':
+        direction = 'asc' if ascending else 'desc'
+        q = q.order_by(getattr(Entity.name, direction)())
     entities = db.execute(select(Entity).from_statement(q)).scalars().all()
 
-    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key]
-    return EntityListSchema(total=total, entities=_get_attr_values_batch(db, entities, attr_defs))
+    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key or i.attribute.name == order_by]
+    entities = _get_attr_values_batch(db, entities, attr_defs)
+    if order_by != 'name':
+        entities = sorted(entities, key=lambda x: x[order_by], reverse=not ascending)
+    return EntityListSchema(total=total, entities=entities)
 
 
 def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:
