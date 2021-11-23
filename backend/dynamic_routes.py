@@ -130,7 +130,8 @@ FILTER_DESCRIPTION = {
     'ge': 'greater than or equal to',
     'ne': 'not equal to',
     'contains': 'contains substring',
-    'regexp': 'matches regular expression'
+    'regexp': 'matches regular expression',
+    'starts': 'starts with substring',
 }
 
 
