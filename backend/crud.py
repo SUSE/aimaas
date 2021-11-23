@@ -340,7 +340,8 @@ ALLOWED_FILTERS = {
     AttrType.INT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
     AttrType.FLOAT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
     AttrType.DT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
-    AttrType.BOOL: ['eq', 'ne']
+    AttrType.DATE: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
+    AttrType.BOOL: ['eq', 'ne'],
 }
 
 

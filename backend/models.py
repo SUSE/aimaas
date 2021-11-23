@@ -58,6 +58,9 @@ class ValueDatetime(Value):
     __tablename__ = 'values_datetime'
     value = Column(DateTime(timezone=True))
 
+class ValueDate(Value):
+    __tablename__ = 'values_date'
+    value = Column(Date)
 
 class Mapping(NamedTuple):
     model: Value
@@ -71,6 +74,7 @@ class AttrType(enum.Enum):
     FLOAT = Mapping(ValueFloat, float)
     FK = Mapping(ValueForeignKey, int)
     DT = Mapping(ValueDatetime, lambda x: x)
+    DATE = Mapping(ValueDate, lambda x: x)
 
 
 class BoundFK(Base):

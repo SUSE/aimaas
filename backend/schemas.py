@@ -13,6 +13,7 @@ class AttrTypeMapping(Enum):
     FLOAT = 'FLOAT'
     FK = 'FK'
     DT = 'DT'
+    DATE = 'DATE'
 
 assert set(AttrType.__members__.keys()) == set(AttrTypeMapping.__members__.keys())
 
