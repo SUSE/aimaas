@@ -88,7 +88,7 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     if data.slug in RESERVED_SCHEMA_SLUGS:
         raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
     try:
-        sch = Schema(name=data.name, slug=data.slug)
+        sch = Schema(name=data.name, slug=data.slug, reviewable=data.reviewable)
         db.add(sch)
         db.flush()
     except sqlalchemy.exc.IntegrityError:
@@ -180,7 +180,7 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
         db.execute(
             update(Schema)
             .where(Schema.id == sch.id)
-            .values(name=data.name, slug=data.slug)
+            .values(name=data.name, slug=data.slug, reviewable=data.reviewable or sch.reviewable)
         )
     except sqlalchemy.exc.IntegrityError:
         db.rollback()

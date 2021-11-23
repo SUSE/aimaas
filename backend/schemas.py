@@ -74,6 +74,7 @@ def validate_slug(cls, slug: str):
 class SchemaCreateSchema(BaseModel):
     name: str
     slug: str
+    reviewable: bool = False
     attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
@@ -82,6 +83,7 @@ class SchemaCreateSchema(BaseModel):
 class SchemaUpdateSchema(BaseModel):
     name: str
     slug: str
+    reviewable: Optional[bool]
 
     update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
     add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
@@ -107,6 +109,7 @@ class SchemaForListSchema(SchemaBaseSchema):
 
 class SchemaDetailSchema(SchemaBaseSchema):
     deleted: bool
+    reviewable: bool
     attr_defs: List[AttrDefWithAttrDataSchema] = Field(alias='attributes')
 
 

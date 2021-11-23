@@ -101,6 +101,7 @@ class Schema(Base):
     name = Column(String(128), unique=True)
     slug = Column(String(128), unique=True)
     deleted = Column(Boolean, default=False)
+    reviewable = Column(Boolean, default=False)
 
     entities = relationship('Entity', back_populates='schema')
     attr_defs = relationship('AttributeDefinition', back_populates='schema')
