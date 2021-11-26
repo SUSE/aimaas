@@ -422,16 +422,34 @@ def get_entities(
         if not all:
             q = q.where(Entity.deleted == deleted_only)
     total = db.execute(select(func.count(distinct(column('id')))).select_from(q.subquery())).scalar()
-    q = q.offset(offset).limit(limit)
-    if order_by == 'name':
+    try:
+        queries = q.selects
+        q1 = queries[0]
+        from_ = Entity.__table__.join(q1, Entity.id == q1.c.id)
+        for i in queries[1:]:
+            from_ = from_.join(i, Entity.id == i.c.id)
+        q = select(Entity).select_from(from_)
+    except AttributeError:
+        pass
+    if order_by != 'name':
+        attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type in ALLOWED_FILTERS}
+        attr = attrs[order_by]
+        value_model = attr.type.value.model
+        direction = asc if ascending else desc
+        q = q.order_by(
+            direction(
+                select(value_model.value)
+                .where(value_model.attribute_id == attr.id)
+                .where(value_model.entity_id == Entity.id).scalar_subquery()
+            ), Entity.name.asc()
+        )
+    else:
         direction = 'asc' if ascending else 'desc'
         q = q.order_by(getattr(Entity.name, direction)())
+    q = q.offset(offset).limit(limit)
     entities = db.execute(select(Entity).from_statement(q)).scalars().all()
-
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key or i.attribute.name == order_by]
     entities = _get_attr_values_batch(db, entities, attr_defs)
-    if order_by != 'name':
-        entities = sorted(entities, key=lambda x: x[order_by], reverse=not ascending)
     return EntityListSchema(total=total, entities=entities)
 
 
