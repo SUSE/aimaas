@@ -20,8 +20,7 @@ from .models import (
 
 from .schemas import (
     AttrDefSchema,
-    AttrDefWithAttrDataSchema,
-    AttributeDefinitionUpdateSchema,
+    AttrDefUpdateSchema,
     EntityListSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
@@ -97,13 +96,8 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     
     attr_names = set()
     for attr in data.attributes:
-        if isinstance(attr, AttrDefSchema):
-            a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
-            if a is None:
-                raise MissingAttributeException(attr.attr_id)
-        elif isinstance(attr, AttrDefWithAttrDataSchema):
-            a = create_attribute(db, attr, commit=False)
-            db.flush()
+        a = create_attribute(db, attr, commit=False)
+        db.flush()
         
         if a.name in attr_names:
             raise MultipleAttributeOccurencesException(a.name)
@@ -209,13 +203,8 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
     
     attr_names = set()
     for attr in data.add_attributes:
-        if isinstance(attr, AttrDefSchema):
-            a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
-            if a is None:
-                raise MissingAttributeException(obj_id=attr.attr_id)
-        elif isinstance(attr, AttrDefWithAttrDataSchema):
-            a = create_attribute(db, attr, commit=False)
-            db.flush()
+        a = create_attribute(db, attr, commit=False)
+        db.flush()
         
         if a.name in attr_names:
             raise MultipleAttributeOccurencesException(attr_name=a.name)

@@ -41,12 +41,7 @@ class AttributeDefinitionBase(BaseModel):
         orm_mode = True
         allow_population_by_field_name = True
 
-
-class AttrDefSchema(AttributeDefinitionBase):
-    attr_id: int = Field(alias='attribute_id')
-
-
-class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
+class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
     @classmethod
     def from_orm(cls, obj: Any):
         if isinstance(obj, AttributeDefinition):
@@ -55,11 +50,7 @@ class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
         return super().from_orm(obj)
 
 
-class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
-    attr_def_id: int
-
-
-class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
+class AttrDefUpdateSchema(AttributeDefinitionBase):
     name: str
 
     validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
@@ -75,7 +66,7 @@ class SchemaCreateSchema(BaseModel):
     name: str
     slug: str
     reviewable: bool = False
-    attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+    attributes: List[AttrDefSchema]
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
@@ -85,8 +76,9 @@ class SchemaUpdateSchema(BaseModel):
     slug: str
     reviewable: Optional[bool]
 
-    update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
-    add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+    update_attributes: List[AttrDefUpdateSchema] = []
+    add_attributes: List[AttrDefSchema] = []
+    delete_attributes: List[str] = []
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
@@ -110,7 +102,7 @@ class SchemaForListSchema(SchemaBaseSchema):
 class SchemaDetailSchema(SchemaBaseSchema):
     deleted: bool
     reviewable: bool
-    attr_defs: List[AttrDefWithAttrDataSchema] = Field(alias='attributes')
+    attr_defs: List[AttrDefSchema] = Field(alias='attributes')
 
 
 class AttributeSchema(BaseModel):
