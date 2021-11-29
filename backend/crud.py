@@ -83,7 +83,7 @@ def get_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
     return schema
 
 
-def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
+def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) -> Schema:
     if data.slug in RESERVED_SCHEMA_SLUGS:
         raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
     try:
@@ -130,14 +130,17 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
     return sch
 
 
-def delete_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
+def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True) -> Schema:
     q = select(Schema).where(Schema.deleted == False)
     if isinstance(id_or_slug, int):
         q = q.where(Schema.id == id_or_slug)
@@ -152,11 +155,14 @@ def delete_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
         update(Entity).where(Entity.schema_id == schema.id).values(deleted=True)
     )
     schema.deleted = True
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return schema
 
 
-def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema) -> Schema:
+def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
     if data.slug in RESERVED_SCHEMA_SLUGS:
         raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
     
@@ -245,7 +251,10 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
             bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
             db.add(bfk)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
@@ -501,7 +510,7 @@ def _check_unique_value(db: Session, attr_def: AttributeDefinition, model: Value
                 raise UniqueValueException(attr_name=attr_def.attribute.name, schema_id=attr_def.schema_id, value=val.value)
 
 
-def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
+def create_entity(db: Session, schema_id: int, data: dict, commit: bool = True) -> Entity:
     sch: Schema = db.execute(
         select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
     ).scalar()
@@ -544,11 +553,14 @@ def create_entity(db: Session, schema_id: int, data: dict) -> Entity:
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
+    if commit:
     db.commit()
+    else:
+        db.flush()
     return e
 
 
-def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data: dict) -> Entity:
+def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data: dict, commit: bool = True) -> Entity:
     q = select(Entity).where(Entity.schema_id == schema_id)
     q = q.where(Entity.id == id_or_slug) if isinstance(id_or_slug, int) else q.where(Entity.slug == id_or_slug)
     e = db.execute(q).scalar()
@@ -598,11 +610,14 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return e
 
 
-def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int) -> Entity:
+def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, commit: bool = True) -> Entity:
     q = select(Entity).where(Entity.deleted == False).where(Entity.schema_id == schema_id)
     if isinstance(id_or_slug, int):
         q = q.where(Entity.id == id_or_slug)
@@ -612,5 +627,8 @@ def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int) -> E
     if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
     e.deleted = True
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return e
