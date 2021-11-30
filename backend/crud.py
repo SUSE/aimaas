@@ -1,8 +1,8 @@
-from typing import Callable, Dict, List, Tuple, Union
-from collections import defaultdict
+from typing import Callable, Dict, List, Tuple, Union, Optional
+from collections import defaultdict, Counter
 
 import sqlalchemy
-from sqlalchemy import func, distinct, column
+from sqlalchemy import func, distinct, column, asc, desc
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from sqlalchemy.sql.expression import delete, intersect
@@ -19,8 +19,6 @@ from .models import (
 )
 
 from .schemas import (
-    AttrDefSchema,
-    AttrDefUpdateSchema,
     EntityListSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
@@ -604,7 +602,7 @@ def create_entity(db: Session, schema_id: int, data: dict, commit: bool = True) 
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
     if commit:
-    db.commit()
+        db.commit()
     else:
         db.flush()
     return e
