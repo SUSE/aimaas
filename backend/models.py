@@ -84,7 +84,9 @@ class BoundFK(Base):
     attr_def_id = Column(Integer, ForeignKey('attr_definitions.id'))
     schema_id = Column(Integer, ForeignKey('schemas.id'))
 
-    attr_def = relationship('AttributeDefinition')
+    attr_def = relationship(
+        'AttributeDefinition', 
+        back_populates='bound_fk')
     schema = relationship(
         'Schema', 
         doc='''Points to schema that is bound 
