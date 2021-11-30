@@ -1,10 +1,11 @@
+from datetime import datetime
 import re
 from enum import Enum
-from typing import List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any
 
 from pydantic import BaseModel, validator, Field
 
-from .models import AttrType, AttributeDefinition
+from .models import AttrType, AttributeDefinition, ChangeObject, ChangeStatus, ChangeType
 
 class AttrTypeMapping(Enum):
     STR = 'STR'
@@ -142,3 +143,85 @@ class EntityBaseSchema(BaseModel):
 class EntityListSchema(BaseModel):
     total: int
     entities: List[dict]
+
+
+class MetaFilterField(BaseModel):
+    operators: List[str]
+    type: str
+
+
+class FilterFields(BaseModel):
+    operators: Dict[str, List[str]]
+    fields: Dict[str, Dict[str, str]]
+
+
+class EntityListMeta(BaseModel):
+    filter_fields: FilterFields
+
+
+class EntityDetailMeta(BaseModel):
+    fields: Dict[str, Dict[str, Union[bool, str]]]
+
+
+class ReviewResult(Enum):
+    APPROVE = 'APPROVE'
+    DECLINE = 'DECLINE'
+
+
+class ChangeReviewSchema(BaseModel):
+    result: ReviewResult
+    change_object: ChangeObject
+    change_type: ChangeType
+    comment: Optional[str]
+    
+
+class ChangedEntitySchema(BaseModel):
+    slug: str
+    name: str
+    schema_slug: str = Field(alias='schema')
+
+
+class EntityChangeSchema(BaseModel):
+    new: Optional[Union[str, list[str]]]
+    old: Optional[str]
+    current: Optional[str]
+
+
+class EntityChangeDetailSchema(BaseModel):
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+    created_by: str
+    reviewed_by: Optional[str]
+    status: ChangeStatus
+    entity: ChangedEntitySchema
+    comment: Optional[str]
+    changes: dict[str, EntityChangeSchema]
+
+
+class RecentChangeSchema(BaseModel):
+    created_at: datetime
+    status: ChangeStatus
+
+    class Config:
+        orm_mode = True
+
+
+class SchemaChangesSchema(BaseModel):
+    name: Optional[Dict[str, str]]
+    slug: Optional[Dict[str, str]]
+    reviewable: Optional[Dict[str, bool]]
+    deleted: Optional[Dict[str, bool]]
+    add: Optional[List[AttrDefSchema]]
+    update: Optional[List[AttrDefUpdateSchema]]
+    delete: Optional[List[str]]
+
+
+class SchemaChangeDetailSchema(BaseModel):
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+    created_by: str
+    reviewed_by: Optional[str]
+    status: ChangeStatus
+    schema_: SchemaBaseSchema = Field(alias='schema')
+    comment: Optional[str]
+    changes: SchemaChangesSchema
