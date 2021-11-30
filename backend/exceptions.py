@@ -36,6 +36,40 @@ class MissingEntityException(MissingObjectException):
 class MissingAttributeException(MissingObjectException):
     obj_type = 'Attribute'
 
+
+class MissingChangeException(MissingObjectException):
+    obj_type = 'Change'
+
+class MissingEntityUpdateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity update request with id {self.obj_id}'
+
+
+class MissingEntityDeleteRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity delete request with id {self.obj_id}'
+
+
+class MissingEntityCreateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity create request with id {self.obj_id}'
+
+
+class MissingSchemaCreateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema create request with id {self.obj_id}'
+
+
+class MissingSchemaUpdateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema update request with id {self.obj_id}'
+
+
+class MissingSchemaDeleteRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema delete request with id {self.obj_id}'
+
+
 class MultipleAttributeOccurencesException(Exception):
     def __init__(self, attr_name: str):
         self.attr_name = attr_name
