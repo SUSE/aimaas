@@ -19,6 +19,11 @@ def load_schemas() -> List[models.Schema]:
                 subqueryload(Schema.attr_defs)
                 .subqueryload(AttributeDefinition.attribute)
             )
+             .options(
+                subqueryload(Schema.attr_defs)
+                .subqueryload(AttributeDefinition.bound_fk)
+                .subqueryload(BoundFK.schema)
+            )
         ).scalars().all()
         return schemas
     finally:
