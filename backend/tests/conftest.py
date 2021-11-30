@@ -3,6 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 
+# from backend.auth import get_password_hash
+
 from ..models import *
 from ..config import settings as s
 from .. import database
@@ -49,7 +51,93 @@ def populate_db(db: Session):
       1  | Jack   | 10  |   -  |   []    | jack     | Jack | red, blue
       2  | Jane   | 12  |   -  |   [1]   | jane     | Jane | red, black
     
-    '''
+    ### Users
+
+    id | username | password 
+    ---|----------|---------
+     1 |  admin   | admin       
+       |          |                  
+
+
+    ### Permissions
+    
+    id | obj_id | obj_type |       name      |
+    ---|--------|----------|-----------------|
+     1 |  null  |  SCHEMA  |     CREATE      |
+     2 |  null  |  SCHEMA  |     UPDATE      |
+     3 |  null  |  SCHEMA  |     DELETE      |
+     4 |  null  |  ENTITY  |     CREATE      |
+     5 |  null  |  ENTITY  |     UPDATE      |
+     6 |  null  |  ENTITY  |     DELETE      |
+     7 |  1000  |  SCHEMA  |     CREATE      |
+       |        |          |                 |   
+
+    ### User permissions
+    
+    id | user      | perm_id  |
+    ---|-----------|----------|
+     1 |  admin[1] |     1    |
+       |           |          |  
+
+    ### Groups
+    
+    id |  name     | parent group
+    ---|-----------|-------------
+     1 | GroupA    |  None
+     2 | GroupBA   |  GroupA
+     3 | GroupCA   |  GroupA
+     4 | GroupDB   |  GroupBA
+     5 | GroupEC   |  GroupCA
+       |           |  
+
+    ### Group permissions
+    
+    id | group      | perm_id  |
+    ---|------------|----------|
+     1 | GroupA[1]  |     7    |
+       |            |          |
+   
+    
+    ### Groups users
+    
+    id | group       | user       |
+    ---|-------------|------------|
+     1 | GroupEC[5]  |  admin[1]  |
+       |             |            | 
+    '''    
+    # from .. import auth
+    admin = User(username='admin', email='admin@example.com', password='12345')# password=auth.get_password_hash('admin'))
+    # perm_c_sch = Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.CREATE)
+    # perms = [Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.UPDATE),
+    #     Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.DELETE),
+    #     Permission(obj_id=None, obj_type=PermObject.ENTITY, name=PermType.CREATE),
+    #     Permission(obj_id=None, obj_type=PermObject.ENTITY, name=PermType.UPDATE),
+    #     Permission(obj_id=None, obj_type=PermObject.ENTITY, name=PermType.DELETE),]
+    db.add(admin)
+    # db.add_all(perms)
+    # db.add_all([
+    #     UserPermission(user=admin, permission=perm_c_sch),
+    #     Permission(obj_id=1000, obj_type=PermObject.SCHEMA, name=PermType.CREATE)
+    # ])
+    # for perm in perms:
+    #     db.add(UserPermission(user=admin, permission=perm))
+
+    # groupA = Group(name='groupA')
+    # groupBA = Group(name='groupBA', parent=groupA)
+    # groupCA = Group(name='groupCA', parent=groupA)
+    # groupDB = Group(name='groupDB', parent=groupBA)
+    # groupEC = Group(name='groupEC', parent=groupCA)
+
+    # db.add_all([
+    #     groupA, 
+    #     groupBA, 
+    #     groupCA, 
+    #     groupDB, 
+    #     groupEC,
+    #     UserGroup(user=admin, group=groupEC),
+    #     GroupPermission(group=groupA, permission_id=7)
+    # ])
+    
     age_float = Attribute(name='age', type=AttrType.FLOAT)
     age_int = Attribute(name='age', type=AttrType.INT)
     age_str = Attribute(name='age', type=AttrType.STR)
@@ -165,13 +253,36 @@ def client_(engine):
             yield db
         finally:
             db.close()
+    
             
     database.get_db = override_get_db
     database.SessionLocal = TestingSessionLocal
+    # from .. import auth
+    # from ..auth import Depends, oauth2_scheme
+    # db = TestingSessionLocal()
+    # user = db.execute(select(User)).scalar()
+    # db.close()
+    # async def override_get_user(
+    #     db: Session = Depends(database.get_db), 
+    #         token: str = Depends(oauth2_scheme)
+    #     ):
+    #     return user
+    # def override_authorize(*args, **kwargs):
+    #     return True
+
+    # auth.get_current_user = override_get_user
+    # auth.is_authorized = override_authorize
     from .. import create_app
     app = create_app()
+    # app.dependency_overrides[auth.get_current_user] = override_get_user
+    
 
     client = TestClient(app)
+    # put = client.put
+    # def put_override(*args, **kwargs):
+    #     kwargs['headers'] = {'Authorization': 'Bearer qwe'}
+    #     return put(*args, **kwargs)
+    # client.put = put_override
     return client
     
 @pytest.fixture
