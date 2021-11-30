@@ -1,5 +1,6 @@
 from typing import List, Callable, Optional, Union
 from dataclasses import make_dataclass
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.applications import FastAPI
@@ -57,7 +58,8 @@ def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
         'id': (int, Field(description='ID of this entity')),
         'deleted': (bool, Field(description='Indicates whether this entity is marked as deleted')),
         'slug': (str, Field(description='Slug for this entity')),
-        'name': (str, Field(description='Name of this entity'))
+        'name': (str, Field(description='Name of this entity')),
+        'meta': (Optional[schemas.EntityDetailMeta], Field(description='Metadata'))
     }
     model = create_model(
         name,
@@ -77,16 +79,28 @@ def _description_for_get_entity(schema: Schema) -> str:
     return description
 
 
+def _meta_for_get_entity(schema: Schema) -> dict:
+    meta = {'fields': defaultdict(dict)}
+    for attr_def in schema.attr_defs:
+        attr = attr_def.attribute
+        meta['fields'][attr.name]['type'] = attr.type.name
+        meta['fields'][attr.name]['list'] = attr_def.list
+        if attr.type == AttrType.FK:
+            meta['fields'][attr.name]['bind_to_schema'] = attr_def.bound_fk.schema.slug
+    return meta
+
+
 def route_get_entity(router: APIRouter, schema: Schema, get_db: Callable):
     entity_get_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}Get") 
     description = _description_for_get_entity(schema=schema)
-
+    metadata = _meta_for_get_entity(schema=schema)
     @router.get(
         f'/{schema.slug}/{{id_or_slug}}',
         response_model=entity_get_schema,
         tags=[schema.name],
         summary=f'Get {schema.name} entity by ID',
         description=description,
+        response_model_exclude_unset=True,
         responses={
             404: {
                 'description': "Entity with provided ID doesn't exist",
@@ -96,9 +110,12 @@ def route_get_entity(router: APIRouter, schema: Schema, get_db: Callable):
             }
         }
     )
-    def get_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
+    def get_entity(id_or_slug: Union[int, str], meta: bool = Query(False, description='Include metadata'), db: Session = Depends(get_db)):
         try:
-            return crud.get_entity(db=db, id_or_slug=id_or_slug, schema=schema)
+            res = crud.get_entity(db=db, id_or_slug=id_or_slug, schema=schema)
+            if meta:
+                res['meta'] = metadata
+            return res
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.MismatchingSchemaException as e:
@@ -163,14 +180,30 @@ def _filters_request_model(schema: Schema):
     return filter_model
 
 
+
+def _meta_for_get_entities(schema: Schema) -> dict:
+    meta = {'filter_fields': {'fields': defaultdict(dict), 'operators': defaultdict(dict)}}
+    for attr_def in schema.attr_defs:
+        if attr_def.attribute.type == AttrType.FK:
+            continue
+        type_ = (attr_def.attribute.type  # Attribute.type -> AttrType
+            .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
+            .value.property.columns[0].type.python_type)  # get python type of value column in Value child
+        # default filter {attr.name} which works as {attr.name}.eq, i.e. for equality filtering
+        meta['filter_fields']['operators'][type_.__name__] = crud.ALLOWED_FILTERS[attr_def.attribute.type]
+        meta['filter_fields']['fields'][attr_def.attribute.name]['type'] = type_.__name__
+    return meta
+
 def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
     entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
     description = _description_for_get_entities(schema=schema)
     filter_model = _filters_request_model(schema=schema)
+    metadata = _meta_for_get_entities(schema=schema)
     response_model = create_model(
         f'Get{entity_schema.__name__}', 
         total=(int, Field(description='Total number of entities satisfying conditions')),
-        entities=(List[entity_schema], Field(description='List of returned entities'))
+        entities=(List[entity_schema], Field(description='List of returned entities')),
+        meta=(Optional[schemas.EntityListMeta], Field(description='Metadata'))
     )
     @router.get(
         f'/{schema.slug}',
@@ -181,12 +214,15 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
         response_model_exclude_unset=True
     )
     def get_entities(
-        limit: int = Query(None, min=0, description='Limit results to `limit` entities'), 
+        limit: int = Query(s.query_limit, min=0, description='Limit results to `limit` entities'), 
         offset: int = Query(None, min=0, description='Take an offset of `offset` when retreiving entities'), 
         all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
         deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
-        all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'), 
+        all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'),
+        meta: bool = Query(False, description='Include metadata'),  
         filters: filter_model = Depends(),
+        order_by: str = Query('name', description='Ordering field'),
+        ascending: bool = Query(True, description='Direction of ordering'),
         db: Session = Depends(get_db)
     ):
         filters = {k: v for k, v in filters.__dict__.items() if v is not None}
@@ -197,7 +233,7 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
             filter = split[-1] if len(split) > 1 else 'eq'
             new_filters[f'{attr}.{filter}'] = v
         try:
-            return crud.get_entities(
+            entities = crud.get_entities(
                 db=db, 
                 schema=schema,
                 limit=limit,
@@ -205,8 +241,15 @@ def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
                 all=all,
                 deleted_only=deleted_only,
                 all_fields=all_fields,
-                filters=new_filters
-            )  # these two exceptions are not supposed to be ever raised
+                filters=new_filters,
+                order_by=order_by,
+                ascending=ascending
+            )  
+            if meta:
+                entities = entities.dict()
+                entities['meta'] = metadata
+            return entities
+        # these two exceptions are not supposed to be ever raised
         except exceptions.InvalidFilterAttributeException as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
         except exceptions.InvalidFilterOperatorException as e:
