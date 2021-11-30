@@ -35,10 +35,18 @@ def review_changes(db: Session, change_id: int, review: ChangeReviewSchema, revi
             reviewed_by=reviewed_by,
             comment=review.comment
         )
+    kwargs = {'db': db, 'change_id': change_id, 'reviewed_by': reviewed_by, 'comment': review.comment}
     if review.change_object == ChangeObject.SCHEMA:
-        pass
+        if review.change_type == ChangeType.CREATE:
+            return apply_schema_create_request(**kwargs)
+        elif review.change_type == ChangeType.UPDATE:
+            return apply_schema_update_request(**kwargs)
+        elif review.change_type == ChangeType.DELETE:
+            return apply_schema_delete_request(**kwargs)
     elif review.change_object == ChangeObject.ENTITY:
         if review.change_type == ChangeType.CREATE:
-            pass
+            return apply_entity_create_request(**kwargs)
         elif review.change_type == ChangeType.UPDATE:
-            return apply_entity_update_request(db=db, change_id=change_id, reviewed_by=reviewed_by, comment=review.comment)
+            return apply_entity_update_request(**kwargs)
+        elif review.change_type == ChangeType.DELETE:
+            return apply_entity_delete_request(**kwargs)
