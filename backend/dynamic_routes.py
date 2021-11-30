@@ -8,8 +8,9 @@ from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
 from pydantic.main import BaseModel, ModelMetaclass
 
-from .models import AttrType, Schema, AttributeDefinition
-from . import crud, exceptions, schemas
+from .models import AttrType, Schema, AttributeDefinition, User
+from . import crud, exceptions, schemas, traceability
+from .config import settings as s
 
 
 def _make_type(attr_def: AttributeDefinition, optional: bool = False) -> tuple:
@@ -320,7 +321,20 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
     )
     def create_entity(data: entity_create_schema, db: Session = Depends(get_db)):
         try:
-            return crud.create_entity(db=db, schema_id=schema.id, data=data.dict())
+            # user: User = Depends(auth.get_current_user)
+            from sqlalchemy import select
+            user = db.execute(select(User)).scalar()
+            change = traceability.create_entity_create_request(
+                db=db, 
+                schema_id=schema.id, 
+                data=data.dict(), 
+                created_by=user,
+                commit=False
+            )
+            if not schema.reviewable:
+                return traceability.apply_entity_create_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+            db.commit()
+            return {}
         except exceptions.MissingSchemaException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.EntityExistsException as e:
@@ -371,7 +385,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
     entity_update_schema = _update_entity_request_model(schema=schema)
     @router.put(
         f'/{schema.slug}/{{id_or_slug}}',
-        response_model=schemas.EntityBaseSchema,
+        response_model=Union[schemas.EntityBaseSchema, dict],
         tags=[schema.name],
         summary=f'Update {schema.name} entity',
         responses={
@@ -402,9 +416,23 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             }
         }
     )
-    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema, db: Session = Depends(get_db)):
+    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema , db: Session = Depends(get_db)):
         try:
-            return crud.update_entity(db=db, id_or_slug=id_or_slug, schema_id=schema.id, data=data.dict(exclude_unset=True))
+            # user: User = Depends(auth.get_current_user)
+            from sqlalchemy import select
+            user = db.execute(select(User)).scalar()
+            change = traceability.create_entity_update_request(
+                db=db, 
+                id_or_slug=id_or_slug, 
+                schema_id=schema.id, 
+                data=data.dict(exclude_unset=True), 
+                created_by=user,
+                commit=False
+            )
+            if not schema.reviewable:
+                return traceability.apply_entity_update_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+            db.commit()
+            return {}
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.MissingSchemaException as e:
@@ -433,7 +461,21 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
     )
     def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
         try:
-            return crud.delete_entity(db=db, id_or_slug=id_or_slug, schema_id=schema.id)
+            # user: User = Depends(auth.get_current_user)
+            from sqlalchemy import select
+            user = db.execute(select(User)).scalar()
+
+            change = traceability.create_entity_delete_request(
+                db=db, 
+                id_or_slug=id_or_slug, 
+                schema_id=schema.id, 
+                created_by=user, 
+                commit=False
+            )
+            if not schema.reviewable:
+                return traceability.apply_entity_delete_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+            db.commit()
+            return {}
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         

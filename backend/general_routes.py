@@ -46,12 +46,18 @@ def get_schemas(
 
 @router.post(
     '/schemas', 
-    response_model=schemas.SchemaForListSchema,
+    response_model=Union[schemas.SchemaForListSchema, dict],
     tags=['General routes']
 )
 def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db)):
     try:
-        schema = crud.create_schema(db=db, data=data)
+        from sqlalchemy import select
+        user = db.execute(select(User)).scalar()
+        change = traceability.create_schema_create_request(
+            db=db, data=data, created_by=user, commit=False
+        )
+        schema =  traceability.apply_schema_create_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+        db.commit()
         create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
         return schema
     except exceptions.ReservedSchemaSlugException as e:
@@ -82,13 +88,25 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
 
 @router.put(
     '/schemas/{id_or_slug}', 
-    response_model=schemas.SchemaDetailSchema,
+    response_model=schemas.SchemaBaseSchema,
     tags=['General routes']
 )
-def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str], request: Request, db: Session = Depends(get_db)):
+def update_schema(
+    data: schemas.SchemaUpdateSchema, 
+    id_or_slug: Union[int, str], 
+    request: Request, 
+    db: Session = Depends(get_db),
+    ):
     try:
         old_slug = crud.get_schema(db=db, id_or_slug=id_or_slug).slug
-        schema = crud.update_schema(db=db, id_or_slug=id_or_slug, data=data)
+
+        from sqlalchemy import select
+        user = db.execute(select(User)).scalar()
+        change = traceability.create_schema_update_request(
+            db=db, id_or_slug=id_or_slug, data=data, created_by=user, commit=False
+        )
+        schema =  traceability.apply_schema_update_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+        db.commit()
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
         return schema
     except exceptions.ReservedSchemaSlugException as e:
@@ -119,6 +137,13 @@ def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str],
 )
 def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
     try:
-        return crud.delete_schema(db=db, id_or_slug=id_or_slug)
+        from sqlalchemy import select
+        user = db.execute(select(User)).scalar()
+        change = traceability.create_schema_delete_request(
+            db=db, id_or_slug=id_or_slug, created_by=user, commit=False
+        )
+        schema = traceability.apply_schema_delete_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+        db.commit()
+        return schema
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
