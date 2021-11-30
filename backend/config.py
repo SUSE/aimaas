@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     test_pg_port:  Optional[int] = 5432
     test_pg_db:  Optional[str]
 
+    query_limit: Optional[int] = 10
     class Config:
         env_file = '.env'
 
