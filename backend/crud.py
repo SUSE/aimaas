@@ -162,6 +162,37 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     return schema
 
 
+def _check_attr_names_after_update(schema: Schema, data: SchemaUpdateSchema):
+    attrs = [i.attribute.name for i in schema.attr_defs]
+    expected_count = len(attrs) - len(data.delete_attributes) + len(data.add_attributes)
+    attrs = [i for i in attrs if i not in data.delete_attributes]
+
+    for attr in data.update_attributes:
+        if attr.new_name:
+            attrs.remove(attr.name)
+            attrs.append(attr.new_name)
+    for attr in data.add_attributes:
+        attrs.append(attr.name)
+
+    repeating_attrs = [i for i, count in Counter(attrs).items() if count > 1]
+    if repeating_attrs:
+        raise MultipleAttributeOccurencesException(', '.join(repeating_attrs))
+
+    assert len(attrs) == expected_count
+
+
+def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
+    attrs = {i.attribute.name: i.attribute.type.name for i in schema.attr_defs}
+    deleted = [i for i in schema.attr_defs if i.attribute.name in data.delete_attributes]
+    deleted = {i.attribute.name: i.attribute.type.name for i in deleted}
+    for attr in data.add_attributes:
+        if attr.name in deleted and deleted[attr.name] == attr.type.name:
+            raise Exception('NOOP CHANGE')
+    for attr in data.update_attributes:
+        if attr.name in deleted and deleted[attr.name] == attrs[attr.name]:
+             raise Exception('NOOP CHANGE')
+
+
 def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
     if data.slug in RESERVED_SCHEMA_SLUGS:
         raise ReservedSchemaSlugException(slug=data.slug, reserved=RESERVED_SCHEMA_SLUGS)
@@ -180,22 +211,38 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
         db.execute(
             update(Schema)
             .where(Schema.id == sch.id)
-            .values(name=data.name, slug=data.slug, reviewable=data.reviewable or sch.reviewable)
+            .values(
+                name=data.name or sch.name, 
+                slug=data.slug or sch.slug, 
+                reviewable=data.reviewable if data.reviewable is not None else sch.reviewable)
         )
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
+    
+    _check_no_op_changes(schema=sch, data=data)
+    _check_attr_names_after_update(schema=sch, data=data)
 
-    attr_def_ids: Dict[int, AttributeDefinition] = {i.id: i for i in sch.attr_defs}
     attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
+
+    for attr in data.delete_attributes:
+        attr_def = attr_def_names.get(attr)
+        if attr_def is None:
+            raise AttributeNotDefinedException(attr_id=attr, schema_id=sch.id)
+        ValueModel = attr_def.attribute.type.value.model
+        db.execute(delete(BoundFK).where(BoundFK.attr_def_id == attr_def.id))
+        db.execute(delete(AttributeDefinition).where(AttributeDefinition.id == attr_def.id))
+        db.execute(delete(ValueModel)
+            .where(ValueModel.attribute_id == attr_def.attribute_id)
+            .where(ValueModel.entity_id == Entity.id)
+            .where(Entity.schema_id == sch.id)
+            .execution_options(synchronize_session=False)
+        )
     for attr in data.update_attributes:
-        if isinstance(attr, AttributeDefinitionUpdateSchema):
-            attr_def = attr_def_ids.get(attr.attr_def_id)
-        else:
-            attr_def = attr_def_names.get(attr.name)
+        attr_def = attr_def_names.get(attr.name)
         
         if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr.attr_def_id, schema_id=sch.id)
+            raise AttributeNotDefinedException(attr_id=attr.name, schema_id=sch.id)
         if attr_def.list and not attr.list:
             raise ListedToUnlistedException(attr_def_id=attr_def.id)
         if attr.list:
@@ -205,20 +252,20 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
         attr_def.list = attr.list
         attr_def.key = attr.key
         attr_def.description = attr.description
+
+        if attr.new_name:
+            attr_def.attribute = create_attribute(
+                db=db, 
+                data=AttributeCreateSchema(name=attr.new_name, type=attr_def.attribute.type.name),
+                commit=False
+            )
+                
+
     db.flush()
     
-    attr_names = set()
     for attr in data.add_attributes:
         a = create_attribute(db, attr, commit=False)
         db.flush()
-        
-        if a.name in attr_names:
-            raise MultipleAttributeOccurencesException(attr_name=a.name)
-        elif a.name in attr_def_names:
-            raise AttributeAlreadyDefinedException(attr_id=a.id, schema_id=sch.id)
-
-        attr_names.add(a.name)
-        
         try:
             ad = AttributeDefinition(
                 attribute_id=a.id, 
