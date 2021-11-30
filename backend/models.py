@@ -166,10 +166,11 @@ class AttributeDefinition(Base):
     unique = Column(Boolean)
     key = Column(Boolean)
     list = Column(Boolean, default=False)
-    description = Column(String)
+    description = Column(String(128))
 
     schema = relationship('Schema', back_populates='attr_defs')
     attribute = relationship('Attribute', back_populates='attr_defs')
+    bound_fk = relationship('BoundFK', back_populates='attr_def', uselist=False)
 
     __table_args__ = (
         UniqueConstraint('schema_id', 'attribute_id'),
