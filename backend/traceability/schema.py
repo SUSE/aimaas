@@ -19,7 +19,7 @@ def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> Sc
         .order_by(Change.created_at.desc()).limit(count)
     ).scalars().all()
 
-def schema_change_details(db: Session, change_id: int):
+def schema_change_details(db: Session, change_id: int) -> SchemaChangeDetailSchema:
     # TODO details for schema create?
     change = db.execute(select(Change).where(Change.id == change_id).where(Change.change_object == ChangeObject.SCHEMA)).scalar()
     if change is None:
@@ -85,7 +85,7 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
     return change
 
 
-def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True):
+def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Schema:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)
@@ -127,7 +127,7 @@ def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, 
     return schema
 
 
-def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, created_by: User, commit: bool = True):
+def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, created_by: User, commit: bool = True) -> Change:
     crud.update_schema(db=db, id_or_slug=id_or_slug, data=data, commit=False)
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
@@ -184,7 +184,7 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     return change
 
 
-def apply_schema_update_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None):
+def apply_schema_update_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None) -> Schema:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)

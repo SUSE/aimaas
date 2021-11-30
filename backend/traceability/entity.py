@@ -72,7 +72,7 @@ def get_old_value(db: Session, entity: Entity, attr_name: str) -> Any:
     return str(val.value) if val is not None else None
 
 
-def create_entity_create_request(db: Session, data: dict, schema_id: int, created_by: User, commit: bool = True):
+def create_entity_create_request(db: Session, data: dict, schema_id: int, created_by: User, commit: bool = True) -> Change:
     crud.create_entity(db=db, schema_id=schema_id, data=deepcopy(data), commit=False)
     db.rollback()
     
@@ -103,7 +103,7 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     return change
 
 
-def apply_entity_create_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None):
+def apply_entity_create_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None) -> Entity:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)
@@ -155,7 +155,7 @@ def apply_entity_create_request(db: Session, change_id: int, reviewed_by: User, 
     return e
 
 
-def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schema_id: int, data: dict, created_by: User, commit: bool = True):
+def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schema_id: int, data: dict, created_by: User, commit: bool = True) -> Change:
     crud.update_entity(db=db, id_or_slug=id_or_slug, schema_id=schema_id, data=deepcopy(data), commit=False)
     db.rollback()
     if isinstance(id_or_slug, int):
@@ -199,7 +199,7 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     return change
 
 
-def apply_entity_update_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None):
+def apply_entity_update_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None) -> Entity:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)
@@ -273,7 +273,7 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
     return change
 
 
-def apply_entity_delete_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str]):
+def apply_entity_delete_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str]) -> Entity:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)
