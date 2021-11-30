@@ -451,16 +451,19 @@ def get_entities(
     return EntityListSchema(total=total, entities=entities)
 
 
-def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:
+def get_entity_model(db: Session, id_or_slug: Union[int, str], schema: Schema) -> Optional[Entity]:
+    q = select(Entity).where(Entity.schema_id == schema.id)
     if isinstance(id_or_slug, int):
-        e = db.execute(select(Entity).where(Entity.id == id_or_slug)).scalar()
+        return db.execute(q.where(Entity.id == id_or_slug)).scalar()
     else:
-        e = db.execute(select(Entity).where(Entity.slug == id_or_slug)).scalar()
+        return db.execute(q.where(Entity.slug == id_or_slug)).scalar()
+
+
+def get_entity(db: Session, id_or_slug: Union[int, str], schema: Schema) -> dict:
+    e = get_entity_model(db=db, id_or_slug=id_or_slug, schema=schema)
     
     if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
-    if e.schema_id != schema.id:
-        raise MismatchingSchemaException(entity_id=id_or_slug, schema_id=schema.id)
 
     attrs = [i.attribute.name for i in schema.attr_defs]
     return _get_entity_data(db=db, entity=e, attr_names=attrs)
