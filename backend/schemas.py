@@ -47,6 +47,8 @@ class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
         if isinstance(obj, AttributeDefinition):
             obj.type = obj.attribute.type.name
             obj.name = obj.attribute.name
+            if obj.attribute.type == AttrType.FK:
+                obj.bind_to_schema = obj.bound_fk.schema_id
         return super().from_orm(obj)
 
 
