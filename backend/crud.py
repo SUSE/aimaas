@@ -468,9 +468,11 @@ def get_entities(
     try:
         queries = q.selects
         q1 = queries[0]
-        from_ = Entity.__table__.join(q1, Entity.id == q1.c.id)
-        for i in queries[1:]:
-            from_ = from_.join(i, Entity.id == i.c.id)
+        sub = q1.subquery(name='anon_1')
+        from_ = Entity.__table__.join(sub, Entity.id == sub.c.id)
+        for idx, i in enumerate(queries[1:]):
+            sub = i.subquery(name=f'anon_{idx+2}')
+            from_ = from_.join(sub, Entity.id == sub.c.id)
         q = select(Entity).select_from(from_)
     except AttributeError:
         pass
