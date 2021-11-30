@@ -54,6 +54,7 @@ class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
 
 class AttrDefUpdateSchema(AttributeDefinitionBase):
     name: str
+    new_name: Optional[str]
 
     validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
