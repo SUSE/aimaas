@@ -72,8 +72,8 @@ class SchemaCreateSchema(BaseModel):
 
 
 class SchemaUpdateSchema(BaseModel):
-    name: str
-    slug: str
+    name: Optional[str]
+    slug: Optional[str]
     reviewable: Optional[bool]
 
     update_attributes: List[AttrDefUpdateSchema] = []
