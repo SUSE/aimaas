@@ -2,7 +2,7 @@ from typing import List
 # from datetime import timedelta
 
 from fastapi import FastAPI#, Depends, HTTPException, status
-# from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
@@ -53,12 +53,12 @@ def create_app() -> FastAPI:
         create_dynamic_router(schema=schema, app=app, get_db=database.get_db)
     app.include_router(router)
 
-    # origins = ['*']
-    # app.add_middleware(CORSMiddleware,
-    #     allow_origins=origins,
-    #     allow_credentials=True,
-    #     allow_methods=['*'],
-    #     allow_headers=['*'])
+    origins = ['*']
+    app.add_middleware(CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'])
 
     # from . import auth
     # @app.post("/token", response_model=auth.Token)
