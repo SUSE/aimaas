@@ -86,20 +86,6 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
-@router.patch('/schemas/{schema_id}', tags=['General routes'])
-def exterminate_schema(schema_id: int, r: Request, db: Session = Depends(get_db)):
-    sch = crud.get_schema(db, schema_id)
-    app = r.app
-    routes_to_remove = []
-    for route in app.routes:
-        if route.path.startswith(f'/{sch.slug}/') or route.path == f'/{sch.slug}':
-            routes_to_remove.append(route)
-    for route in routes_to_remove:
-        app.routes.remove(route)
-    
-    app.openapi_schema = None
-    return crud.delete_schema_from_db(db, schema_id)
-
 
 @router.put(
     '/schemas/{id_or_slug}', 
