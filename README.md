@@ -1,6 +1,6 @@
-# Abstract Information Management and Authority Service (aimaas) 
+# Abstract Information Management and Authority Service (_aimaas_) 
 
-aimaas aims to be a central authoritative web service for information management. Main aspects in
+_aimaas_ aims to be a central authoritative web service for information management. Main aspects in
 (future) development are:
 
 * [EAV](https://en.wikipedia.org/wiki/Entity%E2%80%93attribute%E2%80%93value_model) data model
@@ -9,25 +9,33 @@ aimaas aims to be a central authoritative web service for information management
 * Role-based permission management
 * Traceability of information changes
 
-## What does this mean?
-
-Are you familiar with [PIM](https://en.wikipedia.org/wiki/Product_information_management) systems 
-for eCommerce? They are central hubs for product information and related media. They can be the
-primary authority for this information or an intermediary between systems providing the data (e.g. a
-company's internal system) and system consuming the data (e.g. a webshop on the internet).
-
-Did you notice the limitation to *product* information? What if we want to manage information of
-different types, say additional *product bundles*? This is where the **abstract** comes into play.
-aimaas wants to allow users to define their own object types with different attributes and value 
-types in a traceable way.
-
-Think of aimaas as an abstraction of an SQL database where traceability information is also inside
-the database instead of log files.
+For more details on _aimaas_ see: 
+[Philosophy & Architecture](https://github.com/SUSE/aimaas/wiki/Philosophy-&-Architecture).
 
 ## Status
 
-This project is currently in the initial planning phase.
+This project is currently under active development.
 
 ## Contributing
 
-Right now anyone can contribute by defining requirements.
+Right now anyone can contribute by defining requirements or submitting pull requests.
+
+# Getting started
+
+We assume that interested parties are familiar with Python, JavaScript, FastAPI and NodeJs.
+
+## Setup
+In a nutshell these are the steps to set up a development environment:
+
+1. Install PostgreSQL.
+2. Create a database.
+3. Create a config file: `.env`.
+4. Create a Python virtualenv.
+5. Install Python dependencies with `pip`.
+6. Run database migrations: `alembic upgrade head`.
+
+## Cheat Sheet
+
+This is a collection of helpful links:
+
+* [Create database migration](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)
