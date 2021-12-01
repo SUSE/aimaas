@@ -1,11 +1,8 @@
-from datetime import datetime, timezone
-
 import pytest
 
 from ..config import *
 from ..crud import *
 from ..models import *
-from ..schemas import *
 from ..exceptions import *
 
 
@@ -24,6 +21,7 @@ def asserts_after_entities_create(db: Session):
 class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
+        tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
         p1 = {
             'name': 'Mike',
             'slug': 'Mike',
@@ -41,6 +39,15 @@ class TestEntityCreate:
             'born': born
         }
         p2 = create_entity(dbsession, schema_id=1, data=p2)
+        p3 = {
+            'name': 'Pumpkin Jack',
+            'slug': 'pumpkin-jack',
+            'nickname': 'pumpkin',
+            'age': 38,
+            'friends': [p1.id, p2.id],
+            'born': tz_born
+        }
+        p3 = create_entity(dbsession, schema_id=1, data=p3)
 
         asserts_after_entities_create(dbsession)
     
@@ -420,7 +427,7 @@ def asserts_after_entities_update(db: Session, born_time: datetime):
 
 class TestEntityUpdate:
     def test_update(self, dbsession):
-        time = datetime.now(timezone.utc)
+        time = datetime.now(timezone(timedelta(hours=-4)))
         data = {
             'slug': 'test',
             'nickname': None,
