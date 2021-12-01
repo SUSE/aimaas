@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from sqlalchemy import select, update
@@ -63,6 +63,7 @@ class TestRouteCreateEntity:
         asserts_after_applying_entity_create_request(dbsession, change_id=1)
 
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
+        tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
         p2 = {
             'name': 'John',
             'slug': 'John',
@@ -73,11 +74,26 @@ class TestRouteCreateEntity:
         }
         response = client.post(f'/dynamic/person', json=p2)
         json = response.json()
-        del json['id']
+        john_id = json.pop('id')
         assert json == {'slug': 'John', 'name': 'John', 'deleted': False}
+        
+        asserts_after_applying_entity_create_request(dbsession, change_id=2)
+
+        p3 = {
+            'name': 'Pumpkin Jack',
+            'slug': 'pumpkin-jack',
+            'nickname': 'pumpkin',
+            'age': 38,
+            'friends': [mike_id, john_id],
+            'born': str(tz_born)
+        }
+        response = client.post(f'/dynamic/person', json=p3)
+        json = response.json()
+        del json['id']
+        assert json == {'slug': 'pumpkin-jack', 'name': 'Pumpkin Jack', 'deleted': False}
 
         asserts_after_entities_create(dbsession)
-        asserts_after_applying_entity_create_request(dbsession, change_id=2)
+        asserts_after_applying_entity_create_request(dbsession, change_id=3)
 
     def test_raise_on_non_unique_slug(self, dbsession, client):
         p1 = {

@@ -8,15 +8,17 @@ from ..exceptions import *
 
 def asserts_after_entities_create(db: Session):
     born = datetime(1990, 6, 30, tzinfo=timezone.utc)
+    tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
     persons = db.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
-    assert len(persons) == 4
-    assert persons[-1].name == 'John'
-    assert persons[-1].slug == 'John'
-    assert persons[-1].get('nickname', db).value == 'john'
-    assert persons[-1].get('age', db).value == 10
-    assert persons[-1].get('born', db).value == born
-    assert isinstance(persons[-1].get('age', db), ValueInt)
-    assert [i.value for i in persons[-1].get('friends', db)] == [persons[-2].id, 1]
+    assert len(persons) == 5
+    assert persons[-2].name == 'John'
+    assert persons[-2].slug == 'John'
+    assert persons[-2].get('nickname', db).value == 'john'
+    assert persons[-2].get('age', db).value == 10
+    assert persons[-2].get('born', db).value == born
+    assert isinstance(persons[-2].get('age', db), ValueInt)
+    assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
+    assert persons[-1].get('born', db).value == tz_born
 
 class TestEntityCreate:
     def test_create(self, dbsession):
@@ -39,6 +41,7 @@ class TestEntityCreate:
             'born': born
         }
         p2 = create_entity(dbsession, schema_id=1, data=p2)
+
         p3 = {
             'name': 'Pumpkin Jack',
             'slug': 'pumpkin-jack',
@@ -404,7 +407,7 @@ def asserts_after_entities_update(db: Session, born_time: datetime):
     e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
     assert e.slug == 'test'
     assert e.get('age', db).value == 10
-    assert e.get('born', db).value == born_time
+    assert e.get('born', db).value.replace(tzinfo=timezone.utc) == born_time
     assert [i.value for i in e.get('friends', db)] == [1, 2]
     assert e.get('nickname', db) == None
     nicknames = db.execute(
