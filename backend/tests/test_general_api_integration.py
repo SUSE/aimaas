@@ -6,7 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 from dateutil import parser
 
-from ..crud import RESERVED_SCHEMA_SLUGS
 from ..models import *
 from ..schemas import *
 from .test_crud_schema import (
@@ -218,21 +217,9 @@ class TestRouteSchemaCreate:
         json = response.json()
         del json['id']
         assert json == {'name': 'Car', 'slug': 'car'}
-        assert '/car' in [i.path for i in client.app.routes]
+        assert '/dynamic/car' in [i.path for i in client.app.routes]
         asserts_after_applying_schema_create_request(dbsession, change_id=1, comment='Autosubmit')
         asserts_after_schema_create(dbsession)
-
-    def test_raise_on_reserved_slug(self, dbsession: Session, client: TestClient):
-        for i in RESERVED_SCHEMA_SLUGS:
-            data = {
-                'name': 'Person',
-                'slug': i,
-                'attributes': []
-            }
-            response = client.post('/schemas', json=data)
-            assert response.status_code == 409
-            assert "Can't create schema with slug" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession: Session, client: TestClient):
         data = {
@@ -390,23 +377,11 @@ class TestRouteSchemaUpdate:
         assert json == result
 
         routes = [i.path for i in client.app.routes]
-        assert '/test' in routes
-        assert '/person' not in routes
+        assert '/dynamic/test' in routes
+        assert '/dynamic/person' not in routes
 
         asserts_after_applying_schema_update_request(db=dbsession, comment='Autosubmit')
         asserts_after_schema_update(db=dbsession)
-
-
-    def test_raise_on_reserved_slug(self, dbsession: Session, client: TestClient):
-        for i in RESERVED_SCHEMA_SLUGS:
-            data = {
-                'name': 'Person',
-                'slug': i,
-            }
-            response = client.put('/schemas/1', json=data)
-            assert response.status_code == 409
-            assert "Can't create schema with slug" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
 
     def test_raise_on_existing_slug_or_name(self, dbsession: Session, client: TestClient):

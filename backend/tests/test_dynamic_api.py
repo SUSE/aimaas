@@ -28,7 +28,7 @@ class TestRouteGetEntities:
     ])
     def test_get_entities_with_different_params(self, mocker, params: dict, dbsession: Session, client: TestClient):
         mocker.patch('backend.crud.get_entities', return_value=EntityListSchema(total=0, entities=[]))
-        response = client.get('/person', params=params)
+        response = client.get('/dynamic/person', params=params)
         assert response.status_code < 400
     
 
@@ -43,7 +43,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [],
         }
-        response = client.post(f'/person', json=data)
+        response = client.post(f'/dynamic/person', json=data)
         assert response.status_code < 400
 
 
@@ -54,7 +54,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': []
         }
-        response = client.post(f'/person', json=p1)
+        response = client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 422
         assert 'is invalid value for slug field' in response.json()['detail'][0]['msg']
 
@@ -67,7 +67,7 @@ class TestRouteCreateEntity:
             'friends': [1],
             'nonexistent': True
         }
-        response = client.post(f'/person', json=p)
+        response = client.post(f'/dynamic/person', json=p)
         assert response.status_code == 422
         assert 'extra fields not permitted' in response.json()['detail'][0]['msg']
 
@@ -79,7 +79,7 @@ class TestRouteCreateEntity:
             'age': 'INVALID VALUE',
             'friends': [1],
         }
-        response = client.post(f'/person', json=p)
+        response = client.post(f'/dynamic/person', json=p)
         assert response.status_code == 422
         assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
 
@@ -91,7 +91,7 @@ class TestRouteCreateEntity:
             'age': [1, 2, 3],
             'friends': [1],
         }
-        response = client.post(f'/person', json=p)
+        response = client.post(f'/dynamic/person', json=p)
         assert response.status_code == 422
         assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
 
@@ -103,7 +103,7 @@ class TestRouteCreateEntity:
             'age': 2,
             'friends': 1,
         }
-        response = client.post(f'/person', json=p)
+        response = client.post(f'/dynamic/person', json=p)
         assert response.status_code == 422
         assert 'value is not a valid list' in response.json()['detail'][0]['msg']
         
@@ -113,7 +113,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [1]
         }
-        response = client.post(f'/person', json=p1)
+        response = client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 422
         assert 'field required' in response.json()['detail'][0]['msg']
 
@@ -122,7 +122,7 @@ class TestRouteCreateEntity:
             'slug': 'Mike',
             'friends': [1]
         }
-        response = client.post(f'/person', json=p1)
+        response = client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 422
         assert 'field required' in response.json()['detail'][0]['msg']
 
@@ -138,7 +138,7 @@ class TestRouteUpdateEntity:
             'born': '2021-10-20T13:52:17+03',
             'friends': [1, 2],
         }
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code < 400
 
 
@@ -146,36 +146,36 @@ class TestRouteUpdateEntity:
         p1 = {
             'slug': '-Jake-', 
         }
-        response = client.put(f'/person/1', json=p1)
+        response = client.put(f'/dynamic/person/1', json=p1)
         assert response.status_code == 422
         assert 'is invalid value for slug field' in response.json()['detail'][0]['msg']
 
     def test_raise_on_deleting_required_value(self, dbsession, client):
         data = {'age': None}
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'Missing required field' in response.json()['detail']
 
     def test_raise_on_attribute_not_defined_on_schema(self, dbsession, client):
         data = {'not_existing_attr': 50000}
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'extra fields not permitted' in response.json()['detail'][0]['msg']
 
         data = {'address': 1234}
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'extra fields not permitted' in response.json()['detail'][0]['msg']
 
     def test_raise_on_passing_list_for_not_listed_attr(self, dbsession, client):
         data = {'age': [1, 2, 3, 4, 5]}
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
 
     def test_raise_on_passing_single_value_for_listed_attr(self, dbsession, client):
         data = {'friends': 1}
-        response = client.put('person/1', json=data)
+        response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'value is not a valid list' in response.json()['detail'][0]['msg']
     
@@ -184,8 +184,8 @@ class TestRouteDeleteEntity:
         mocker.patch('backend.traceability.create_entity_delete_request', return_value=Change(id=1))
         mocker.patch('backend.traceability.apply_entity_delete_request', return_value=dbsession.execute(select(Entity)).scalar())
 
-        response = client.delete(f'/person/1')
+        response = client.delete(f'/dynamic/person/1')
         assert response.status_code < 400
 
-        response = client.delete(f'/person/Jack')
+        response = client.delete(f'/dynamic/person/Jack')
         assert response.status_code < 400

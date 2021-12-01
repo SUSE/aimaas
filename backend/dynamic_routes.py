@@ -494,10 +494,10 @@ def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable, old_sl
     for route in app.routes:
         if (route.path, route.methods) in router_routes:
             routes_to_remove.append(route)
-        elif old_slug and (route.path.startswith(f'/{old_slug}/') or route.path == f'/{old_slug}'):
+        elif old_slug and (route.path.startswith(f'/dynamic/{old_slug}/') or route.path == f'/dynamic/{old_slug}'):
             routes_to_remove.append(route)
     for route in routes_to_remove:
         app.routes.remove(route)
 
-    app.include_router(router, prefix='')
+    app.include_router(router, prefix='/dynamic')
     app.openapi_schema = None

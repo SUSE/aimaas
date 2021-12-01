@@ -94,13 +94,6 @@ class TestSchemaCreate:
         create_schema(dbsession, data=car)
         asserts_after_schema_create(dbsession)
 
-
-    def test_raise_on_reserved_slug(self, dbsession):
-        for i in RESERVED_SCHEMA_SLUGS:
-            sch = SchemaCreateSchema(name='Person', slug=i, attributes=[])
-            with pytest.raises(ReservedSchemaSlugException):
-                create_schema(dbsession, data=sch)
-
     def test_raise_on_duplicate_name_or_slug(self, dbsession):
         sch = SchemaCreateSchema(name='Person', slug='test', attributes=[])
         with pytest.raises(SchemaExistsException):
@@ -111,19 +104,6 @@ class TestSchemaCreate:
         with pytest.raises(SchemaExistsException):
             create_schema(dbsession, data=sch)
         dbsession.rollback()
-
-    # def test_raise_on_nonexistent_attr_id(self, dbsession):
-    #     nonexistent = AttrDefSchema(
-    #         attr_id=99999,
-    #         required=True,
-    #         unique=True,
-    #         list=False,
-    #         key=True,
-    #         description='Nonexistent attribute'
-    #     )
-    #     sch = SchemaCreateSchema(name='Test', slug='test', attributes=[nonexistent])
-    #     with pytest.raises(MissingAttributeException):
-    #         create_schema(dbsession, data=sch)
 
     def test_raise_on_empty_schema_when_binding(self, dbsession):
         no_schema = AttrDefSchema(
@@ -532,17 +512,6 @@ class TestSchemaUpdate:
         )
         update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
-    def test_raise_on_reserved_slig(self, dbsession):
-        for i in RESERVED_SCHEMA_SLUGS:
-            upd_schema = SchemaUpdateSchema(
-                name='Test', 
-                slug=i, 
-                update_attributes=[], 
-                add_attributes=[]
-            )
-            with pytest.raises(ReservedSchemaSlugException):
-                update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
     def test_raise_on_schema_doesnt_exist(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
@@ -569,24 +538,6 @@ class TestSchemaUpdate:
         with pytest.raises(SchemaExistsException):
             update_schema(dbsession, id_or_slug=new_sch.id, data=upd_schema)
 
-    # def test_raise_on_attr_def_doesnt_exist(self, dbsession):
-    #     upd_schema = SchemaUpdateSchema(
-    #         name='Test', 
-    #         slug='test', 
-    #         update_attributes=[
-    #             AttributeDefinitionUpdateWithNameSchema(
-    #                 attr_def_id=9999999,
-    #                 required=True,
-    #                 unique=True,
-    #                 list=True,
-    #                 key=True,
-    #             )
-    #         ], 
-    #         add_attributes=[]
-    #     )
-    #     with pytest.raises(AttributeNotDefinedException):
-    #         update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
     def test_raise_on_convert_list_to_single(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
@@ -604,25 +555,6 @@ class TestSchemaUpdate:
         )
         with pytest.raises(ListedToUnlistedException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
-# THis one won't make sense as soon as I disallow adding by attr id
-    # def test_raise_on_attr_doesnt_exist(self, dbsession):
-    #     upd_schema = SchemaUpdateSchema(
-    #         name='Test', 
-    #         slug='test', 
-    #         update_attributes=[], 
-    #         add_attributes=[
-    #             AttrDefWithAttrDataSchema(
-    #                 attr_id=99999999999,
-    #                 required=True,
-    #                 unique=True,
-    #                 list=True,
-    #                 key=True
-    #             )
-    #         ]
-    #     )
-    #     with pytest.raises(MissingAttributeException):
-    #         update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_attr_def_already_exists(self, dbsession):
         upd_schema = SchemaUpdateSchema(

@@ -63,8 +63,6 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
         db.commit()
         create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
         return schema
-    except exceptions.ReservedSchemaSlugException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.SchemaExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingAttributeException as e:
@@ -126,8 +124,6 @@ def update_schema(
         db.commit()
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
         return schema
-    except exceptions.ReservedSchemaSlugException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingAttributeException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except exceptions.MissingSchemaException as e:
