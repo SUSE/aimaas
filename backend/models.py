@@ -11,12 +11,15 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql.schema import UniqueConstraint
 
+from .config import settings
 from .database import Base
+
 
 class Value(Base):
     __abstract__ = True
     
     id = Column(Integer, primary_key=True, index=True)
+
     @declared_attr
     def entity_id(cls):
         return Column(Integer, ForeignKey('entities.id'))
@@ -28,6 +31,7 @@ class Value(Base):
     @declared_attr
     def entity(cls):
         return relationship('Entity')
+
 
 class ValueBool(Value):
     __tablename__ = 'values_bool'
@@ -64,13 +68,19 @@ class Mapping(NamedTuple):
     converter: type
 
 
+def make_aware_datetime(dt: datetime) -> datetime:
+    if dt and dt.tzinfo is None:
+        return dt.replace(tzinfo=settings.timezone)
+    return dt
+
+
 class AttrType(enum.Enum):
     STR = Mapping(ValueStr, str)
     BOOL = Mapping(ValueBool, bool)
     INT = Mapping(ValueInt, int)
     FLOAT = Mapping(ValueFloat, float)
     FK = Mapping(ValueForeignKey, int)
-    DT = Mapping(ValueDatetime, lambda x: x)
+    DT = Mapping(ValueDatetime, make_aware_datetime)
 
 
 class BoundFK(Base):

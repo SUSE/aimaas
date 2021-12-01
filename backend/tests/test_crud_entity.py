@@ -1,17 +1,15 @@
-from datetime import datetime, timezone
-
 import pytest
 
 from ..config import *
 from ..crud import *
 from ..models import *
-from ..schemas import *
 from ..exceptions import *
 
 
 class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
+        tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
         p1 = {
             'name': 'Mike',
             'slug': 'Mike',
@@ -29,16 +27,26 @@ class TestEntityCreate:
             'born': born
         }
         p2 = create_entity(dbsession, schema_id=1, data=p2)
+        p3 = {
+            'name': 'Pumpkin Jack',
+            'slug': 'pumpkin-jack',
+            'nickname': 'pumpkin',
+            'age': 38,
+            'friends': [p1.id, p2.id],
+            'born': tz_born
+        }
+        p3 = create_entity(dbsession, schema_id=1, data=p3)
 
         persons = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
-        assert len(persons) == 4
-        assert persons[-1].name == 'John'
-        assert persons[-1].slug == 'John'
-        assert persons[-1].get('nickname', dbsession).value == 'john'
-        assert persons[-1].get('age', dbsession).value == 10
-        assert persons[-1].get('born', dbsession).value == born
-        assert isinstance(persons[-1].get('age', dbsession), ValueInt)
-        assert [i.value for i in persons[-1].get('friends', dbsession)] == [p1.id, 1]
+        assert len(persons) == 5
+        assert persons[-2].name == 'John'
+        assert persons[-2].slug == 'John'
+        assert persons[-2].get('nickname', dbsession).value == 'john'
+        assert persons[-2].get('age', dbsession).value == 10
+        assert persons[-2].get('born', dbsession).value == born
+        assert isinstance(persons[-2].get('age', dbsession), ValueInt)
+        assert [i.value for i in persons[-2].get('friends', dbsession)] == [p1.id, 1]
+        assert persons[-1].get('born', dbsession).value == tz_born
     
     def test_raise_on_non_unique_slug(self, dbsession):
         p1 = {
@@ -391,7 +399,7 @@ class TestEntityRead:
 
 class TestEntityUpdate:
     def test_update(self, dbsession):
-        time = datetime.now(timezone.utc)
+        time = datetime.now(timezone(timedelta(hours=-4)))
         data = {
             'slug': 'test',
             'nickname': None,
