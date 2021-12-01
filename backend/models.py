@@ -84,7 +84,7 @@ class AttrType(enum.Enum):
     FLOAT = Mapping(ValueFloat, float)
     FK = Mapping(ValueForeignKey, int)
     DT = Mapping(ValueDatetime, make_aware_datetime)
-    DATE = Mapping(ValueDate, make_aware_datetime)
+    DATE = Mapping(ValueDate, lambda x: x)
 
 
 class BoundFK(Base):
