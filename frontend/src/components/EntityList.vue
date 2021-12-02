@@ -96,7 +96,7 @@ export default {
   components: { Pagination, EntityListTable, SchemaList, SearchPanel },
   name: "EntityList",
   async created() {
-    const response = await api.get_schemas();
+    const response = await api.getSchemas();
     const json = await response.json();
     this.schemas = json.sort((a, b) => (a.name > b.name ? 1 : -1));
     if (this.schemas.length) await this.selectSchema(this.schemas[0]);
@@ -118,7 +118,7 @@ export default {
     async selectSchema(schema) {
       this.selectedSchema = schema;
       this.filters = {};
-      const response = await api.get_entities({
+      const response = await api.getEntities({
         schemaSlug: schema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
@@ -138,7 +138,7 @@ export default {
       if (resetPage) {
         this.currentPage = 1;
       }
-      const response = await api.get_entities({
+      const response = await api.getEntities({
         schemaSlug: this.selectedSchema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,

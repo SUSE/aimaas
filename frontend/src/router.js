@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-// import EntityDetail from './components/EntityDetail.vue';
+import EntityDetail from './components/EntityDetail.vue';
 import EntityList from "./components/EntityList.vue";
 // import CreateSchema from "./components/CreateSchema.vue"
 // import CreateEntity from "./components/CreateEntity.vue"
@@ -17,7 +17,7 @@ export const router = createRouter({
         // { path: '/edit/:schemaSlug/:entitySlug', component: EditEntity},
         // { path: '/edit/:slugOrId', component: EditSchema},
         // { path: '/:schemaSlug/entities/new', component: CreateEntity },
-        // { path: '/:schemaSlug/:entityIdSlug', component: EntityDetail },
+        { path: '/:schemaSlug/:entityIdOrSlug', component: EntityDetail },
         { path: '/', component: EntityList },
     ],
 });
