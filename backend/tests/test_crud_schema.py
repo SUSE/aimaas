@@ -419,18 +419,6 @@ class TestSchemaUpdate:
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
         dbsession.rollback()
 
-        upd_schema.update_attributes = [
-             AttrDefUpdateSchema(
-                    name='nickname',
-                    new_name='fav_color',
-                    required=False,
-                    unique=False,
-                    list=False,
-                    key=False,
-                    description='updated'
-                )
-        ]
-
     def test_update_with_deleting_attr(self, dbsession):
         initial_count = len(
             dbsession.execute(
