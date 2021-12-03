@@ -516,7 +516,7 @@ def _convert_values(attr_def: AttributeDefinition, value: Any, caster: Callable)
             raise NotListedAttributeException(attr_name=attr_def.attribute.name, schema_id=attr_def.schema_id)
         return [caster(i) for i in [j for j in value if j is not None]]
     else:
-        return [caster(value)] if value is not None else [None]
+        return [caster(value)] if value is not None else []
 
 
 def _check_fk_value(db: Session, attr_def: AttributeDefinition, entity_ids: List[int]):

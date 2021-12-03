@@ -54,6 +54,27 @@ class TestEntityCreate:
 
         asserts_after_entities_create(dbsession)
     
+    def test_no_raise_with_empty_optional_single_fk_field(self, dbsession):
+        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
+        attr_def = AttributeDefinition(
+            schema_id=1, 
+            attribute=attr,
+            required=False,
+            key=False,
+            unique=False,
+            list=False
+        )
+        dbsession.add(attr_def)
+        dbsession.commit()
+        data = {
+            'name': 'Mike',
+            'slug': 'Mike',
+            'nickname': 'mike',
+            'age': 10,
+            'friends': []
+        }
+        create_entity(dbsession, schema_id=1, data=data)
+
     def test_raise_on_non_unique_slug(self, dbsession):
         p1 = {
             'name': 'Jack',
@@ -445,6 +466,25 @@ class TestEntityUpdate:
         }
         update_entity(dbsession, id_or_slug='Jane', schema_id=1, data=data)
         asserts_after_entities_update(dbsession, born_time=time)
+
+    def test_no_raise_with_empty_optional_single_fk_field(self, dbsession):
+        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
+        attr_def = AttributeDefinition(
+            schema_id=1, 
+            attribute=attr,
+            required=False,
+            key=False,
+            unique=False,
+            list=False
+        )
+        dbsession.add(attr_def)
+        dbsession.commit()
+        data = {
+            'name': 'Mike',
+            'slug': 'Mike',
+            'address': None,
+        }
+        update_entity(dbsession, id_or_slug=1, schema_id=1, data=data)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession):
         with pytest.raises(MissingEntityException):
