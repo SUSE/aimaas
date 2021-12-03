@@ -44,10 +44,10 @@
       <tbody>
         <tr v-for="attr in this.schema.attributes" :key="attr.name">
           <td>{{ attr.name }}</td>
-          <td v-if="attr.type != 'FK'">{{ this.ATTR_TYPES[attr.type] }}</td>
+          <td v-if="attr.type != 'FK'">{{ this.ATTR_TYPES_NAMES[attr.type] }}</td>
           <td v-else>
             <RouterLink :to="`/${this.fkSchemas[attr.bind_to_schema].slug}`"
-              >{{ this.ATTR_TYPES[attr.type] }}
+              >{{ this.ATTR_TYPES_NAMES[attr.type] }}
             </RouterLink>
           </td>
 
@@ -77,16 +77,8 @@
 import CheckIcon from "./CheckIcon.vue";
 import CircleXIcon from "./CircleXIcon.vue";
 import { api } from "../api";
+import { ATTR_TYPES_NAMES } from "../utils";
 
-const ATTR_TYPES = {
-  STR: "string",
-  BOOL: "boolean",
-  INT: "integer",
-  FLOAT: "float",
-  FK: "reference",
-  DT: "datetime",
-  DATE: "date",
-};
 
 export default {
   name: "SchemaDetail",
@@ -120,7 +112,7 @@ export default {
     return {
       schema: null,
       fkSchemas: {},
-      ATTR_TYPES,
+      ATTR_TYPES_NAMES,
     };
   },
 };

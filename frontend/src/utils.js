@@ -4,7 +4,15 @@ export function titleCase(string){
     return string[0].toUpperCase() + string.slice(1).toLowerCase();
   }
 
-
+export const ATTR_TYPES_NAMES = {
+    STR: "string",
+    BOOL: "boolean",
+    INT: "integer",
+    FLOAT: "float",
+    FK: "reference",
+    DT: "datetime",
+    DATE: "date",
+  };
 
 const FIELD_TYPE_COMPONENT = {
     DT: 'ValueDateTime',

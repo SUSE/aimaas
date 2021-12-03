@@ -2,9 +2,9 @@
   <label :for="args.id" v-if="label" class="form-label">
     {{ label }}
   </label>
-  <input
+  <textarea
     class="form-control"
-    type="date"
+    type="text"
     :value="modelValue"
     @input="onInput"
     v-bind="args"
@@ -13,7 +13,7 @@
 
 <script>
 export default {
-  name: "DateInput",
+  name: "Textarea",
   props: ["label", "modelValue", "args"],
   methods: {
     onInput(event) {

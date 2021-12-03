@@ -5,6 +5,10 @@ class API {
         this.base = baseUrl;
     }
 
+    async getAttributes() {
+        return fetch(`${this.base}/attributes`);
+    }
+
     async getSchemas({ all = false, deletedOnly = false } = {}) {
         const params = new URLSearchParams();
         params.set('all', all);
@@ -14,6 +18,14 @@ class API {
 
     async getSchema({ slugOrId } = {}) {
         return fetch(`${this.base}/schemas/${slugOrId}`);
+    }
+
+    async createSchema({ body } = {}) {
+        return fetch(`${this.base}/schemas`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" },
+        });
     }
 
     async getEntities({

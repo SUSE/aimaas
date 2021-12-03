@@ -1,5 +1,5 @@
 <template>
-  <label v-if="label">
+  <label :for="args.id" v-if="label" class="form-label">
     {{ label }}
   </label>
   <input
@@ -7,13 +7,14 @@
     type="number"
     :value="modelValue"
     @input="onInput"
+    v-bind="args"
   />
 </template>
 
 <script>
 export default {
   name: "FloatInput",
-  props: ["label", "modelValue"],
+  props: ["label", "modelValue", "args"],
   methods: {
     onInput(event) {
       this.$emit("update:modelValue", event.target.value);

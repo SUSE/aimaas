@@ -1,5 +1,5 @@
 <template>
-  <label v-if="label">
+  <label :for="args.id" v-if="label" class="form-label">
     {{ label }}
   </label>
   <input
@@ -8,6 +8,7 @@
     :value="modelValue"
     @input="onInput"
     placeholder="enter entity name"
+    v-bind="args"
   />
   <ul class="list-group">
     <li
@@ -34,7 +35,7 @@
 export default {
   name: "ReferencedEntitySelect",
   emits: ["changed", "selected", "update:modelValue"],
-  props: ["label", "modelValue", "foundEntities", "schemaSlug"],
+  props: ["args", "label", "modelValue", "foundEntities", "schemaSlug"],
   methods: {
     onInput(event) {
       this.$emit("update:modelValue", event.target.value);
