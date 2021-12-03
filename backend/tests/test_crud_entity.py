@@ -430,7 +430,7 @@ def asserts_after_entities_update(db: Session, born_time: datetime):
     assert e.get('age', db).value == 10
     assert e.get('born', db).value.replace(tzinfo=timezone.utc) == born_time
     assert [i.value for i in e.get('friends', db)] == [1, 2]
-    assert e.get('nickname', db) == None
+    assert e.get('nickname', db) is None
     nicknames = db.execute(
         select(ValueStr)
         .where(Attribute.name == 'nickname')
