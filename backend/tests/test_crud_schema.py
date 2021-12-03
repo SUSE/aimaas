@@ -10,7 +10,7 @@ from ..exceptions import *
 def asserts_after_schema_create(db: Session):
     data = TestSchemaCreate.data_for_test()
     car = db.execute(select(Schema).where(Schema.name == 'Car')).scalar()
-    assert car is not None and car.reviewable == False
+    assert car is not None and not car.reviewable
 
     attr_defs = db.execute(select(AttributeDefinition).where(AttributeDefinition.schema_id == car.id)).scalars().all()
     assert sorted([i.attribute.name for i in attr_defs]) == sorted(data['attr_defs'])
