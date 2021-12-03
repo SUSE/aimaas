@@ -5,7 +5,7 @@ import EntityList from "./components/EntityList.vue";
 import EntityEdit from "./components/EntityEdit.vue"
 // import EditSchema from "./components/EditSchema.vue";
 import EntityCreate from "./components/EntityCreate.vue";
-// import EntityChangeDetails from "./components/EntityChangeDetails.vue";
+import EntityChangeDetails from "./components/EntityChangeDetails.vue";
 // import SchemaDetails from "./components/SchemaDetails.vue";
 
 export const router = createRouter({
@@ -13,7 +13,7 @@ export const router = createRouter({
     routes: [
         // { path: '/createSchema', component: CreateSchema},
         // { path: '/:schemaSlug', component: SchemaDetails},
-        // { path: '/changes/entity/:changeId', component: EntityChangeDetails},
+        { path: '/changes/entity/:schema/:entity/:changeId', component: EntityChangeDetails},
         { path: '/edit/:schemaSlug/:entitySlug', component: EntityEdit},
         // { path: '/edit/:slugOrId', component: EditSchema},
         { path: '/:schemaSlug/entities/new', component: EntityCreate },

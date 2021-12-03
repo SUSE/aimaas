@@ -4,7 +4,7 @@
     <ul class="list-group">
       <template v-for="change in changes" :key="change.id">
         <li class="list-group-item">
-          <RouterLink :to="`/changes/entity/${change.id}`">
+          <RouterLink :to="`/changes/entity/${schemaSlug}/${entitySlug}/${change.id}`">
             {{
               new Date(change.reviewed_at || change.created_at).toLocaleString()
             }}

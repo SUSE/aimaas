@@ -73,6 +73,19 @@ class API {
         return fetch(`${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}/${changeId}`);
     }
 
+    async reviewChanges({ changeId, verdict, changeObject, changeType, comment } = {}) {
+        return fetch(`${this.base}/changes/review/${changeId}`, {
+            method: "POST",
+            body: JSON.stringify({
+                result: verdict,
+                change_object: changeObject,
+                change_type: changeType,
+                comment: comment || null,
+            }),
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+
 }
 
 const api = new API(process.env.VUE_APP_API_BASE);
