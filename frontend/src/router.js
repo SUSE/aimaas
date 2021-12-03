@@ -2,9 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import EntityDetail from './components/EntityDetail.vue';
 import EntityList from "./components/EntityList.vue";
 // import CreateSchema from "./components/CreateSchema.vue"
-// import CreateEntity from "./components/CreateEntity.vue"
+import EntityEdit from "./components/EntityEdit.vue"
 // import EditSchema from "./components/EditSchema.vue";
-// import EditEntity from "./components/EditEntity.vue";
+import EntityCreate from "./components/EntityCreate.vue";
 // import EntityChangeDetails from "./components/EntityChangeDetails.vue";
 // import SchemaDetails from "./components/SchemaDetails.vue";
 
@@ -14,9 +14,9 @@ export const router = createRouter({
         // { path: '/createSchema', component: CreateSchema},
         // { path: '/:schemaSlug', component: SchemaDetails},
         // { path: '/changes/entity/:changeId', component: EntityChangeDetails},
-        // { path: '/edit/:schemaSlug/:entitySlug', component: EditEntity},
+        { path: '/edit/:schemaSlug/:entitySlug', component: EntityEdit},
         // { path: '/edit/:slugOrId', component: EditSchema},
-        // { path: '/:schemaSlug/entities/new', component: CreateEntity },
+        { path: '/:schemaSlug/entities/new', component: EntityCreate },
         { path: '/:schemaSlug/:entityIdOrSlug', component: EntityDetail },
         { path: '/', component: EntityList },
     ],
