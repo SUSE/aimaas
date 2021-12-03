@@ -628,7 +628,6 @@ class TestSchemaUpdate:
                 AttrDefSchema(
                     name='address',
                     type='FK',
-                    attr_id=address.id,
                     required=True,
                     unique=True,
                     list=True,
