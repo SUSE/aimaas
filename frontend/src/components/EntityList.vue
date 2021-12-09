@@ -84,8 +84,6 @@
 </template>
 
 <script>
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap";
 import Pagination from "./Pagination.vue";
 import EntityListTable from "./EntityListTable.vue";
 import SchemaList from "./SchemaList.vue";
