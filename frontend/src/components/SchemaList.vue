@@ -5,11 +5,10 @@
       v-for="schema in schemas"
       :key="schema.id"
       class="list-group-item"
-      :class="this.selectedSchema == schema ? 'active' : ''"
+      :class="selectedSchema === schema ? 'active' : ''"
     >
       {{ schema.name }}
     </li>
-    <li v-for="index in 30" :key="index" class="list-group-item">An item</li>
   </ul>
 </template>
 
