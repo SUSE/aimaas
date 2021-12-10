@@ -514,7 +514,7 @@ def _convert_values(attr_def: AttributeDefinition, value: Any, caster: Callable)
     if isinstance(value, list):
         if not attr_def.list:
             raise NotListedAttributeException(attr_name=attr_def.attribute.name, schema_id=attr_def.schema_id)
-        return [caster(i) for i in [j for j in value if j is not None]]
+        return [caster(i) for i in value if i is not None]
     else:
         return [caster(value)] if value is not None else []
 
