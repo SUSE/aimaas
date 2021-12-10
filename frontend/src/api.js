@@ -28,6 +28,17 @@ class API {
         });
     }
 
+    async updateSchema({ schemaSlug, body } = {}) {
+        return fetch(
+            `${this.base}/schemas/${schemaSlug}`,
+            {
+                method: "PUT",
+                body: JSON.stringify(body),
+                headers: { "Content-Type": "application/json" },
+            }
+        );
+    }
+
     async getEntities({
         schemaSlug,
         limit = 10,
