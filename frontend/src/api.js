@@ -5,6 +5,21 @@ class API {
         this.base = baseUrl;
     }
 
+    async _is_response_ok(response) {
+        if (response.ok && response.status < 400) {
+            return null;
+        }
+
+        let detail = {msg: "Something went wrong"};
+        try {
+             detail = await response.json();
+        }
+        catch (e) {
+            console.error("Failed to fetch data from API", e);
+        }
+        throw detail;
+    }
+
     async getAttributes() {
         return fetch(`${this.base}/attributes`);
     }
@@ -13,7 +28,14 @@ class API {
         const params = new URLSearchParams();
         params.set('all', all);
         params.set('deleted_only', deletedOnly);
-        return fetch(`${this.base}/schemas?${params.toString()}`);
+        const response = await fetch(`${this.base}/schemas?${params.toString()}`);
+        try {
+            this._is_response_ok(response);
+            return response.json()
+        }
+        catch (e) {
+            // TODO: Do something else
+        }
     }
 
     async getSchema({ slugOrId } = {}) {

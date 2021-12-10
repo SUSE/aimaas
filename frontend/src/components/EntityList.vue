@@ -1,105 +1,106 @@
 <template>
-  <div class="row">
-    <div class="col-lg-2">
+  <BaseLayout>
+    <template v-slot:additional_breadcrumbs>
+      <li class="breadcrumb-item">{{ schemaName }}</li>
+      <li class="breadcrumb-item active">Entities</li>
+    </template>
+    <template v-slot:actions>
       <RouterLink
-        to="/createSchema"
-        class="btn btn-sm btn-outline-primary mt-1 mb-1 d-grid"
-        style="text-decoration: none"
-        >Create schema</RouterLink
-      >
-      <SchemaList
-        v-on:selectSchema="this.selectSchema"
-        :schemas="this.schemas"
-        :selectedSchema="this.selectedSchema"
-      />
+          v-if="this.activeSchema"
+          :to="`/${this.activeSchema.slug}`"
+          class="btn btn-primary"
+          data-bs-toggle="tooltip"
+          data-bs-placement="bottom"
+          title="View schema structure">
+        <i class="eos-icons">visibility</i>
+        View
+      </RouterLink>
+      <RouterLink
+          v-if="this.activeSchema"
+          :to="`/edit/${this.activeSchema.slug}`"
+          class="btn btn-primary ms-1"
+          data-bs-toggle="tooltip"
+          data-bs-placement="bottom"
+          title="Edit schema structure">
+        <i class="eos-icons">mode_edit</i>
+        Edit
+      </RouterLink>
+      <RouterLink
+          v-if="this.activeSchema"
+          :to="`/${this.activeSchema?.slug}/entities/new`"
+          class="btn btn-secondary ms-1"
+          data-bs-toggle="tooltip"
+          data-bs-placement="bottom"
+          title="Add new entity to schema">
+        <i class="eos-icons">add</i>
+        Add
+      </RouterLink>
+    </template>
+  </BaseLayout>
+
+  <SearchPanel
+      @search="setFiltersAndSearch"
+      :key="this.activeSchema?.slug"
+      :filterableFields="this.filterableFields"
+      :operators="this.operators"/>
+  <Pagination
+      v-if="this.totalEntities > this.entitiesPerPage"
+      v-on:goTo="changePage"
+      :totalEntities="this.totalEntities"
+      :entitiesPerPage="this.entitiesPerPage"
+      :currentPage="this.currentPage"/>
+
+  <div class="row mb-1">
+    <div class="col-2">
+      <label for="entitiesLimit"><small>Entities per page</small></label>
     </div>
-    <div class="col-lg-10 table-responsive">
-      <h2 v-if="this.selectedSchema" class="mt-1">
-        Schema {{ this.selectedSchema.name }}
-        <RouterLink
-          v-if="this.selectedSchema"
-          :to="`/${this.selectedSchema.slug}`"
-          class="btn btn-sm btn-primary"
-          style="text-decoration: none"
-          >View schema</RouterLink
-        >
-        <RouterLink
-          v-if="this.selectedSchema"
-          :to="`/edit/${this.selectedSchema.slug}`"
-          class="btn btn-sm btn-primary ms-1"
-          style="text-decoration: none"
-          >Edit schema</RouterLink
-        >
-        <RouterLink
-          :to="`/${this.selectedSchema?.slug}/entities/new`"
-          class="btn btn-sm btn-primary ms-1"
-          style="text-decoration: none"
-          >Create new entity</RouterLink
-        >
-      </h2>
-      <SearchPanel
-        @search="setFiltersAndSearch"
-        :key="this.selectedSchema?.slug"
-        :filterableFields="this.filterableFields"
-        :operators="this.operators"
-      />
-      <Pagination
-        v-if="this.totalEntities > this.entitiesPerPage"
-        v-on:goTo="changePage"
-        :totalEntities="this.totalEntities"
-        :entitiesPerPage="this.entitiesPerPage"
-        :currentPage="this.currentPage"
-      />
-
-      <div class="row">
-        <div class="col-11">
-          <label for="entitiesLimit"><small>Entities per page</small></label>
-          <select v-model="entitiesPerPage" id="entitiesLimit">
-            <option>10</option>
-            <option>30</option>
-            <option>50</option>
-          </select>
-        </div>
-        <div class="col">
-          <p>
-            <small>{{ this.totalEntities }} results</small>
-          </p>
-        </div>
-      </div>
-
-      <EntityListTable
-        @reorder="this.reorder"
-        :entities="this.entities"
-        :schemaSlug="this.selectedSchema?.slug"
-      />
-      <Pagination
-        v-if="this.totalEntities > this.entitiesPerPage"
-        v-on:goTo="changePage"
-        :totalEntities="this.totalEntities"
-        :entitiesPerPage="this.entitiesPerPage"
-        :currentPage="this.currentPage"
-      />
+    <div class="col-1">
+      <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm">
+        <option>10</option>
+        <option>30</option>
+        <option>50</option>
+      </select>
+    </div>
+    <div class="col-9 text-end">
+      <small>{{ this.totalEntities }} result(s)</small>
     </div>
   </div>
+  <EntityListTable
+      @reorder="this.reorder"
+      :entities="this.entities"
+      :schemaSlug="this.activeSchema?.slug"/>
+
+  <Pagination
+      v-if="this.totalEntities > this.entitiesPerPage"
+      v-on:goTo="changePage"
+      :totalEntities="this.totalEntities"
+      :entitiesPerPage="this.entitiesPerPage"
+      :currentPage="this.currentPage"
+  />
 </template>
 
 <script>
+import BaseLayout from "@/components/layout/BaseLayout";
 import Pagination from "./Pagination.vue";
 import EntityListTable from "./EntityListTable.vue";
-import SchemaList from "./SchemaList.vue";
 import SearchPanel from "./SearchPanel.vue";
-import { api } from "../api";
+import {api} from "@/api";
 
 export default {
-  components: { Pagination, EntityListTable, SchemaList, SearchPanel },
+  components: {BaseLayout, Pagination, EntityListTable, SearchPanel},
   name: "EntityList",
   async created() {
-    const response = await api.getSchemas();
-    const json = await response.json();
-    this.schemas = json.sort((a, b) => (a.name > b.name ? 1 : -1));
-    if (this.schemas.length) await this.selectSchema(this.schemas[0]);
   },
   computed: {
+    schemaName() {
+      console.debug("Schema name", this.activeSchema);
+      try {
+        return this.activeSchema.name;
+      } catch (e) {
+        console.error("No schema name?", this.activeSchema)
+        return "---";
+      }
+    },
     offset() {
       return (this.currentPage - 1) * this.entitiesPerPage;
     },
@@ -109,15 +110,12 @@ export default {
   },
   watch: {
     entitiesPerPage() {
-      this.getEntities({ resetPage: true });
+      this.getEntities({resetPage: true});
     },
-  },
-  methods: {
-    async selectSchema(schema) {
-      this.selectedSchema = schema;
+    async activeSchema() {
       this.filters = {};
       const response = await api.getEntities({
-        schemaSlug: schema.slug,
+        schemaSlug: this.activeSchema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
         meta: true,
@@ -127,17 +125,19 @@ export default {
       this.totalEntities = json.total;
       this.operators = json.meta.filter_fields.operators;
       this.filterableFields = json.meta.filter_fields.fields;
-    },
+    }
+  },
+  methods: {
     async changePage(page) {
       this.currentPage = page;
       await this.getEntities();
     },
-    async getEntities({ resetPage = false } = {}) {
+    async getEntities({resetPage = false} = {}) {
       if (resetPage) {
         this.currentPage = 1;
       }
       const response = await api.getEntities({
-        schemaSlug: this.selectedSchema.slug,
+        schemaSlug: this.activeSchema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
         filters: this.filters,
@@ -150,9 +150,9 @@ export default {
     },
     async setFiltersAndSearch(filters) {
       this.filters = filters;
-      this.getEntities({ resetPage: true });
+      this.getEntities({resetPage: true});
     },
-    async reorder({ orderBy, ascending } = {}) {
+    async reorder({orderBy, ascending} = {}) {
       this.orderBy = orderBy;
       this.ascending = ascending;
       this.getEntities();
@@ -160,8 +160,6 @@ export default {
   },
   data() {
     return {
-      schemas: [],
-      selectedSchema: null,
       entities: [],
       entitiesPerPage: 10,
       totalEntities: 0,
@@ -173,12 +171,7 @@ export default {
       ascending: true,
     };
   },
+  inject: ['activeSchema']
 };
 </script>
 
-<style scoped>
-.list-group {
-  max-height: 100vh;
-  overflow: scroll;
-}
-</style>

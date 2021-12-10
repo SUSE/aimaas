@@ -1,6 +1,6 @@
 <template>
-  <div class="table-responsive">
-    <table v-if="entities.length > 0" class="table table-bordered table-hover">
+  <div v-if="entities.length > 0" class="table-responsive">
+    <table  class="table table-bordered table-hover">
       <thead class="table-light">
         <tr>
           <th
@@ -31,12 +31,9 @@
         </tr>
       </tbody>
     </table>
-    <table v-else></table>
-    <div class="position-relative" v-if="entities.length == 0">
-      <div class="position-absolute top-50 start-50 translate-middle mt-5">
-        No entities to show
-      </div>
-    </div>
+  </div>
+  <div v-else class="alert alert-info">
+    No entities to show
   </div>
 </template>
 
