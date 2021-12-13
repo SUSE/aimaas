@@ -11,6 +11,7 @@ jobs:
         env:
           POSTGRES_USER: aimaas
           POSTGRES_PASSWORD: password
+          SECRET: 09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
