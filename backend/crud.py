@@ -492,6 +492,13 @@ def get_entities(
     return EntityListSchema(total=total, entities=entities)
 
 
+def get_entity_by_id(db: Session, entity_id: int) -> Entity:
+    entity = db.execute(select(Entity).where(Entity.id == entity_id)).scalar()
+    if entity is None:
+        raise MissingEntityException(obj_id=entity_id)
+    return entity
+
+
 def get_entity_model(db: Session, id_or_slug: Union[int, str], schema: Schema) -> Optional[Entity]:
     q = select(Entity).where(Entity.schema_id == schema.id)
     if isinstance(id_or_slug, int):
