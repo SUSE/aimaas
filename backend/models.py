@@ -189,13 +189,13 @@ class AttributeDefinition(Base):
     )
 
 
-# class Group(Base):
-#     __tablename__ = 'groups'
+class Group(Base):
+    __tablename__ = 'groups'
 
-#     id = Column(Integer, primary_key=True)
-#     name = Column(String(128), nullable=False)
-#     parent_id = Column(Integer, ForeignKey('groups.id'))
-#     parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), nullable=False)
+    parent_id = Column(Integer, ForeignKey('groups.id'))
+    parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
 
 
 class User(Base):
@@ -205,68 +205,71 @@ class User(Base):
     email = Column(String(128), unique=True, nullable=False)
     password = Column(String, nullable=False)
 
-# class PermObject(enum.Enum):
-#     SCHEMA = 'SCHEMA'
-#     ENTITY = 'ENTITY'
 
-# class PermType(enum.Enum):
-#     CREATE = 'CREATE'
-#     UPDATE = 'UPDATE'
-#     DELETE = 'DELETE'
-
-#     CREATE_ENTITIES = 'CREATE_ENTITIES'
-#     UPDATE_ENTITIES = 'UPDATE_ENTITIES'
-#     DELETE_ENTITIES = 'DELETE_ENTITIES'
+class PermObject(enum.Enum):
+    SCHEMA = 'SCHEMA'
+    ENTITY = 'ENTITY'
 
 
-# class Permission(Base):
-#     __tablename__ = 'permissions'
-#     id = Column(Integer, primary_key=True)
-#     obj_id = Column(Integer)
-#     obj_type = Column(Enum(PermObject), nullable=False)
-#     name = Column(Enum(PermType), nullable=False)
+class PermType(enum.Enum):
+    CREATE = 'CREATE'
+    UPDATE = 'UPDATE'
+    DELETE = 'DELETE'
+    READ = 'READ'
+
+    CREATE_ENTITIES = 'CREATE_ENTITIES'
+    UPDATE_ENTITIES = 'UPDATE_ENTITIES'
+    DELETE_ENTITIES = 'DELETE_ENTITIES'
 
 
-# class GroupPermission(Base):
-#     __tablename__ = 'group_permissions'
-#     id = Column(Integer, primary_key=True)
-#     group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
-#     permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
-
-#     group = relationship('Group')
-#     permission = relationship('Permission')
-
-#     __table_args__ = (
-#         UniqueConstraint('group_id', 'permission_id'),
-#     )
+class Permission(Base):
+    __tablename__ = 'permissions'
+    id = Column(Integer, primary_key=True)
+    obj_id = Column(Integer)
+    obj = Column(Enum(PermObject), nullable=False)
+    type = Column(Enum(PermType), nullable=False)
 
 
-# class UserPermission(Base):
-#     __tablename__ = 'user_permissions'
-#     id = Column(Integer, primary_key=True)
-#     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-#     permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
+class GroupPermission(Base):
+    __tablename__ = 'group_permissions'
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
+    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
 
-#     user = relationship('User')
-#     permission = relationship('Permission')
+    group = relationship('Group')
+    permission = relationship('Permission')
 
-#     __table_args__ = (
-#         UniqueConstraint('user_id', 'permission_id'),
-#     )
+    __table_args__ = (
+        UniqueConstraint('group_id', 'permission_id'),
+    )
 
 
-# class UserGroup(Base):
-#     __tablename__ = 'user_groups'
-#     id = Column(Integer, primary_key=True)
-#     group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
-#     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+class UserPermission(Base):
+    __tablename__ = 'user_permissions'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
 
-#     group = relationship('Group')
-#     user = relationship('User')
+    user = relationship('User')
+    permission = relationship('Permission')
 
-#     __table_args__ = (
-#         UniqueConstraint('user_id', 'group_id'),
-#     )
+    __table_args__ = (
+        UniqueConstraint('user_id', 'permission_id'),
+    )
+
+
+class UserGroup(Base):
+    __tablename__ = 'user_groups'
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+
+    group = relationship('Group')
+    user = relationship('User')
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'group_id'),
+    )
 
 class ChangeStatus(enum.Enum):
     PENDING = 'PENDING'
@@ -278,10 +281,12 @@ class ChangeObject(enum.Enum):
     SCHEMA = 'SCHEMA'
     ENTITY = 'ENTITY'
 
+
 class ChangeType(enum.Enum):
     CREATE = 'CREATE'
     UPDATE = 'UPDATE'
     DELETE = 'DELETE'
+
 
 class Change(Base):
     __tablename__ = 'changes'
