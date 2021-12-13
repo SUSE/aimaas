@@ -5,3 +5,5 @@ python-dotenv
 fastapi
 psycopg2-binary
 uvicorn
+python-jose[cryptography]
+passlib[bcrypt]

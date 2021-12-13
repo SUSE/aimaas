@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     query_limit: Optional[int] = 10
     timezone_offset: Union[str, int] = "utc"
+    secret: str
+    
+    pwd_hash_alg: str = 'HS256'  # list of options can be found in jose.jwt.ALGORITHMS
+    token_exp_minutes: int = 30
 
     class Config:
         env_file = '.env'
