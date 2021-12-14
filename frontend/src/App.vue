@@ -9,17 +9,15 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <SchemaList v-model="activeSchema"></SchemaList>
+          <SchemaList v-model="activeSchema" :as-dropdown="true" ref="schemalist"></SchemaList>
         </ul>
       </div>
     </div>
   </nav>
   <div class="container mt-2">
-    <router-view v-slot="{ Component }">
-      <keep-alive include="EntityList">
-        <component :is="Component"/>
-      </keep-alive>
-    </router-view>
+    <keep-alive>
+      <router-view></router-view>
+    </keep-alive>
   </div>
 
 </template>
@@ -27,7 +25,7 @@
 .eos-icons {
   font-size: 120%;
   line-height: 120%;
-  vertical-align: top;
+  vertical-align: text-top;
 }
 </style>
 <script>
@@ -36,6 +34,7 @@ import 'bootstrap/dist/js/bootstrap.min.js';
 import "eos-icons/dist/css/eos-icons.css";
 import "suse-bootstrap5-theme/dist/css/suse.css";
 
+import {api} from "@/api";
 import SchemaList from "@/components/SchemaList";
 
 export default {
@@ -43,16 +42,55 @@ export default {
   metaInfo: {
     title: 'SUSE aimaas'
   },
-  components: {SchemaList, },
+  components: {SchemaList,},
   data: function () {
     return {
+      api: api,
       activeSchema: null
     }
   },
   provide() {
     return {
-      activeSchema: computed(() => this.activeSchema)
+      activeSchema: computed(() => this.activeSchema),
+      availableSchemas: computed(() => this.$refs.schemalist.schemas)
     }
+  },
+  computed: {
+    availableSchemas() {
+      let _avail_schemas = {};
+      if (this.$refs.schemalist.schemas) {
+        for (let schema of this.$refs.schemalist.schemas) {
+          _avail_schemas[schema.slug] = schema;
+        }
+      }
+      return _avail_schemas
+    }
+  },
+  methods: {
+    getSchemaFromApi(schemaSlug) {
+        api.getSchema({slugOrId: schemaSlug}).then(schema => {
+          this.activeSchema = schema;
+        });
+    },
+    getSchemaFromRoute() {
+      let schemaSlug = this.$route.params.schemaSlug || null;
+      if (schemaSlug === undefined || schemaSlug === null) {
+        return null;
+      }
+      try {
+        // First, try to reuse data in storage
+        this.activeSchema = this.availableSchemas[schemaSlug];
+      } catch (e) {
+        true;
+      }
+      this.getSchemaFromApi(schemaSlug);
+    }
+  },
+  watch: {
+    $route: {
+      handler: "getSchemaFromRoute",
+      immediate: true, // runs immediately with mount() instead of calling method on mount hook
+    },
   },
 }
 </script>

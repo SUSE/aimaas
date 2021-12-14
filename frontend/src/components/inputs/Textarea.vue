@@ -1,19 +1,21 @@
 <template>
-  <label :for="args.id" v-if="label" class="form-label">
-    {{ label }}
-  </label>
-  <textarea
-    class="form-control"
-    type="text"
-    :value="modelValue"
-    @input="onInput"
-    v-bind="args"
-  />
+  <BaseInput :label="label" :args="args">
+    <template v-slot:field>
+      <textarea class="form-control" type="text" :value="modelValue" @input="onInput"
+                v-bind="args"/>
+    </template>
+    <template v-slot:helptext>
+      <slot name="helptext"/>
+    </template>
+  </BaseInput>
 </template>
 
 <script>
+import BaseInput from "@/components/layout/BaseInput";
+
 export default {
   name: "Textarea",
+  components: {BaseInput},
   props: ["label", "modelValue", "args"],
   methods: {
     onInput(event) {

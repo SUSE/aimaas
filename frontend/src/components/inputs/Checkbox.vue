@@ -1,20 +1,29 @@
 <template>
-  <input
-    class="form-check-input"
-    type="checkbox"
-    :checked="this.checked"
-    @input="onInput"
-    v-bind="args"
-  />
-  <label :for="args.id" v-if="label" class="form-check-label ms-1">
-    {{ label }}
-  </label>
+  <BaseInput label="" :args="args" :without-offset="withoutOffset">
+    <template v-slot:field>
+      <div class="d-grid gap-2">
+      <input class="btn-check" type="checkbox" :checked="this.checked" @input="onInput"
+             autocomplete="off"
+             v-bind="args"/>
+      <label class="btn" :class="this.checked? 'btn-primary' : 'btn-light'"
+             :for="args.id">
+        {{ label }}
+      </label>
+        </div>
+    </template>
+    <template v-slot:helptext>
+      <slot name="helptext"/>
+    </template>
+  </BaseInput>
 </template>
 
 <script>
+import BaseInput from "@/components/layout/BaseInput";
+
 export default {
   name: "Checkbox",
-  props: ["label", "modelValue", "args"],
+  components: {BaseInput},
+  props: ["label", "modelValue", "args", "withoutOffset"],
   data() {
     return {
       checked: null,
@@ -25,6 +34,7 @@ export default {
   },
   methods: {
     onInput() {
+      console.debug("CHECK?!", this.checked)
       this.checked = !this.checked;
       this.$emit("update:modelValue", this.checked);
     },

@@ -1,43 +1,58 @@
 <template>
-  <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-schema-dropdown" role="button"
-       data-bs-toggle="dropdown" aria-expanded="false">
-      {{ title }}
-    </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-schema-dropdown">
-      <li v-if="loading">
-        <div class="dropdown-item placeholder-wave">
-          <span class="placeholder col-8"></span>
-        </div>
-      </li>
-      <li v-for="schema in schemas" :key="schema.id">
-        <button type="button" class="dropdown-item" :class="modelValue === schema ? 'active': ''"
-           v-on:click="selectSchema" :value="schema.id">
+  <template v-if="asDropdown">
+    <li class="nav-item dropdown">
+      <a class="nav-link dropdown-toggle" href="#" id="nav-schema-dropdown" role="button"
+         data-bs-toggle="dropdown" aria-expanded="false">
+        Schema
+      </a>
+      <ul class="dropdown-menu" aria-labelledby="nav-schema-dropdown">
+        <li v-if="loading">
+          <div class="dropdown-item placeholder-wave">
+            <span class="placeholder col-8"></span>
+          </div>
+        </li>
+        <li v-for="schema in schemas" :key="schema.id">
+          <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}"
+                       class="dropdown-item" :class="modelValue?.id === schema.id ? 'active': ''">
+            {{ schema.name }}
+          </router-link>
+        </li>
+        <li>
+          <hr class="dropdown-divider">
+        </li>
+        <li>
+          <RouterLink
+              to="/createSchema"
+              class="dropdown-item">
+            <i class='eos-icons'>add_circle</i>
+            New
+          </RouterLink>
+        </li>
+      </ul>
+    </li>
+  </template>
+  <template v-else>
+    <BaseLayout key="/"/>
+    <div class="container">
+      <h1>Schema selection</h1>
+      <div class="list-group">
+        <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}"
+                     v-for="schema in schemas" :key="schema.id"
+                     class="list-group-item list-group-item-action">
           {{ schema.name }}
-        </button>
-      </li>
-      <li>
-        <hr class="dropdown-divider">
-      </li>
-      <li>
-        <RouterLink
-            to="/createSchema"
-            class="dropdown-item">
-          <i class='eos-icons'>add_circle</i>
-          New
-        </RouterLink>
-      </li>
-    </ul>
-  </li>
+        </router-link>
+      </div>
+    </div>
+  </template>
 </template>
 
 <script>
 import {api} from "@/api";
+import BaseLayout from "@/components/layout/BaseLayout";
 
 export default {
   name: "SchemaList",
-  props: ["modelValue"],
-  emits: ["update:modelValue"],
+  props: ["modelValue", "asDropdown"],
   data: function () {
     return {
       schemas: null,
@@ -45,40 +60,16 @@ export default {
     }
   },
 
-  components: {},
-  computed: {
-    title() {
-      if (this.modelValue !== undefined && this.modelValue !== null) {
-        return `Schema: ${this.modelValue.name}`;
-      }
-      return "Schema";
-    }
-  },
-  mounted: function () {
-    console.debug("Route", this.$route, this.$router)
+  components: {BaseLayout,},
+  computed: {},
+  created: function () {
     this.load();
   },
   methods: {
     async load() {
       this.loading = true;
       this.schemas = await api.getSchemas();
-      console.debug("Schemas", this.schemas);
       this.loading = false;
-    },
-    getSchemaForId(id) {
-      if (!this.schemas) {
-        return null;
-      }
-      for (let schema of this.schemas) {
-        if (schema.id == id) {
-          return schema;
-        }
-      }
-    },
-    selectSchema(event) {
-      event.preventDefault();
-      console.debug("Event", event, event.target.value);
-      this.$emit("update:modelValue", this.getSchemaForId(event.target.value));
     }
   }
 

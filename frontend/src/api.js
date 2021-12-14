@@ -21,7 +21,14 @@ class API {
     }
 
     async getAttributes() {
-        return fetch(`${this.base}/attributes`);
+        const response = await fetch(`${this.base}/attributes`);
+        try {
+            this._is_response_ok(response);
+            return await response.json()
+        }
+        catch (e) {
+            // TODO: Do something else
+        }
     }
 
     async getSchemas({ all = false, deletedOnly = false } = {}) {
@@ -31,7 +38,7 @@ class API {
         const response = await fetch(`${this.base}/schemas?${params.toString()}`);
         try {
             this._is_response_ok(response);
-            return response.json()
+            return await response.json()
         }
         catch (e) {
             // TODO: Do something else
@@ -39,7 +46,17 @@ class API {
     }
 
     async getSchema({ slugOrId } = {}) {
-        return fetch(`${this.base}/schemas/${slugOrId}`);
+        console.debug("Getting schema for slug/id", slugOrId)
+        const response = await fetch(`${this.base}/schemas/${slugOrId}`);
+        try {
+            this._is_response_ok(response);
+            return await response.json()
+        }
+        catch (e) {
+            console.error(e);
+            throw e;
+            // TODO: Do something else
+        }
     }
 
     async createSchema({ body } = {}) {
@@ -85,7 +102,16 @@ class API {
         for (const [filter, value] of Object.entries(filters)) {
             params.set(filter, value);
         }
-        return fetch(`${this.base}/dynamic/${schemaSlug}?${params.toString()}`);
+        const response = await fetch(`${this.base}/dynamic/${schemaSlug}?${params.toString()}`);
+        try {
+            this._is_response_ok(response);
+            return await response.json();
+        }
+        catch (e) {
+            console.error("Failed to get entities", e, response);
+            throw e;
+            // TODO: Do something else
+        }
     }
 
     async getEntity({ schemaSlug, entityIdOrSlug, meta = false } = {}) {

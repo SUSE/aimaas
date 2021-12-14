@@ -1,54 +1,15 @@
 <template>
-  <BaseLayout>
-    <template v-slot:additional_breadcrumbs>
-      <li class="breadcrumb-item">{{ schemaName }}</li>
-      <li class="breadcrumb-item active">Entities</li>
-    </template>
-    <template v-slot:actions>
-      <RouterLink
-          v-if="this.activeSchema"
-          :to="`/${this.activeSchema.slug}`"
-          class="btn btn-primary"
-          data-bs-toggle="tooltip"
-          data-bs-placement="bottom"
-          title="View schema structure">
-        <i class="eos-icons">visibility</i>
-        View
-      </RouterLink>
-      <RouterLink
-          v-if="this.activeSchema"
-          :to="`/edit/${this.activeSchema.slug}`"
-          class="btn btn-primary ms-1"
-          data-bs-toggle="tooltip"
-          data-bs-placement="bottom"
-          title="Edit schema structure">
-        <i class="eos-icons">mode_edit</i>
-        Edit
-      </RouterLink>
-      <RouterLink
-          v-if="this.activeSchema"
-          :to="`/${this.activeSchema?.slug}/entities/new`"
-          class="btn btn-secondary ms-1"
-          data-bs-toggle="tooltip"
-          data-bs-placement="bottom"
-          title="Add new entity to schema">
-        <i class="eos-icons">add</i>
-        Add
-      </RouterLink>
-    </template>
-  </BaseLayout>
-
   <SearchPanel
       @search="setFiltersAndSearch"
-      :key="this.activeSchema?.slug"
-      :filterableFields="this.filterableFields"
-      :operators="this.operators"/>
+      :key="schema?.slug"
+      :filterableFields="filterableFields"
+      :operators="operators"/>
   <Pagination
-      v-if="this.totalEntities > this.entitiesPerPage"
+      v-if="totalEntities > entitiesPerPage"
       v-on:goTo="changePage"
-      :totalEntities="this.totalEntities"
-      :entitiesPerPage="this.entitiesPerPage"
-      :currentPage="this.currentPage"/>
+      :totalEntities="totalEntities"
+      :entitiesPerPage="entitiesPerPage"
+      :currentPage="currentPage"/>
 
   <div class="row mb-1">
     <div class="col-2">
@@ -62,45 +23,35 @@
       </select>
     </div>
     <div class="col-9 text-end">
-      <small>{{ this.totalEntities }} result(s)</small>
+      <small>{{ totalEntities }} result(s)</small>
     </div>
   </div>
   <EntityListTable
-      @reorder="this.reorder"
-      :entities="this.entities"
-      :schemaSlug="this.activeSchema?.slug"/>
+      @reorder="reorder"
+      :entities="entities"
+      :schema="schema"
+      :loading="loading"/>
 
   <Pagination
-      v-if="this.totalEntities > this.entitiesPerPage"
+      v-if="totalEntities > entitiesPerPage"
       v-on:goTo="changePage"
-      :totalEntities="this.totalEntities"
-      :entitiesPerPage="this.entitiesPerPage"
-      :currentPage="this.currentPage"
+      :totalEntities="totalEntities"
+      :entitiesPerPage="entitiesPerPage"
+      :currentPage="currentPage"
   />
 </template>
 
 <script>
-import BaseLayout from "@/components/layout/BaseLayout";
 import Pagination from "./Pagination.vue";
-import EntityListTable from "./EntityListTable.vue";
+import EntityListTable from "@/components/EntityListTable";
 import SearchPanel from "./SearchPanel.vue";
 import {api} from "@/api";
 
 export default {
-  components: {BaseLayout, Pagination, EntityListTable, SearchPanel},
+  components: {EntityListTable, Pagination, SearchPanel},
   name: "EntityList",
-  async created() {
-  },
+  props: ["schema"],
   computed: {
-    schemaName() {
-      console.debug("Schema name", this.activeSchema);
-      try {
-        return this.activeSchema.name;
-      } catch (e) {
-        console.error("No schema name?", this.activeSchema)
-        return "---";
-      }
-    },
     offset() {
       return (this.currentPage - 1) * this.entitiesPerPage;
     },
@@ -112,19 +63,13 @@ export default {
     entitiesPerPage() {
       this.getEntities({resetPage: true});
     },
-    async activeSchema() {
-      this.filters = {};
-      const response = await api.getEntities({
-        schemaSlug: this.activeSchema.slug,
-        limit: this.entitiesPerPage,
-        offset: this.offset,
-        meta: true,
-      });
-      const json = await response.json();
-      this.entities = json.entities;
-      this.totalEntities = json.total;
-      this.operators = json.meta.filter_fields.operators;
-      this.filterableFields = json.meta.filter_fields.fields;
+    schema() {
+      console.debug("Schema has changed?", this.schema)
+      if (this.schema === undefined || this.schema === null) {
+        console.debug("Oops, no valid schema")
+        return
+      }
+      this.getEntities();
     }
   },
   methods: {
@@ -133,20 +78,26 @@ export default {
       await this.getEntities();
     },
     async getEntities({resetPage = false} = {}) {
+      console.debug("Getting entities");
+      let _this = this;
       if (resetPage) {
         this.currentPage = 1;
       }
-      const response = await api.getEntities({
-        schemaSlug: this.activeSchema.slug,
+      this.loading = true;
+      api.getEntities({
+        schemaSlug: this.schema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
         filters: this.filters,
         orderBy: this.orderBy,
         ascending: this.ascending,
+      }).then(response => {
+        console.debug("Got entities", response)
+        _this.entities = response.entities;
+        _this.totalEntities = response.total;
+        _this.loading = false
       });
-      const json = await response.json();
-      this.entities = json.entities;
-      this.totalEntities = json.total;
+
     },
     async setFiltersAndSearch(filters) {
       this.filters = filters;
@@ -169,9 +120,14 @@ export default {
       filters: {},
       orderBy: "name",
       ascending: true,
+      loading: true
     };
   },
-  inject: ['activeSchema']
+  mounted() {
+    if (this.schema !== undefined && this.schema !== null) {
+      this.getEntities();
+    }
+  }
 };
 </script>
 
