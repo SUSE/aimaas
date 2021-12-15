@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar bg-navbar navbar-dark navbar-expand-lg">
+  <nav class="navbar bg-navbar navbar-dark navbar-expand-sm">
     <div class="container-fluid">
       <RouterLink class="navbar-brand" to="/">SUSE <i>aimaas</i></RouterLink>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse"

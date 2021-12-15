@@ -1,143 +1,85 @@
 <template>
-  <div class="accordion" id="filtersAccordion">
-    <div class="accordion-item">
-      <h2 class="accordion-header">
-        <button
-          class="accordion-button"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#collapseOne"
-        >
-          Search filters
-        </button>
-      </h2>
-      <div
-        id="collapseOne"
-        class="accordion-collapse collapse"
-        data-bs-parent="#filtersAccordion"
-      >
-        <div class="accordion-body">
-          <form class="row row-cols-lg-auto g-3 align-items-center">
-            <div
-              class="row"
-              v-for="(row, rowIndex) in this.filterRows"
-              :key="rowIndex"
-            >
-              <!-- SELECT FILTER FIELD -->
-              <div class="col-4">
-                <label :for="`fieldSelect${rowIndex}`">Field</label>
-                <select
-                  class="form-control"
-                  :id="`fieldSelect${rowIndex}`"
-                  v-model="this.filterRows[rowIndex].field"
-                >
-                  <option
-                    v-for="(field, index) in Object.keys(this.filterableFields)"
-                    :key="index"
-                  >
-                    {{ field }}
-                  </option>
-                </select>
-              </div>
+  <div class="d-flex input-group mb-1">
+    <input v-model="searchQuery" type="text" class="form-control" placeholder="search by name"
+           :autofocus="true" @keyup.enter="$emit('search', this.filters)" id="entity-name-search"/>
+    <button @click="$emit('search', this.filters)" class="btn btn-primary px-3"
+            type="button" data-bs-toggle="tooltip" title="Search">
+      <i class='eos-icons'>search</i>
+    </button>
+    <button class="btn btn-dark px-3" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapsed-filters" aria-expanded="false"
+            aria-controls="collapsed-filters" title="Click to expand more filter options">
+      <i class="eos-icons">more_vert</i>
+    </button>
+  </div>
+  <div id="collapsed-filters" class="collapse">
+    <div class="card">
+      <div class="card-body">
+        <div class="row border-bottom border-light pb-1 mb-1" :key="rowIndex"
+             v-for="(row, rowIndex) in this.filterRows">
+          <!-- SELECT FILTER FIELD -->
+          <div class="col-md-4">
+            <label :for="`fieldSelect${rowIndex}`">Field</label>
+            <select class="form-control" :id="`fieldSelect${rowIndex}`"
+                    v-model="this.filterRows[rowIndex].field">
+              <option v-for="(field, index) in Object.keys(this.filterableFields)" :key="index">
+                {{ field }}
+              </option>
+            </select>
+          </div>
 
-              <!-- SELECT FILTER OPERATOR -->
-              <div v-if="this.filterRows[rowIndex].field != null" class="col">
-                <label :for="`operatorSelect${rowIndex}`">Operator</label>
-                <select
-                  class="form-control mb-2 mr-sm-2"
-                  :id="`operatorSelect${rowIndex}`"
-                  v-model="this.filterRows[rowIndex].operator"
-                >
-                  <option
-                    v-for="(field, index) in getFiltersForRow(rowIndex)"
-                    :key="index"
-                    :value="field"
-                  >
-                    {{ OPERATOR_DESCRIPTION_MAP[field] }}
-                  </option>
-                </select>
-              </div>
-              <div v-else class="col">
-                <label :for="`operatorSelect${rowIndex}`">Operator</label>
-                <input
-                  :id="`operatorSelect${rowIndex}`"
-                  class="form-control"
-                  disabled
-                />
-              </div>
+          <!-- SELECT FILTER OPERATOR -->
+          <div class="col-md-3">
+            <label :for="`operatorSelect${rowIndex}`">Operator</label>
+            <select class="form-control" :id="`operatorSelect${rowIndex}`"
+                    v-model="this.filterRows[rowIndex].operator"
+                    :disabled="!this.filterRows[rowIndex].field">
+              <option v-for="(field, index) in getFiltersForRow(rowIndex)" :key="index"
+                      :value="field">
+                {{ OPERATOR_DESCRIPTION_MAP[field] }}
+              </option>
+            </select>
+          </div>
 
-              <!-- INPUT FILTER VALUE -->
-              <div v-if="this.filterRows[rowIndex].field != null" class="col">
-                <label :for="`filterValue${rowIndex}`">Value</label>
-                <input
-                  :type="TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)].type"
-                  :class="
-                    TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)].type ==
-                    'checkbox'
-                      ? 'form-check-input'
-                      : 'form-control'
-                  "
-                  :id="`filterValue${rowIndex}`"
-                  v-model="this.filterRows[rowIndex].value"
-                />
-              </div>
-              <div v-else class="col">
-                <label :for="`filterValue${rowIndex}`">Value</label>
-                <input
-                  :id="`filterValue${rowIndex}`"
-                  class="form-control"
-                  disabled
-                />
-              </div>
+          <!-- INPUT FILTER VALUE -->
+          <div class="col-md-4">
+            <label :for="`filterValue${rowIndex}`">Value</label>
+            <input :type="TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)]?.type || 'text'"
+                   :class="TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)]?.type ===
+                           'checkbox' ? 'form-check-input' : 'form-control'"
+                   :id="`filterValue${rowIndex}`" :disabled="!this.filterRows[rowIndex].field"
+                   v-model="this.filterRows[rowIndex].value"/>
+          </div>
 
-              <!-- REMOVE FILTER -->
-              <div class="col-1">
-                <button
-                  @click="this.removeFilter(rowIndex)"
-                  type="button"
-                  class="btn-close mt-4"
-                ></button>
-              </div>
+          <!-- REMOVE FILTER -->
+          <div class="col-md-1 d-flex">
+            <button @click="this.removeFilter(rowIndex)" type="button"
+                    class="btn align-self-end mb-1" data-bs-togle="tooltip" title="Remove filter">
+              <i class="eos-icons">remove_circle</i>
+            </button>
+          </div>
 
-            </div>
-          </form>
-
-          <button
-            type="button"
-            class="btn btn-sm btn-primary ms-1 mt-3"
-            @click="
-              this.filterRows.push({
-                field: null,
-                operator: null,
-                value: null,
-              })
-            "
-          >
-            Add filter
-          </button>
         </div>
       </div>
-    </div>
-  </div>
+      <div class="card-body d-flex">
+        <button type="button" class="btn btn-outline-secondary flex-grow-1 me-1"
+                @click="addFilter">
+          <i class="eos-icons me-1">add_circle</i>
+          Add filter
+        </button>
+        <button type="button" class="btn btn-outline-secondary flex-grow-1 mx-1"
+                @click="clearFilters">
+          <i class="eos-icons me-1">backspace</i>
+          Clear filters
+        </button>
+        <button @click="$emit('search', this.filters)" class="btn btn-primary flex-grow-1 ms-1"
+                type="button" data-bs-toggle="tooltip" title="Search">
+          <i class='eos-icons me-1'>search</i>
+          Search
+        </button>
+      </div>
 
-  <div class="input-group mb-3 mt-3">
-    <input
-      v-model="searchQuery"
-      type="text"
-      class="form-control"
-      placeholder="search by entity name"
-      style="background-color: #f5f5f5"
-      :autofocus="true"
-      @keyup.enter="$emit('search', this.filters)"
-    />
-    <button
-      @click="$emit('search', this.filters)"
-      class="btn btn-outline-primary"
-      type="button"
-      id="button-addon2"
-    >
-      Search
-    </button>
+    </div>
   </div>
 </template>
 
@@ -155,12 +97,12 @@ const OPERATOR_DESCRIPTION_MAP = {
 };
 
 const TYPE_INPUT_MAP = {
-  str: { type: "text" },
-  datetime: { type: "datetime-local" },
-  date: { type: "date" },
-  int: { type: "number", args: { step: 1 } },
-  float: { type: "number" },
-  bool: { type: "checkbox" },
+  str: {type: "text"},
+  datetime: {type: "datetime-local"},
+  date: {type: "date"},
+  int: {type: "number", args: {step: 1}},
+  float: {type: "number"},
+  bool: {type: "checkbox"},
 };
 
 export default {
@@ -170,25 +112,36 @@ export default {
   computed: {
     filters() {
       const params = {};
-      if (this.searchQuery != "") {
+      if (this.searchQuery !== "") {
         params["name.contains"] = this.searchQuery;
       }
       this.filterRows.map((row) => {
         if (row.field == null || row.operator == null || row.value == null)
           return;
-        params[`${row.field}.${row.operator}`]=  row.value;
+        params[`${row.field}.${row.operator}`] = row.value;
       });
       return params;
     },
   },
   methods: {
+    addFilter() {
+      this.filterRows.push({field: null, operator: null, value: null});
+    },
+    clearFilters() {
+      this.filterRows.splice(0, this.filterRows.length);
+      this.searchQuery = "";
+    },
     getFieldTypeForRow(rowIndex) {
       const fieldName = this.filterRows[rowIndex].field;
-      return this.filterableFields[fieldName].type;
+      try {
+        return this.filterableFields[fieldName].type
+      } catch {
+        return undefined;
+      }
     },
     getFiltersForRow(rowIndex) {
       const fieldType = this.getFieldTypeForRow(rowIndex);
-      return this.operators[fieldType];
+      return this.operators[fieldType] || [];
     },
     removeFilter(rowIndex) {
       this.filterRows.splice(rowIndex, 1);
