@@ -39,9 +39,6 @@ import SchemaList from "@/components/SchemaList";
 
 export default {
   name: 'App',
-  metaInfo: {
-    title: 'SUSE aimaas'
-  },
   components: {SchemaList,},
   data: function () {
     return {
@@ -74,7 +71,7 @@ export default {
     },
     getSchemaFromRoute() {
       let schemaSlug = this.$route.params.schemaSlug || null;
-      if (schemaSlug === undefined || schemaSlug === null) {
+      if (!schemaSlug) {
         return null;
       }
       try {
@@ -83,7 +80,9 @@ export default {
       } catch (e) {
         true;
       }
-      this.getSchemaFromApi(schemaSlug);
+      if (!this.activeSchema) {
+        this.getSchemaFromApi(schemaSlug);
+      }
     }
   },
   watch: {

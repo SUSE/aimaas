@@ -11,20 +11,17 @@
       :entitiesPerPage="entitiesPerPage"
       :currentPage="currentPage"/>
 
-  <div class="row mb-1">
-    <div class="col-2">
-      <label for="entitiesLimit"><small>Entities per page</small></label>
-    </div>
-    <div class="col-1">
-      <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm">
+  <div class="d-flex mb-1">
+    <div class="flex-grow-1 d-flex">
+      <label for="entitiesLimit" class="me-1"><small>Entities per page</small></label>
+      <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm"
+              style="width: 5.5rem;">
         <option>10</option>
         <option>30</option>
         <option>50</option>
       </select>
     </div>
-    <div class="col-9 text-end">
-      <small>{{ totalEntities }} result(s)</small>
-    </div>
+    <small>{{ totalEntities }} result(s)</small>
   </div>
   <EntityListTable
       @reorder="reorder"
@@ -65,7 +62,7 @@ export default {
     },
     schema() {
       console.debug("Schema has changed?", this.schema)
-      if (this.schema === undefined || this.schema === null) {
+      if (!this.schema) {
         console.debug("Oops, no valid schema")
         return
       }
@@ -91,10 +88,13 @@ export default {
         filters: this.filters,
         orderBy: this.orderBy,
         ascending: this.ascending,
+        meta: true
       }).then(response => {
         console.debug("Got entities", response)
         _this.entities = response.entities;
         _this.totalEntities = response.total;
+        _this.operators = response.meta.filter_fields.operators;
+        _this.filterableFields = response.meta.filter_fields.fields;
         _this.loading = false
       });
 
@@ -124,7 +124,8 @@ export default {
     };
   },
   mounted() {
-    if (this.schema !== undefined && this.schema !== null) {
+    //if (this.schema !== undefined && this.schema !== null) {
+    if (this.schema) {
       this.getEntities();
     }
   }

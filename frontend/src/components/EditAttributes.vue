@@ -69,6 +69,7 @@
 
 <script>
 import {ref} from "vue";
+import _cloneDeep from "lodash/cloneDeep";
 import TextInput from "@/components/inputs/TextInput.vue";
 import Textarea from "@/components/inputs/Textarea.vue";
 import Checkbox from "@/components/inputs/Checkbox.vue";
@@ -77,7 +78,7 @@ import {ATTR_TYPES_NAMES} from "@/utils";
 
 export default {
   name: "EditAttributes",
-  props: ["initialAttributes", "schemas", "availableFieldNames"],
+  props: ["schema", "schemas", "availableFieldNames"],
   components: {TextInput, Checkbox, Select, Textarea},
   data() {
     return {
@@ -89,10 +90,13 @@ export default {
     };
   },
   async mounted() {
-    this.attributes = this.initialAttributes;
-    this.attributes.map((x) => (x.initialName = x.name));
+    await this.cloneAttrs();
   },
   methods: {
+    cloneAttrs() {
+      this.attributes = _cloneDeep(this.schema.attributes);
+      this.attributes.map((x) => (x.initialName = x.name));
+    },
     getData() {
       return {
         attributes: this.attributes,
@@ -119,5 +123,10 @@ export default {
       return [{id: -1, name: "<this/new schema>"}, ...this.schemas];
     },
   },
+  watch: {
+    schema() {
+      this.cloneAttrs();
+    }
+  }
 };
 </script>

@@ -12,8 +12,7 @@
         :args="{ id: 'reviewable', class: 'mb-3' , tooltip: 'Require reviews for schema and entity changes?'}">
     </Checkbox>
     <h3 class="mt-3">Attributes</h3>
-    <EditAttributes ref="initial" :schemas="availableSchemas"
-                    :initialAttributes="clone(schema.attributes)"
+    <EditAttributes ref="initial" :schemas="availableSchemas" :schema="details"
                     :availableFieldNames="availableFieldNames"/>
     <button @click="sendData" type="button" class="mt-3 mb-3 btn btn-outline-primary">
       <i class='eos-icons'>save</i>
@@ -59,9 +58,6 @@ export default {
     }
   },
   methods: {
-    clone(obj) {
-      return _cloneDeep(obj);
-    },
     getDetails() {
       api.getSchema({slugOrId: this.schema.slug}).then(details => {
         this.details = details;
