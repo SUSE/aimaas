@@ -7,7 +7,7 @@
 
   <div class="container">
     <ul class="nav nav-tabs" id="schemaTabs" role="tablist">
-      <li v-for="tab in tabs" data-bs-toggle="tooltip" :key="tab.name"
+      <li v-for="tab in tabs" data-bs-toggle="tooltip" :key="tab.name" :title="tab.tooltip"
           class="nav-item">
         <button class="nav-link" :class="currentTab === tab.component ? 'active': ''" type="button"
                 v-on:click="currentTab = tab.component">

@@ -1,8 +1,8 @@
 <template>
   <div v-if="details">
-    <TextInput label="Name" v-model="details.name" :args="{ id: 'name' }"
+    <TextInput label="Name" v-model="details.name" :args="{ id: 'name', maxlength: 128 }"
                @change="hasChanged = true"/>
-    <TextInput label="Slug" v-model="details.slug" :args="{ id: 'slug' }"
+    <TextInput label="Slug" v-model="details.slug" :args="{ id: 'slug', maxlength: 128 }"
                @change="hasChanged = true">
       <template v-slot:helptext>
         URL-friendly ID of schema
@@ -21,7 +21,12 @@
               :class="hasChanged? 'btn-primary' : 'btn-light'"
               :disabled="!hasChanged">
         <i class='eos-icons me-1'>save</i>
-        Update schema
+        <template v-if="schema">
+          Update schema
+        </template>
+        <template v-else>
+          Create schema
+        </template>
       </button>
     </div>
   </div>
@@ -66,12 +71,36 @@ export default {
   },
   methods: {
     getDetails() {
-      api.getSchema({slugOrId: this.schema.slug}).then(details => {
-        this.details = details;
-        this.attributeDefinitions = _cloneDeep(details.attributes);
-      });
+      if (this.schema) {
+        api.getSchema({slugOrId: this.schema.slug}).then(details => {
+          this.details = details;
+          this.attributeDefinitions = _cloneDeep(details.attributes);
+        });
+      } else {
+        this.details = {name: "", slug: "", attributes: []};
+      }
     },
     async sendData() {
+      if (this.schema) {
+        await this.updateSchema();
+      } else {
+        await this.createSchema();
+      }
+    },
+    async createSchema() {
+      const initialData = this.$refs.initial.getData();
+      const json = {
+        name: this.details.name,
+        slug: this.details.slug,
+        reviewable: this.details.reviewable,
+        attributes: initialData.attributes,
+      };
+      const response = await api.createSchema({ body: json });
+      if (response.status === 200) {
+        this.$router.push({name: 'schema-view', params: {schemaSlug: json.slug}});
+      }
+    },
+    async updateSchema() {
       const initialData = this.$refs.initial.getData();
       const initialAttrs = initialData.attributes;
       const newAttrs = initialData.additions
