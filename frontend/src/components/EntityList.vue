@@ -61,11 +61,11 @@ export default {
       this.getEntities({resetPage: true});
     },
     schema() {
-      console.debug("Schema has changed?", this.schema)
       if (!this.schema) {
-        console.debug("Oops, no valid schema")
         return
       }
+      this.orderBy = 'name';
+      this.ascending = true;
       this.getEntities();
     }
   },

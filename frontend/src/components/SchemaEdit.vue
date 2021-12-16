@@ -132,7 +132,7 @@ export default {
         body: toSend,
       });
       if (response.status === 200) {
-        this.$router.push({name: this.schema.slug});
+        this.$router.push({name: 'schema-view', params: {schemaSlug: this.schema.slug}});
       }
     },
   },

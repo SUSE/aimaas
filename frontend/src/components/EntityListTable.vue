@@ -50,8 +50,8 @@ export default {
   props: ['entities', 'schema', 'loading'],
   emits: ['reorder'],
   updated() {
-    if (this.previousSchema !== this.schemaSlug) {
-      this.previousSchema = this.schemaSlug;
+    if (this.previousSchema !== this.schema) {
+      this.previousSchema = this.schema;
       this.ascending = true;
       this.orderBy = 'name';
     }
@@ -75,7 +75,7 @@ export default {
     return {
       orderBy: 'name',
       ascending: true,
-      previousSchema: '',
+      previousSchema: null,
     };
   },
   methods: {
