@@ -1,23 +1,29 @@
 <template>
   <div v-if="details">
-    <TextInput label="Name" v-model="details.name" :args="{ id: 'name' }"/>
-    <TextInput label="Slug" v-model="details.slug" :args="{ id: 'slug' }">
+    <TextInput label="Name" v-model="details.name" :args="{ id: 'name' }"
+               @change="hasChanged = true"/>
+    <TextInput label="Slug" v-model="details.slug" :args="{ id: 'slug' }"
+               @change="hasChanged = true">
       <template v-slot:helptext>
         URL-friendly ID of schema
       </template>
     </TextInput>
     <Checkbox
         label="Review"
-        v-model="details.reviewable"
+        v-model="details.reviewable" @change="hasChanged = true"
         :args="{ id: 'reviewable', class: 'mb-3' , tooltip: 'Require reviews for schema and entity changes?'}">
     </Checkbox>
     <h3 class="mt-3">Attributes</h3>
     <EditAttributes ref="initial" :schemas="availableSchemas" :schema="details"
-                    :availableFieldNames="availableFieldNames"/>
-    <button @click="sendData" type="button" class="mt-3 mb-3 btn btn-outline-primary">
-      <i class='eos-icons'>save</i>
-      Update schema
-    </button>
+                    :availableFieldNames="availableFieldNames" @change="hasChanged = true"/>
+    <div class="d-grid gap-2">
+      <button @click="sendData" type="button" class="mt-3 mb-3 btn"
+              :class="hasChanged? 'btn-primary' : 'btn-light'"
+              :disabled="!hasChanged">
+        <i class='eos-icons me-1'>save</i>
+        Update schema
+      </button>
+    </div>
   </div>
   <div v-else class="d-flex justify-content-center py-4">
     <div class="spinner-border" role="status">
@@ -47,6 +53,7 @@ export default {
       attributeDefinitions: [],
       attributes: [],
       ATTR_TYPES_NAMES,
+      hasChanged: false
     };
   },
   async created() {
@@ -81,11 +88,14 @@ export default {
       const remove = [...initialData.deleted];
 
       for (const attr of initialAttrs) {
+        if (initialData.additions.indexOf(attr) > -1 || initialData.deleted.indexOf(attr) > -1) {
+          continue;
+        }
         if (attr.initialName && attr.initialName !== attr.name) {
           update.push(attr);
         } else {
           delete attr.initialName;
-          const initialAttr = this.schema.attributes.filter(
+          const initialAttr = this.details.attributes.filter(
               (x) => x.name === attr.name
           )[0];
           if (!_isEqual(attr, initialAttr)) {

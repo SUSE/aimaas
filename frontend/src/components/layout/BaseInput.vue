@@ -23,7 +23,6 @@ export default {
   props: ["label", "args", "withoutOffset"],
   computed: {
     justify() {
-      console.debug("Offset", this.withoutOffset);
       if (this.withoutOffset) {
         return "";
       }
