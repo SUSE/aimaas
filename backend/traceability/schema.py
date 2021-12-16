@@ -116,7 +116,7 @@ def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, 
     )
 
     change.reviewed_at = datetime.utcnow()
-    change.reviewed_by_user_id = reviewed_by.id if reviewed_by else None
+    change.reviewed_by_user_id = reviewed_by.id
     change.status = ChangeStatus.APPROVED
     change.comment = comment
     schema = create_schema(db=db, data=data, commit=False)
