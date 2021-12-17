@@ -6,6 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from dateutil import parser
 
+from backend.tests.test_traceability import make_change_for_review
+
 from ..models import *
 from ..schemas import *
 from .test_crud_schema import (
@@ -167,9 +169,7 @@ class TestRouteSchemasGet:
 
 class TestRouteSchemaCreate:
     def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(SchemaCreate)).scalar() is None
-        assert db.execute(select(AttributeCreate)).scalar() is None
+        assert db.execute(select(ChangeRequest)).scalar() is None
 
     def test_create_without_review(self, dbsession: Session, client):
         data = {
@@ -218,7 +218,7 @@ class TestRouteSchemaCreate:
         del json['id']
         assert json == {'name': 'Car', 'slug': 'car'}
         assert '/dynamic/car' in [i.path for i in client.app.routes]
-        asserts_after_applying_schema_create_request(dbsession, change_id=1, comment='Autosubmit')
+        asserts_after_applying_schema_create_request(dbsession, change_request_id=1, comment='Autosubmit')
         asserts_after_schema_create(dbsession)
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession: Session, client: TestClient):
@@ -337,11 +337,7 @@ class TestRouteSchemaCreate:
 
 class TestRouteSchemaUpdate:
     def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(SchemaUpdate)).scalar() is None
-        assert db.execute(select(AttributeCreate)).scalar() is None
-        assert db.execute(select(AttributeUpdate)).scalar() is None
-        assert db.execute(select(AttributeDelete)).scalar() is None
+        assert db.execute(select(ChangeRequest)).scalar() is None
 
     def test_update_without_review(self, dbsession: Session, client: TestClient):
         data = {
@@ -367,7 +363,8 @@ class TestRouteSchemaUpdate:
                     'key': True,
                     'bind_to_schema': -1
                 }
-            ]
+            ],
+            'delete_attributes': ['friends']
         } 
         result = {'name': 'Person', 'slug': 'test'}
         response = client.put('/schemas/1', json=data)
@@ -572,7 +569,7 @@ class TestRouteGetEntityChanges:
         age = change['changes']['age']
         fav_color = change['changes']['fav_color']
         assert name['new'] == 'Jackson' and name['old'] == name['current'] == 'Jack'
-        assert age['new'] == '42' and age['old'] == age['current'] == '10'
+        assert age['new'] == 42 and age['old'] == age['current'] == 10
         assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
     # TODO
     # test for create details
@@ -593,7 +590,7 @@ class TestRouteGetEntityChanges:
         assert change['entity']['schema'] == 'person'
         assert len(change['changes']) == 1
         deleted = change['changes']['deleted']
-        assert deleted['new'] == 'True' and deleted['old'] == deleted['current'] == 'False'
+        assert deleted['new'] == True and deleted['old'] == deleted['current'] == False
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/changes/entity/person/Jack/12345678')
@@ -705,4 +702,47 @@ class TestRouteGetSchemaChanges:
         assert response.status_code == 404
 
         response = client.get('/changes/schema/1234567890')
+        assert response.status_code == 404
+
+
+class TestTraceabilityRoutes:
+    def test_review_changes(self, dbsession: Session, client: TestClient):
+        change_request = make_change_for_review(dbsession)
+
+        # APPROVE
+        review = {
+            'result': 'APPROVE',
+            'change_object': 'ENTITY',
+            'change_type': 'UPDATE',
+            'comment': 'test'
+        }
+
+        response = client.post(f'/changes/review/{change_request.id}', json=review)
+        assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack'}
+
+        change_request.status = ChangeStatus.PENDING
+        dbsession.commit()
+
+        # DECLINE
+        review['result'] = 'DECLINE'
+        review['comment'] = 'test2'
+        response = client.post(f'/changes/review/{change_request.id}', json=review)
+        json = response.json()
+        assert json['status'] == 'DECLINED'
+        assert json['comment'] == 'test2'
+
+    def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
+        # raise on existing id but mismatching records
+        change_request = make_change_for_review(dbsession)
+        review = {
+            'result': 'APPROVE',
+            'change_object': 'SCHEMA',
+            'change_type': 'UPDATE',
+            'comment': 'test'
+        }
+        response = client.post(f'/changes/review/{change_request.id}', json=review)
+        assert response.status_code == 404
+        # raise on nonexistent id
+
+        response = client.post(f'/changes/review/23456', json=review)
         assert response.status_code == 404

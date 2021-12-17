@@ -2,11 +2,28 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Union, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
-from ..models import ChangeObject, ChangeStatus, ChangeType
+from ..models import ChangeObject, ChangeStatus, ChangeType, User
 from .schema import AttrDefSchema, AttrDefUpdateSchema, SchemaBaseSchema
 
+
+class ChangeRequestSchema(BaseModel):
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+    created_by: str
+    reviewed_by: Optional[str]
+    status: ChangeStatus
+    comment: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+    @validator('created_by', 'reviewed_by', pre=True)
+    def convert_to_str(cls, v):
+        if isinstance(v, User):
+            return v.username
+        return v
 
 class ReviewResult(Enum):
     APPROVE = 'APPROVE'
@@ -27,19 +44,13 @@ class ChangedEntitySchema(BaseModel):
 
 
 class EntityChangeSchema(BaseModel):
-    new: Optional[Union[str, list[str]]]
-    old: Optional[str]
-    current: Optional[str]
+    new: Optional[Union[Any, list[Any]]]
+    old: Optional[Any]
+    current: Optional[Any]
 
 
-class EntityChangeDetailSchema(BaseModel):
-    created_at: datetime
-    reviewed_at: Optional[datetime]
-    created_by: str
-    reviewed_by: Optional[str]
-    status: ChangeStatus
+class EntityChangeDetailSchema(ChangeRequestSchema):
     entity: ChangedEntitySchema
-    comment: Optional[str]
     changes: dict[str, EntityChangeSchema]
 
 
@@ -62,12 +73,6 @@ class SchemaChangesSchema(BaseModel):
     delete: Optional[List[str]]
 
 
-class SchemaChangeDetailSchema(BaseModel):
-    created_at: datetime
-    reviewed_at: Optional[datetime]
-    created_by: str
-    reviewed_by: Optional[str]
-    status: ChangeStatus
+class SchemaChangeDetailSchema(ChangeRequestSchema):
     schema_: SchemaBaseSchema = Field(alias='schema')
-    comment: Optional[str]
     changes: SchemaChangesSchema
