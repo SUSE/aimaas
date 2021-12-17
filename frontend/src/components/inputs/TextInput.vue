@@ -1,5 +1,5 @@
 <template>
-  <BaseInput :label="label" :args="args">
+  <BaseInput :label="label" :args="args" :vertical="vertical">
     <template v-slot:field>
       <input class="form-control" type="text" :value="modelValue" @input="onInput" v-bind="args"
              :list="datalistId"/>
@@ -19,7 +19,8 @@ import BaseInput from "@/components/layout/BaseInput";
 export default {
   name: "TextInput",
   components: {BaseInput},
-  props: ["label", "modelValue", "args"],
+  props: ["label", "modelValue", "args", "vertical"],
+  emits: ["update:modelValue"],
   computed: {
     datalistId() {
       return `dl-${this.args.id}`;

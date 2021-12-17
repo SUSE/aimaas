@@ -13,7 +13,7 @@
     "core-js": "^3.6.5",
     "eos-icons": "^5.3.1",
     "lodash": "^4.17.21",
-    "suse-bootstrap5-theme": "^1.0.1",
+    "suse-bootstrap5-theme": "^1.0.2",
     "vue": "^3.0.0",
     "vue-router": "^4.0.12"
   },

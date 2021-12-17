@@ -9,18 +9,17 @@
         </option>
       </template>
     </TextInput>
-    <Select label="Type" v-model="attributes[rowIndex].type" @change="onChange()"
-            :args="{ id: `initialattrType${rowIndex}`, disabled: !attr.isNew }"
-            :options="
-              Object.keys(ATTR_TYPES_NAMES).map((type) => {
-                return { value: type, text: ATTR_TYPES_NAMES[type] };
-              })"/>
-    <Select v-if="attributes[rowIndex].type === 'FK'" label="Bind to schema" @change="onChange()"
-            v-model="attributes[rowIndex].bind_to_schema"
-            :options="schemasToBind.map((schema) => {
-                return { value: schema.id, text: schema.name };
-              })"
-            :args="{ id: `initialboundFK${rowIndex}`, disabled: !attr.isNew }"/>
+    <SelectInput label="Type" v-model="attributes[rowIndex].type" @change="onChange()"
+                 :args="{ id: `initialattrType${rowIndex}`, disabled: !attr.isNew }"
+                 :options="Object.keys(ATTR_TYPES_NAMES).map((type) => {
+                   return { value: type, text: ATTR_TYPES_NAMES[type] };
+                 })"/>
+    <SelectInput v-if="attributes[rowIndex].type === 'FK'" label="Bind to schema"
+                 @change="onChange()" v-model="attributes[rowIndex].bind_to_schema"
+                 :options="schemasToBind.map((schema) => {
+                   return { value: schema.id, text: schema.name };
+                 })"
+                 :args="{ id: `initialboundFK${rowIndex}`, disabled: !attr.isNew }"/>
     <Textarea label="Description" @change="onChange()"
               v-model="attributes[rowIndex].description"
               :args="{ id: `initialDescription${rowIndex}` }">
@@ -76,14 +75,14 @@ import _cloneDeep from "lodash/cloneDeep";
 import TextInput from "@/components/inputs/TextInput.vue";
 import Textarea from "@/components/inputs/Textarea.vue";
 import Checkbox from "@/components/inputs/Checkbox.vue";
-import Select from "@/components/inputs/Select.vue";
+import SelectInput from "@/components/inputs/SelectInput.vue";
 import {ATTR_TYPES_NAMES} from "@/utils";
 
 export default {
   name: "EditAttributes",
   props: ["schema", "schemas", "availableFieldNames"],
   emits: ["change"],
-  components: {TextInput, Checkbox, Select, Textarea},
+  components: {TextInput, Checkbox, SelectInput, Textarea},
   data() {
     return {
       attributes: [],

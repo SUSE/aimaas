@@ -6,7 +6,7 @@
   </BaseLayout>
 
   <div class="container">
-    <SchemaEdit :schema="null" ref="editor"></SchemaEdit>
+    <SchemaEdit :schema="null"/>
   </div>
 </template>
 

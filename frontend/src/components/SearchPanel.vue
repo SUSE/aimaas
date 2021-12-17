@@ -1,8 +1,9 @@
 <template>
   <div class="d-flex input-group mb-1">
     <input v-model="searchQuery" type="text" class="form-control" placeholder="search by name"
-           :autofocus="true" @keyup.enter="$emit('search', this.filters)" id="entity-name-search"/>
-    <button @click="$emit('search', this.filters)" class="btn btn-primary px-3"
+           :autofocus="true" @keyup.enter="$emit('search', this.filterParams)"
+           id="entity-name-search"/>
+    <button @click="$emit('search', this.filterParams)" class="btn btn-primary px-3"
             type="button" data-bs-toggle="tooltip" title="Search">
       <i class='eos-icons'>search</i>
     </button>
@@ -15,40 +16,27 @@
   <div id="collapsed-filters" class="collapse">
     <div class="card">
       <div class="card-body">
-        <div class="row border-bottom border-light pb-1 mb-1" :key="rowIndex"
-             v-for="(row, rowIndex) in this.filterRows">
+        <div class="row border-bottom border-light pb-1 mb-1 align-items-end" :key="rowIndex"
+             v-for="(row, rowIndex) in this.filters">
           <!-- SELECT FILTER FIELD -->
           <div class="col-md-4">
-            <label :for="`fieldSelect${rowIndex}`">Field</label>
-            <select class="form-control" :id="`fieldSelect${rowIndex}`"
-                    v-model="this.filterRows[rowIndex].field">
-              <option v-for="(field, index) in Object.keys(this.filterableFields)" :key="index">
-                {{ field }}
-              </option>
-            </select>
+            <SelectInput label="Field" :args="{id: `fieldSelect${rowIndex}`}"
+                         :options="fieldOptions" :vertical="true" v-model="row.field"
+                         @change="updateRow(row)"/>
           </div>
 
           <!-- SELECT FILTER OPERATOR -->
           <div class="col-md-3">
-            <label :for="`operatorSelect${rowIndex}`">Operator</label>
-            <select class="form-control" :id="`operatorSelect${rowIndex}`"
-                    v-model="this.filterRows[rowIndex].operator"
-                    :disabled="!this.filterRows[rowIndex].field">
-              <option v-for="(field, index) in getFiltersForRow(rowIndex)" :key="index"
-                      :value="field">
-                {{ OPERATOR_DESCRIPTION_MAP[field] }}
-              </option>
-            </select>
+            <SelectInput v-model="row.operator" label="Operator"
+                         :args="{id: `operatorSelect${rowIndex}`, disabled: !row.field}"
+                         :vertical="true" :options="row.operatorOptions"/>
           </div>
 
           <!-- INPUT FILTER VALUE -->
           <div class="col-md-4">
-            <label :for="`filterValue${rowIndex}`">Value</label>
-            <input :type="TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)]?.type || 'text'"
-                   :class="TYPE_INPUT_MAP[this.getFieldTypeForRow(rowIndex)]?.type ===
-                           'checkbox' ? 'form-check-input' : 'form-control'"
-                   :id="`filterValue${rowIndex}`" :disabled="!this.filterRows[rowIndex].field"
-                   v-model="this.filterRows[rowIndex].value"/>
+            <component :is="row.component" v-model="row.value" label="Value" :vertical="true"
+                       :disabled="!row.field"
+                       :args="{id: `filterValue${rowIndex}`, disabled: !row.field}"/>
           </div>
 
           <!-- REMOVE FILTER -->
@@ -72,84 +60,105 @@
           <i class="eos-icons me-1">backspace</i>
           Clear filters
         </button>
-        <button @click="$emit('search', this.filters)" class="btn btn-primary flex-grow-1 ms-1"
+        <button @click="$emit('search', this.filterParams)" class="btn btn-primary flex-grow-1 ms-1"
                 type="button" data-bs-toggle="tooltip" title="Search">
           <i class='eos-icons me-1'>search</i>
           Search
         </button>
       </div>
-
     </div>
   </div>
 </template>
 
 <script>
-const OPERATOR_DESCRIPTION_MAP = {
-  eq: "equals to",
-  ne: "not equal to",
-  lt: "less than",
-  le: "less than or equal to",
-  gt: "greater than",
-  ge: "greater than or equal",
-  contains: "contains substring",
-  regexp: "matches regular expression",
-  starts: "starts with substring",
-};
-
-const TYPE_INPUT_MAP = {
-  str: {type: "text"},
-  datetime: {type: "datetime-local"},
-  date: {type: "date"},
-  int: {type: "number", args: {step: 1}},
-  float: {type: "number"},
-  bool: {type: "checkbox"},
-};
+import {OPERATOR_DESCRIPTION_MAP, TYPE_INPUT_MAP} from "@/utils";
+import IntegerInput from "@/components/inputs/IntegerInput.vue";
+import FloatInput from "@/components/inputs/FloatInput.vue";
+import TextInput from "@/components/inputs/TextInput.vue";
+import Checkbox from "@/components/inputs/Checkbox.vue";
+import DateTime from "@/components/inputs/DateTime.vue";
+import DateInput from "@/components/inputs/DateInput.vue";
+import SelectInput from "@/components/inputs/SelectInput.vue";
 
 export default {
   name: "SearchPanel",
   props: ["filterableFields", "operators"],
+  components: {TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput, SelectInput},
   emits: ["search"],
   computed: {
-    filters() {
+    filterParams() {
       const params = {};
       if (this.searchQuery !== "") {
         params["name.contains"] = this.searchQuery;
       }
-      this.filterRows.map((row) => {
+      this.filters.map((row) => {
         if (row.field == null || row.operator == null || row.value == null)
           return;
         params[`${row.field}.${row.operator}`] = row.value;
       });
       return params;
     },
+    fieldOptions() {
+      let r = Object.keys(this.filterableFields).map(x => {
+        return {value: x}
+      });
+      r.unshift({value: '', text: '-- select one --'})
+      console.debug("Fields", this.filterableFields, r);
+      return r;
+    }
   },
   methods: {
     addFilter() {
-      this.filterRows.push({field: null, operator: null, value: null});
+      this.filters.push({
+        field: null,
+        operator: null,
+        value: null,
+        operatorOptions: [],
+        component: TextInput
+      });
     },
     clearFilters() {
-      this.filterRows.splice(0, this.filterRows.length);
+      this.filters.splice(0, this.filters.length);
       this.searchQuery = "";
     },
-    getFieldTypeForRow(rowIndex) {
-      const fieldName = this.filterRows[rowIndex].field;
+    updateRow(row) {
+      console.debug("Updating row", row)
+      row.operatorOptions = this.getFiltersForRow(row);
+      row.component = this.getComponentForRow(row);
+    },
+    getComponentForRow(row) {
+      if (!row.field) {
+        return null;
+      }
+      console.debug("FILTERABLE FIELDS", this.filterableFields, row.field);
       try {
-        return this.filterableFields[fieldName].type
-      } catch {
-        return undefined;
+        const fieldType = this.filterableFields[row.field].type.toUpperCase();
+        return TYPE_INPUT_MAP[fieldType];
+      } catch (e) {
+        console.error(e);
+        return null;
       }
     },
-    getFiltersForRow(rowIndex) {
-      const fieldType = this.getFieldTypeForRow(rowIndex);
-      return this.operators[fieldType] || [];
+    getFiltersForRow(row) {
+      if (!row || !row.field) {
+        return [];
+      }
+
+      const fieldType = this.filterableFields[row.field]?.type;
+      if (fieldType) {
+        return (this.operators[fieldType] || []).map(o => {
+          return {value: o, text: OPERATOR_DESCRIPTION_MAP[o]};
+        });
+      }
+      return [];
     },
     removeFilter(rowIndex) {
-      this.filterRows.splice(rowIndex, 1);
+      this.filters.splice(rowIndex, 1);
     },
   },
   data() {
     return {
-      filterRows: [],
+      filters: [],
       searchQuery: "",
       OPERATOR_DESCRIPTION_MAP,
       TYPE_INPUT_MAP,

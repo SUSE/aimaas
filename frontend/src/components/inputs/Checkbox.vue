@@ -1,5 +1,5 @@
 <template>
-  <BaseInput label="" :args="args" :without-offset="withoutOffset">
+  <BaseInput label="" :args="args" :without-offset="withoutOffset" :vertical="vertical">
     <template v-slot:field>
       <div class="d-grid gap-2">
       <input class="btn-check" type="checkbox" :checked="this.checked" @input="onInput"
@@ -23,7 +23,7 @@ import BaseInput from "@/components/layout/BaseInput";
 export default {
   name: "Checkbox",
   components: {BaseInput},
-  props: ["label", "modelValue", "args", "withoutOffset"],
+  props: ["label", "modelValue", "args", "withoutOffset", "vertical"],
   data() {
     return {
       checked: null,

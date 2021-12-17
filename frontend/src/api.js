@@ -46,7 +46,6 @@ class API {
     }
 
     async getSchema({ slugOrId } = {}) {
-        console.debug("Getting schema for slug/id", slugOrId)
         const response = await fetch(`${this.base}/schemas/${slugOrId}`);
         try {
             this._is_response_ok(response);
