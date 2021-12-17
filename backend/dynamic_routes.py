@@ -332,7 +332,7 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_create_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+                return traceability.apply_entity_create_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
             return {}
         except exceptions.MissingSchemaException as e:
@@ -430,7 +430,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_update_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+                return traceability.apply_entity_update_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
             return {}
         except exceptions.MissingEntityException as e:
@@ -473,7 +473,7 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_delete_request(db=db, change_id=change.id, reviewed_by=user, comment='Autosubmit')
+                return traceability.apply_entity_delete_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
             return {}
         except exceptions.MissingEntityException as e:
