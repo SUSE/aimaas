@@ -61,31 +61,128 @@ def schema_change_details(db: Session, change_id: int) -> SchemaChangeDetailSche
     return SchemaChangeDetailSchema(**change_)
 
 
-def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_by: User, commit: bool = True) -> Change:
+def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_by: User, commit: bool = True) -> ChangeRequest:
     crud.create_schema(db=db, data=data, commit=False)
     db.rollback()
 
-    change = Change(
-        created_by=created_by, 
-        created_at=datetime.utcnow(), 
-        change_object=ChangeObject.SCHEMA, 
-        change_type=ChangeType.CREATE
-    )
-    schema_create = SchemaCreate(change=change, name=data.name, slug=data.slug, reviewable=data.reviewable)
-    db.add_all([change, schema_create])
+    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    db.add(change_request)
 
+    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
+    for field, type_ in schema_fields:
+        ValueModel = type_.value.model
+        v = ValueModel(new_value=getattr(data, field))
+        db.add(v)
+        db.flush()
+        db.add(Change(
+            change_request=change_request,
+            field_name=field,
+            value_id=v.id,
+            data_type=type_,
+            content_type=ContentType.SCHEMA,
+            change_type=ChangeType.CREATE
+        ))
+
+    attr_fields = [
+        ('required', ChangeAttrType.BOOL), 
+        ('unique', ChangeAttrType.BOOL), 
+        ('list', ChangeAttrType.BOOL), 
+        ('key', ChangeAttrType.BOOL),
+        ('description', ChangeAttrType.STR),
+        ('bind_to_schema', ChangeAttrType.INT),
+        ('name', ChangeAttrType.STR),
+        # ('type', ChangeAttrType.STR)
+    ]
     for attr in data.attributes:
-        kwargs = attr.dict()
-        kwargs['type'] = AttrType[kwargs['type'].name]
-        db.add(AttributeCreate(change=change, **kwargs))
+        attribute = crud.create_attribute(db=db, data=AttributeCreateSchema(name=attr.name, type=attr.type.name), commit=False)
+        for field, type_ in attr_fields:
+            ValueModel = type_.value.model
+            v = ValueModel(new_value=getattr(attr, field))
+            db.add(v)
+            db.flush()
+            db.add(Change(
+                change_request=change_request,
+                field_name=field,
+                object_id=attribute.id,
+                value_id=v.id,
+                data_type=type_,
+                content_type=ContentType.ATTRIBUTE_DEFINITION,
+                change_type=ChangeType.CREATE
+            ))
+        v = ChangeValueStr(new_value=attr.type.name)
+        db.add(v)
+        db.flush()
+        db.add(Change(
+                change_request=change_request,
+                field_name='type',
+                value_id=v.id,
+                object_id=attribute.id,
+                data_type=ChangeAttrType.STR,
+                content_type=ContentType.ATTRIBUTE_DEFINITION,
+                change_type=ChangeType.CREATE
+        ))
     if commit:
         db.commit()
     else:
         db.flush()
-    return change
+    return change_request
 
+def get_value_for_change(change: Change, db: Session):
+    ValueModel = change.data_type.value.model
+    return db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
 
-def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Schema:
+from itertools import groupby
+def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Schema:
+    change_request = db.execute(
+        select(ChangeRequest)
+        .where(ChangeRequest.id == change_request_id)
+    ).scalar()
+    if change_request is None:
+        raise MissingSchemaCreateRequestException(obj_id=change_request_id)
+
+    schema_changes = db.execute(
+        select(Change)
+        .where(Change.change_request_id == change_request_id)
+        .where(Change.field_name != None)
+        .where(Change.object_id == None)
+        .where(Change.content_type == ContentType.SCHEMA)
+        .where(Change.change_type == ChangeType.CREATE)
+    ).scalars().all()
+    if not schema_changes:
+        raise MissingSchemaCreateRequestException(obj_id=change_request_id)
+    
+    data = {'attributes': []}
+    for change in schema_changes:
+        v = get_value_for_change(change=change, db=db)
+        data[change.field_name] = v.new_value
+    
+    attr_changes = db.execute(
+        select(Change)
+        .where(Change.change_request_id == change_request_id)
+        .where(Change.field_name != None)
+        .where(Change.object_id != None)
+        .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
+        .where(Change.change_type == ChangeType.CREATE)
+    ).scalars().all()
+    attr_changes = groupby(attr_changes, key=lambda x: x.object_id)
+    for attr_id, changes in attr_changes:
+        crud.get_attribute(db=db, attr_id=attr_id)
+        data['attributes'].append({i.field_name: get_value_for_change(change=i, db=db).new_value for i in changes})
+    data = SchemaCreateSchema(**data)
+
+    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_by_user_id = reviewed_by.id
+    change_request.status = ChangeStatus.APPROVED
+    change_request.comment = comment
+    schema = create_schema(db=db, data=data, commit=False)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return schema
+    
+
+def apply_schema_create_request_(db: Session, change_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Schema:
     change = db.execute(
         select(Change)
         .where(Change.id == change_id)
@@ -94,7 +191,7 @@ def apply_schema_create_request(db: Session, change_id: int, reviewed_by: User, 
     ).scalar()
     if change is None:
         raise MissingSchemaCreateRequestException(obj_id=change_id)
-
+    
     schema_create: SchemaCreate = db.execute(select(SchemaCreate).where(SchemaCreate.change_id == change.id)).scalar()
     attrs = db.execute(select(AttributeCreate).where(AttributeCreate.change_id == change.id)).scalars().all()
     data = SchemaCreateSchema(

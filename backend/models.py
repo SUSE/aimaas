@@ -9,7 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.sql.schema import UniqueConstraint
+from sqlalchemy.sql.schema import CheckConstraint, UniqueConstraint
 
 from .config import settings
 from .database import Base
@@ -271,15 +271,73 @@ class UserGroup(Base):
         UniqueConstraint('user_id', 'group_id'),
     )
 
+#################### TRACEABILITY #########################
+class ChangeObject(enum.Enum):
+    SCHEMA = 'SCHEMA'
+    ENTITY = 'ENTITY'
+
+
+class ChangeValue(Base):
+    __abstract__ = True
+    
+    id = Column(Integer, primary_key=True, index=True)
+
+class ChangeValueBool(ChangeValue):
+    __tablename__ = 'change_values_bool'
+    old_value = Column(Boolean, nullable=True)
+    new_value = Column(Boolean, nullable=True)
+
+
+class ChangeValueInt(ChangeValue):
+    __tablename__ = 'change_values_int'
+    old_value = Column(Integer, nullable=True)
+    new_value = Column(Integer, nullable=True)
+
+
+class ChangeValueFloat(ChangeValue):
+    __tablename__ = 'change_values_float'
+    old_value = Column(Float, nullable=True)
+    new_value = Column(Float, nullable=True)
+
+
+class ChangeValueForeignKey(ChangeValue):
+    __tablename__ = 'change_values_fk'
+    old_value = Column(Integer, nullable=True)
+    new_value = Column(Integer, nullable=True)
+
+
+class ChangeValueStr(ChangeValue):
+    __tablename__ = 'change_values_str'
+    old_value = Column(String, nullable=True)
+    new_value = Column(String, nullable=True)
+
+
+class ChangeValueDatetime(ChangeValue):
+    __tablename__ = 'change_values_datetime'
+    old_value = Column(DateTime(timezone=True), nullable=True)
+    new_value = Column(DateTime(timezone=True), nullable=True)
+
+
+class ChangeValueDate(ChangeValue):
+    __tablename__ = 'change_values_date'
+    old_value = Column(Date, nullable=True)
+    new_value = Column(Date, nullable=True)
+
+
+class ChangeAttrType(enum.Enum):
+    STR = Mapping(ChangeValueStr, str)
+    BOOL = Mapping(ChangeValueBool, bool)
+    INT = Mapping(ChangeValueInt, int)
+    FLOAT = Mapping(ChangeValueFloat, float)
+    FK = Mapping(ChangeValueForeignKey, int)
+    DT = Mapping(ChangeValueDatetime, make_aware_datetime)
+    DATE = Mapping(ChangeValueDate, lambda x: x)
+
+
 class ChangeStatus(enum.Enum):
     PENDING = 'PENDING'
     DECLINED = 'DECLINED'
     APPROVED = 'APPROVED'
-
-
-class ChangeObject(enum.Enum):
-    SCHEMA = 'SCHEMA'
-    ENTITY = 'ENTITY'
 
 
 class ChangeType(enum.Enum):
@@ -288,131 +346,44 @@ class ChangeType(enum.Enum):
     DELETE = 'DELETE'
 
 
-class Change(Base):
-    __tablename__ = 'changes'
+class ChangeRequest(Base):
+    __tablename__ = 'change_requests'
     id = Column(Integer, primary_key=True)
     created_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     reviewed_by_user_id = Column(Integer, ForeignKey('users.id'))
+    
     created_at = Column(DateTime(timezone=True), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(Enum(ChangeStatus), default=ChangeStatus.PENDING, nullable=False)
-    change_object = Column(Enum(ChangeObject), nullable=False)
-    change_type = Column(Enum(ChangeType), nullable=False)
     comment = Column(String(1024), nullable=True)
 
     created_by = relationship('User', foreign_keys=[created_by_user_id])
     reviewed_by = relationship('User', foreign_keys=[reviewed_by_user_id])
+
+
+class ContentType(enum.Enum):
+    ATTRIBUTE = 'ATTRIBUTE'
+    ATTRIBUTE_DEFINITION = 'ATTRIBUTE_DEFINITION'
+    ENTITY = 'ENTITY'
+    SCHEMA = 'SCHEMA'
+
+
+class Change(Base):
+    __tablename__ = 'changes'
+    id = Column(Integer, primary_key=True)
+    change_request_id = Column(Integer, ForeignKey('change_requests.id'), nullable=False)
+    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=True)
     
+    object_id = Column(Integer, nullable=True)
+    value_id = Column(Integer, nullable=False)
+    content_type = Column(Enum(ContentType), nullable=False)
+    change_type = Column(Enum(ChangeType), nullable=False)
+    field_name = Column(String, nullable=True)
+    data_type = Column(Enum(ChangeAttrType), nullable=False)
 
-class SchemaCreate(Base):
-    __tablename__ = 'schema_create_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    name = Column(String(128), nullable=False)
-    slug = Column(String(128), nullable=False)
-    reviewable = Column(Boolean, nullable=False)
-
-    change = relationship('Change')
-
-
-class SchemaUpdate(Base):
-    __tablename__ = 'schema_upd_history'
-    id = Column(Integer, primary_key=True) 
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    schema_id = Column(Integer, ForeignKey('schemas.id'), nullable=False)
-    new_name = Column(String(128), nullable=True)
-    old_name = Column(String(128), nullable=True)
-    new_slug = Column(String(128), nullable=True)
-    old_slug = Column(String(128), nullable=True)
-    new_reviewable = Column(Boolean, nullable=True)
-    old_reviewable = Column(Boolean, nullable=True)
-    new_deleted = Column(Boolean, nullable=True)
-    old_deleted = Column(Boolean, nullable=True)
-
-    change = relationship('Change')
-    schema = relationship('Schema')
-
-
-class AttributeUpdate(Base):
-    __tablename__ = 'attr_upd_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=False)
-    new_name = Column(String(128), nullable=True)
-    required = Column(Boolean, nullable=False)
-    unique = Column(Boolean, nullable=False)
-    list = Column(Boolean, nullable=False)
-    key = Column(Boolean, nullable=False)
-    description = Column(String(128), nullable=True)
-    bind_to_schema = Column(Integer, ForeignKey('schemas.id'), nullable=True)
-
-    change = relationship('Change')
+    change_request = relationship('ChangeRequest')
     attribute = relationship('Attribute')
 
-
-class AttributeCreate(Base):
-    __tablename__ = 'attr_create_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    name = Column(String(128), nullable=False)
-    type = Column(Enum(AttrType), nullable=False)
-    required = Column(Boolean, nullable=False)
-    unique = Column(Boolean, nullable=False)
-    list = Column(Boolean, nullable=False)
-    key = Column(Boolean, nullable=False)
-    description = Column(String(128), nullable=True)
-    bind_to_schema = Column(Integer, ForeignKey('schemas.id'), nullable=True)
-
-    change = relationship('Change')
-
-
-class AttributeDelete(Base):
-    __tablename__ = 'attr_delete_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=False)
-
-    change = relationship('Change')
-    attribute = relationship('Attribute')
-
-
-class EntityCreate(Base):
-    __tablename__ = 'entity_create_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    schema_id = Column(Integer, ForeignKey('schemas.id'), nullable=False)
-    name = Column(String(128), nullable=False)
-    slug = Column(String(128), nullable=False)
-
-    change = relationship('Change')
-    schema = relationship('Schema')
-
-
-class EntityUpdate(Base):
-    __tablename__ = 'entity_update_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    entity_id = Column(Integer, ForeignKey('entities.id'), nullable=False)
-    new_name = Column(String(128), nullable=True)
-    new_slug = Column(String(128), nullable=True)
-    old_name = Column(String(128), nullable=True)
-    old_slug = Column(String(128), nullable=True)
-    new_deleted = Column(Boolean, nullable=True)
-    old_deleted = Column(Boolean, nullable=True)
-
-    change = relationship('Change')
-    entity = relationship('Entity')
-
-
-class ValueUpdate(Base):
-    __tablename__ = 'value_update_history'
-    id = Column(Integer, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False)
-    entity_id = Column(Integer, ForeignKey('entities.id'))
-    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=False)
-    new_value = Column(String, nullable=True)
-    old_value = Column(String, nullable=True) 
-
-    change = relationship('Change')
-    entity = relationship('Entity')
-    attribute = relationship('Attribute')
+    __table_args__ = (
+        CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL)'),
+    )
