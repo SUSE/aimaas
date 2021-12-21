@@ -2,7 +2,7 @@
   <BaseLayout>
     <template v-slot:additional_breadcrumbs>
       <li class="breadcrumb-item">
-        <router-link :to="{name: 'schema-view', params: {schemaSlug: activeSchema?.slug || null}}">
+        <router-link :to="{name: 'schema-view', params: {schemaSlug: activeSchema?.slug}}">
           {{ activeSchema?.name || 'n/a' }}
         </router-link>
       </li>

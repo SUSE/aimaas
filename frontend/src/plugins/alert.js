@@ -1,4 +1,4 @@
-export const ALERT_LEVELS = [
+const ALERT_LEVELS = [
     'primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark', 'cta'
 ];
 
@@ -13,7 +13,7 @@ export class AlertMessage {
     }
 }
 
-export class AlertStore {
+class AlertStore {
     constructor() {
         this.storage = {}
     }
@@ -43,5 +43,11 @@ export class AlertStore {
 
     get values() {
         return Object.values(this.storage);
+    }
+}
+
+export default {
+    install: (app) => {
+        app.config.globalProperties.$alerts = new AlertStore();
     }
 }

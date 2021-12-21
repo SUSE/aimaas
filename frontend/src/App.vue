@@ -40,7 +40,6 @@ import "suse-bootstrap5-theme/dist/css/suse.css";
 
 import AlertDisplay from "@/components/alerts/AlertDisplay";
 import SchemaList from "@/components/SchemaList";
-import {AlertMessage} from "@/alert";
 
 export default {
   name: 'App',
@@ -94,10 +93,6 @@ export default {
       handler: "getSchemaFromRoute",
       immediate: true, // runs immediately with mount() instead of calling method on mount hook
     },
-  },
-  mounted() {
-    const alert = new AlertMessage("success", "Hello World");
-    this.$alerts.push(alert);
   }
 }
 </script>
