@@ -1,8 +1,8 @@
 <template>
   <nav class="navbar bg-navbar navbar-dark navbar-expand-sm">
     <div class="container-fluid">
-      <RouterLink class="navbar-brand" to="/">
-        <img src="./assets/logo.svg" style="height: 2.5rem;" class="me-1">
+      <RouterLink class="navbar-brand" :to="{name: 'schema-list'}">
+        <img src="./assets/logo.svg" style="height: 2.5rem;" class="me-1" alt="SUSE">
         <i>aimaas</i>
       </RouterLink>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -68,9 +68,9 @@ export default {
   },
   methods: {
     getSchemaFromApi(schemaSlug) {
-        api.getSchema({slugOrId: schemaSlug}).then(schema => {
-          this.activeSchema = schema;
-        });
+      api.getSchema({slugOrId: schemaSlug}).then(schema => {
+        this.activeSchema = schema;
+      });
     },
     getSchemaFromRoute() {
       let schemaSlug = this.$route.params.schemaSlug || null;

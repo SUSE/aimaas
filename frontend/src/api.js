@@ -116,7 +116,16 @@ class API {
     async getEntity({ schemaSlug, entityIdOrSlug, meta = false } = {}) {
         const params = new URLSearchParams();
         params.set('meta', meta);
-        return fetch(`${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`);
+        const response = await fetch(`${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`);
+        try {
+            this._is_response_ok(response);
+            return await response.json();
+        }
+        catch (e) {
+            console.error("Failed to get entities", e, response);
+            throw e;
+            // TODO: Do something else
+        }
     }
 
     async createEntity({ schemaSlug, body } = {}) {
@@ -128,11 +137,20 @@ class API {
     }
 
     async updateEntity({ schemaSlug, entityIdOrSlug, body } = {}) {
-        return fetch(`${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`, {
+        const response = await fetch(`${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`, {
             method: 'PUT',
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },
         })
+        try {
+            this._is_response_ok(response);
+            return await response.json();
+        }
+        catch (e) {
+            console.error("Failed to update entity", e, response);
+            throw e;
+            // TODO: Do something else
+        }
     }
 
     async getRecentEntityChanges({ schemaSlug, entityIdOrSlug } = {}) {

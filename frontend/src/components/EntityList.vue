@@ -24,10 +24,12 @@
     <small>{{ totalEntities }} result(s)</small>
   </div>
   <EntityListTable
+      ref="selector"
       @reorder="reorder"
       :entities="entities"
       :schema="schema"
-      :loading="loading"/>
+      :loading="loading"
+      :selectType="selectType"/>
 
   <Pagination
       v-if="totalEntities > entitiesPerPage"
@@ -47,14 +49,23 @@ import {api} from "@/api";
 export default {
   components: {EntityListTable, Pagination, SearchPanel},
   name: "EntityList",
-  props: ["schema"],
+  props: {
+    schema: Object,
+    selectType: {
+      type: String,
+      default: "many",
+      validator(value) {
+        return ['many', 'single', 'none'].includes(value);
+      }
+    }
+  },
   computed: {
     offset() {
       return (this.currentPage - 1) * this.entitiesPerPage;
     },
     pages() {
       return Math.ceil(this.totalEntities / this.entitiesPerPage);
-    },
+    }
   },
   watch: {
     entitiesPerPage() {
@@ -75,7 +86,6 @@ export default {
       await this.getEntities();
     },
     async getEntities({resetPage = false} = {}) {
-      console.debug("Getting entities");
       let _this = this;
       if (resetPage) {
         this.currentPage = 1;
@@ -90,7 +100,6 @@ export default {
         ascending: this.ascending,
         meta: true
       }).then(response => {
-        console.debug("Got entities", response)
         _this.entities = response.entities;
         _this.totalEntities = response.total;
         _this.operators = response.meta.filter_fields.operators;
@@ -108,6 +117,10 @@ export default {
       this.ascending = ascending;
       this.getEntities();
     },
+    getSelected() {
+      const selectedIds = this.$refs.selector.getSelected();
+      return this.entities.filter(x => selectedIds.includes(x.id));
+    }
   },
   data() {
     return {
@@ -124,7 +137,6 @@ export default {
     };
   },
   mounted() {
-    //if (this.schema !== undefined && this.schema !== null) {
     if (this.schema) {
       this.getEntities();
     }

@@ -24,7 +24,7 @@
           <RouterLink
               to="/createSchema"
               class="dropdown-item">
-            <i class='eos-icons'>add_circle</i>
+            <i class='eos-icons me-1'>add_circle</i>
             New
           </RouterLink>
         </li>

@@ -27,30 +27,38 @@
 </template>
 
 <script>
+import {shallowRef} from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityList from "@/components/EntityList";
+import EntityForm from "@/components/inputs/EntityForm";
 import SchemaEdit from "@/components/SchemaEdit";
 
 export default {
   name: "Schema",
-  components: {BaseLayout, EntityList, SchemaEdit},
+  components: {BaseLayout, EntityList, EntityForm, SchemaEdit},
   data: function () {
     return {
       tabs: [
         {
           name: "Entities",
-          component: EntityList,
+          component: shallowRef(EntityList),
           icon: "table_view",
           tooltip: "Show entities"
         },
         {
           name: "Edit / Show",
-          component: SchemaEdit,
+          component: shallowRef(SchemaEdit),
           icon: "mode_edit",
           tooltip: "Edit/Show schema structure"
+        },
+        {
+          name: "Add Entity",
+          component: shallowRef(EntityForm),
+          icon: 'add_circle',
+          tooltip: 'Add new entity'
         }
       ],
-      currentTab: EntityList
+      currentTab: shallowRef(EntityList)
     }
   },
   inject: ['activeSchema'],

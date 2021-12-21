@@ -71,6 +71,7 @@
 </template>
 
 <script>
+import {shallowRef} from "vue";
 import {OPERATOR_DESCRIPTION_MAP, TYPE_INPUT_MAP} from "@/utils";
 import IntegerInput from "@/components/inputs/IntegerInput.vue";
 import FloatInput from "@/components/inputs/FloatInput.vue";
@@ -114,7 +115,7 @@ export default {
         operator: null,
         value: null,
         operatorOptions: [],
-        component: TextInput
+        component: shallowRef(TextInput)
       });
     },
     clearFilters() {

@@ -3,6 +3,7 @@
     <table class="table table-bordered table-hover">
       <thead class="table-light">
       <tr>
+        <th v-if="showSelectors"></th>
         <th
             @click="orderByField(field)"
             v-for="field in displayFields"
@@ -18,9 +19,13 @@
       </thead>
       <tbody>
       <tr v-for="e in entities" :key="e.id">
+        <td v-if="showSelectors">
+          <input :type="inputType" class="form-check-input" name="EntitySelection" :value="e.id"/>
+        </td>
         <td v-for="field in displayFields" :key="field">
           <template v-if="field === 'name'">
-            <RouterLink :to="{name: 'entity-view', params: {schemaSlug: schema.slug, entityIdOrSlug: e.slug }}">
+            <RouterLink
+                :to="{name: 'entity-view', params: {schemaSlug: schema.slug, entitySlug: e.slug }}">
               {{ e[field] }}
             </RouterLink>
           </template>
@@ -47,7 +52,7 @@ const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 
 export default {
   name: 'EntityListTable',
-  props: ['entities', 'schema', 'loading'],
+  props: ['entities', 'schema', 'loading', 'selectType'],
   emits: ['reorder'],
   updated() {
     if (this.previousSchema !== this.schema) {
@@ -70,6 +75,20 @@ export default {
       fields.unshift('name');
       return fields;
     },
+    inputType() {
+      if (this.selectType === "many") {
+        return "checkbox";
+      }
+      else if (this.selectType === "single") {
+        return "radio";
+      }
+      else {
+        return "hidden";
+      }
+    },
+    showSelectors() {
+      return this.inputType !== "hidden";
+    }
   },
   data() {
     return {
@@ -79,6 +98,17 @@ export default {
     };
   },
   methods: {
+    getSelected() {
+      const elem = document.getElementsByName("EntitySelection");
+      let s = [];
+      for (let e of elem) {
+        if (!e.checked) {
+          continue;
+        }
+        s.push(parseInt(e.value));
+      }
+      return s;
+    },
     orderByField(field) {
       if (this.orderBy === field) {
         this.ascending = !this.ascending;
