@@ -43,9 +43,8 @@ def test_routes_were_generated(dbsession, client):
 
 class TestRouteCreateEntity:
     def assert_no_change_requests_appeared(self, db: Session):
+        assert db.execute(select(ChangeRequest)).scalar() is None
         assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(EntityCreate)).scalar() is None
-        assert db.execute(select(ValueUpdate)).scalar() is None
 
     def test_create_without_review(self, dbsession, client):
         p1 = {
@@ -60,7 +59,7 @@ class TestRouteCreateEntity:
         mike_id = json.pop('id')
         assert json == {'slug': 'Mike', 'name': 'Mike', 'deleted': False}
 
-        asserts_after_applying_entity_create_request(dbsession, change_id=1)
+        asserts_after_applying_entity_create_request(dbsession, change_request_id=1)
 
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
         tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
@@ -77,7 +76,7 @@ class TestRouteCreateEntity:
         john_id = json.pop('id')
         assert json == {'slug': 'John', 'name': 'John', 'deleted': False}
         
-        asserts_after_applying_entity_create_request(dbsession, change_id=2)
+        asserts_after_applying_entity_create_request(dbsession, change_request_id=2)
 
         p3 = {
             'name': 'Pumpkin Jack',
@@ -93,7 +92,7 @@ class TestRouteCreateEntity:
         assert json == {'slug': 'pumpkin-jack', 'name': 'Pumpkin Jack', 'deleted': False}
 
         asserts_after_entities_create(dbsession)
-        asserts_after_applying_entity_create_request(dbsession, change_id=3)
+        asserts_after_applying_entity_create_request(dbsession, change_request_id=3)
 
     def test_raise_on_non_unique_slug(self, dbsession, client):
         p1 = {
@@ -120,12 +119,8 @@ class TestRouteCreateEntity:
         response = client.post(f'/dynamic/test', json=data)
         assert response.status_code == 200
         
-        changes = dbsession.execute(select(Change)).scalars().all()
-        ent_creates = dbsession.execute(select(EntityCreate)).scalars().all()
-        val_creates = dbsession.execute(select(ValueUpdate)).scalars().all()
+        changes = dbsession.execute(select(ChangeRequest)).scalars().all()
         assert len(changes) == 1
-        assert len(ent_creates) == 1
-        assert not val_creates
         entity = dbsession.execute(select(Entity).where(Entity.schema_id == 2)).scalar()
         assert entity.slug == 'Jack' and entity.name == 'name'
 
@@ -159,11 +154,7 @@ class TestRouteCreateEntity:
         assert response.status_code == 200
 
         changes = dbsession.execute(select(Change)).scalars().all()
-        ent_creates = dbsession.execute(select(EntityCreate)).scalars().all()
-        val_creates = dbsession.execute(select(ValueUpdate)).scalars().all()
-        assert len(changes) == 1
-        assert len(ent_creates) == 1
-        assert len(val_creates) == 5  # 3 passed + 2 optional not passed
+        assert len(changes) == 8  # name, slug, schema_id + 5 fields defined on schema 
         entity = dbsession.execute(select(Entity).where(Entity.slug == 'Jackie')).scalar()
         assert entity is not None
     
@@ -425,9 +416,8 @@ class TestRouteGetEntities:
 
 class TestRouteUpdateEntity:
     def assert_no_change_requests_appeared(self, db: Session):
+        assert db.execute(select(ChangeRequest)).scalar() is None
         assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(EntityUpdate)).scalar() is None
-        assert db.execute(select(ValueUpdate)).scalar() is None
 
     def test_update_without_review(self, dbsession: Session, client):
         data = {
@@ -440,7 +430,7 @@ class TestRouteUpdateEntity:
         response = client.put('/dynamic/person/1', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test', 'deleted': False}
-        asserts_after_applying_entity_update_request(dbsession, change_id=1)
+        asserts_after_applying_entity_update_request(dbsession, change_request_id=1)
 
         born_utc = datetime(2021, 10, 20, 10, 52, 17, tzinfo=timezone.utc)
        
@@ -451,7 +441,7 @@ class TestRouteUpdateEntity:
         response = client.put('/dynamic/person/Jane', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane', 'deleted': False}
-        asserts_after_applying_entity_update_request(dbsession, change_id=2)
+        asserts_after_applying_entity_update_request(dbsession, change_request_id=2)
         asserts_after_entities_update(dbsession, born_time=born_utc)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, client):
@@ -531,13 +521,8 @@ class TestRouteUpdateEntity:
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
         
-        changes = dbsession.execute(select(Change)).scalars().all()
-        ent_updates = dbsession.execute(select(EntityUpdate)).scalars().all()
-        val_updates = dbsession.execute(select(ValueUpdate)).scalars().all()
+        changes = dbsession.execute(select(ChangeRequest)).scalars().all()
         assert len(changes) == 1
-        assert len(ent_updates) == 1
-        assert len(val_updates) == 1
-
 
 class TestRouteDeleteEntity:
     @pytest.mark.parametrize('entity', [1, 'Jack'])

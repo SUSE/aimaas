@@ -167,9 +167,7 @@ class TestRouteSchemasGet:
 
 class TestRouteSchemaCreate:
     def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(SchemaCreate)).scalar() is None
-        assert db.execute(select(AttributeCreate)).scalar() is None
+        assert db.execute(select(ChangeRequest)).scalar() is None
 
     def test_create_without_review(self, dbsession: Session, client):
         data = {
@@ -218,7 +216,7 @@ class TestRouteSchemaCreate:
         del json['id']
         assert json == {'name': 'Car', 'slug': 'car'}
         assert '/dynamic/car' in [i.path for i in client.app.routes]
-        asserts_after_applying_schema_create_request(dbsession, change_id=1, comment='Autosubmit')
+        asserts_after_applying_schema_create_request(dbsession, change_request_id=1, comment='Autosubmit')
         asserts_after_schema_create(dbsession)
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession: Session, client: TestClient):
@@ -337,11 +335,7 @@ class TestRouteSchemaCreate:
 
 class TestRouteSchemaUpdate:
     def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(Change)).scalar() is None
-        assert db.execute(select(SchemaUpdate)).scalar() is None
-        assert db.execute(select(AttributeCreate)).scalar() is None
-        assert db.execute(select(AttributeUpdate)).scalar() is None
-        assert db.execute(select(AttributeDelete)).scalar() is None
+        assert db.execute(select(ChangeRequest)).scalar() is None
 
     def test_update_without_review(self, dbsession: Session, client: TestClient):
         data = {
@@ -572,7 +566,7 @@ class TestRouteGetEntityChanges:
         age = change['changes']['age']
         fav_color = change['changes']['fav_color']
         assert name['new'] == 'Jackson' and name['old'] == name['current'] == 'Jack'
-        assert age['new'] == '42' and age['old'] == age['current'] == '10'
+        assert age['new'] == 42 and age['old'] == age['current'] == 10
         assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
     # TODO
     # test for create details
@@ -593,7 +587,7 @@ class TestRouteGetEntityChanges:
         assert change['entity']['schema'] == 'person'
         assert len(change['changes']) == 1
         deleted = change['changes']['deleted']
-        assert deleted['new'] == 'True' and deleted['old'] == deleted['current'] == 'False'
+        assert deleted['new'] == True and deleted['old'] == deleted['current'] == False
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/changes/entity/person/Jack/12345678')
