@@ -59,16 +59,17 @@ export default {
     }
   },
 
-  components: {BaseLayout,},
-  computed: {},
+  components: {BaseLayout},
   created: function () {
     this.load();
   },
   methods: {
-    async load() {
+    load() {
       this.loading = true;
-      this.schemas = await this.$api.getSchemas();
-      this.loading = false;
+      this.$api.getSchemas().then(data => {
+        this.schemas = data;
+        this.loading = false;
+      });
     }
   }
 

@@ -22,6 +22,7 @@
       <router-view></router-view>
     </keep-alive>
   </div>
+  <AlertDisplay/>
 
 </template>
 <style>
@@ -37,11 +38,13 @@ import 'bootstrap/dist/js/bootstrap.min.js';
 import "eos-icons/dist/css/eos-icons.css";
 import "suse-bootstrap5-theme/dist/css/suse.css";
 
+import AlertDisplay from "@/components/alerts/AlertDisplay";
 import SchemaList from "@/components/SchemaList";
+import {AlertMessage} from "@/alert";
 
 export default {
   name: 'App',
-  components: {SchemaList,},
+  components: {SchemaList, AlertDisplay},
   data: function () {
     return {
       activeSchema: null
@@ -92,5 +95,9 @@ export default {
       immediate: true, // runs immediately with mount() instead of calling method on mount hook
     },
   },
+  mounted() {
+    const alert = new AlertMessage("success", "Hello World");
+    this.$alerts.push(alert);
+  }
 }
 </script>
