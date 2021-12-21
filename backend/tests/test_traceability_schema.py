@@ -1,5 +1,5 @@
 from datetime import timedelta, timezone
-import itertools
+from itertools import groupby
 
 import pytest
 
@@ -240,7 +240,7 @@ def make_schema_update_request(db: Session, user: User, time: datetime):
         ('key', (ChangeAttrType.BOOL, True, True)),
         ('description', (ChangeAttrType.STR, 'Age of this person', 'AGE')),
         ('bind_to_schema', (ChangeAttrType.INT, None, None)),
-        ('name', (ChangeAttrType.STR, 'age', 'AGE')),  # TODO name and new_name
+        ('name', (ChangeAttrType.STR, 'age', 'AGE')),
         ('new_name', (ChangeAttrType.STR, 'age', 'AGE')),
         # ('type', ChangeAttrType.STR)
     ]
@@ -266,7 +266,7 @@ def make_schema_update_request(db: Session, user: User, time: datetime):
             )
         )
     ########## ATTR ADD #########
-    attr_fields2 = [
+    attr_fields = [
         ('required', ChangeAttrType.BOOL, False), 
         ('unique', ChangeAttrType.BOOL, False), 
         ('list', ChangeAttrType.BOOL, False), 
@@ -279,7 +279,7 @@ def make_schema_update_request(db: Session, user: User, time: datetime):
     test = Attribute(name='test', type=AttrType.STR)
     db.add(test)
     db.flush()
-    for attr, data_type, value in attr_fields2:
+    for attr, data_type, value in attr_fields:
         ValueModel = data_type.value.model
         v = ValueModel(new_value=value)
         db.add(v)
@@ -356,7 +356,6 @@ def test_get_schema_update_details(dbsession: Session):
     )
     assert delete[0] == 'born'
 
-from itertools import groupby
 
 def asserts_after_submitting_schema_update_request(db: Session, data: SchemaUpdateSchema):
     change_request = db.execute(select(ChangeRequest)).scalar()

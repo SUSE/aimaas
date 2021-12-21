@@ -256,6 +256,14 @@ class TestSchemaRead:
 
 
 def asserts_after_schema_update(db: Session):
+    friends = db.execute(
+        select(AttributeDefinition)
+        .join(Attribute)
+        .where(Attribute.name == 'friends')
+        .where(AttributeDefinition.schema_id == 1)
+    ).scalar()
+    assert friends is None
+    
     age_def = db.execute(
         select(AttributeDefinition)
         .join(Attribute)
@@ -310,7 +318,8 @@ class TestSchemaUpdate:
                     key=True,
                     bind_to_schema=-1
                 )
-            ]
+            ],
+            delete_attributes=['friends']
         )
         update_schema(dbsession, id_or_slug='person', data=upd_schema)
         asserts_after_schema_update(db=dbsession)

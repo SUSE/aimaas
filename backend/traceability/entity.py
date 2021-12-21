@@ -124,38 +124,40 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
     change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
     
+    entity_change_kwargs = {
+        'change_request': change_request,
+        'content_type': ContentType.ENTITY,
+        'change_type': ChangeType.CREATE
+    }
+
     name_val = ChangeValueStr(new_value=data.pop('name'))
     db.add(name_val)
     db.flush()
     name_change = Change(
-        change_request=change_request, 
         value_id=name_val.id, 
         field_name='name', 
-        data_type=ChangeAttrType.STR, 
-        content_type=ContentType.ENTITY,
-        change_type=ChangeType.CREATE
+        data_type=ChangeAttrType.STR,
+        **entity_change_kwargs
     )
+
     slug_val = ChangeValueStr(new_value=data.pop('slug'))
     db.add(slug_val)
     db.flush()
     slug_change = Change(
-        change_request=change_request, 
         value_id=slug_val.id, 
         field_name='slug', 
         data_type=ChangeAttrType.STR, 
-        content_type=ContentType.ENTITY,
-        change_type=ChangeType.CREATE
+        **entity_change_kwargs
     )
+
     schema_val = ChangeValueInt(new_value=schema_id)
     db.add(schema_val)
     db.flush()
     schema_change = Change(
-        change_request=change_request, 
         value_id=schema_val.id, 
         field_name='schema_id', 
         data_type=ChangeAttrType.INT, 
-        content_type=ContentType.ENTITY,
-        change_type=ChangeType.CREATE
+        **entity_change_kwargs
     )
 
     db.add_all([change_request, name_change, slug_change, schema_change])
@@ -191,33 +193,31 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingEntityCreateRequestException(obj_id=change_request_id)
 
-    name_change = db.execute(
+    entity_change = (
         select(Change)
         .where(Change.change_request_id == change_request_id)
+        .where(Change.content_type == ContentType.ENTITY)
+        .where(Change.change_type == ChangeType.CREATE)
+    )
+    name_change = db.execute(
+        entity_change
         .where(Change.field_name == 'name')
         .where(Change.data_type == ChangeAttrType.STR)
-        .where(Change.content_type == ContentType.ENTITY)
-        .where(Change.change_type == ChangeType.CREATE)
     ).scalar()
     slug_change = db.execute(
-        select(Change)
-        .where(Change.change_request_id == change_request_id)
+        entity_change
         .where(Change.field_name == 'slug')
         .where(Change.data_type == ChangeAttrType.STR)
-        .where(Change.content_type == ContentType.ENTITY)
-        .where(Change.change_type == ChangeType.CREATE)
     ).scalar()
     schema_change = db.execute(
-        select(Change)
-        .where(Change.change_request_id == change_request_id)
+        entity_change
         .where(Change.field_name == 'schema_id')
         .where(Change.data_type == ChangeAttrType.INT)
-        .where(Change.content_type == ContentType.ENTITY)
-        .where(Change.change_type == ChangeType.CREATE)
     ).scalar() 
     if not all([name_change, slug_change, schema_change]):
         raise MissingEntityCreateRequestException(obj_id=change_request_id)
@@ -368,6 +368,7 @@ def apply_entity_update_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingEntityUpdateRequestException(obj_id=change_request_id)
@@ -475,6 +476,7 @@ def apply_entity_delete_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingEntityDeleteRequestException(obj_id=change_request_id)

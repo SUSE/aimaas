@@ -183,6 +183,7 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingSchemaCreateRequestException(obj_id=change_request_id)
@@ -357,6 +358,7 @@ def apply_schema_update_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingSchemaUpdateRequestException(obj_id=change_request_id)
@@ -461,6 +463,7 @@ def apply_schema_delete_request(db: Session, change_request_id: int, reviewed_by
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
     ).scalar()
     if change_request is None:
         raise MissingSchemaDeleteRequestException(obj_id=change_request_id)

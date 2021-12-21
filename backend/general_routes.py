@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import select
 
-from backend.models import  User
+from backend.models import  Entity, User
+from backend.schemas.entity import EntityBaseSchema
+from backend.schemas.schema import SchemaBaseSchema
+from backend.schemas.traceability import ChangeRequestSchema
 
 from . import crud, schemas, exceptions, traceability, auth
 from .database import get_db
@@ -96,7 +99,6 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-
 @router.put(
     '/schemas/{id_or_slug}', 
     response_model=schemas.SchemaBaseSchema,
@@ -158,11 +160,23 @@ def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         
 
-@router.post('/changes/review/{id}')
+@router.post('/changes/review/{id}', response_model=Union[
+    ChangeRequestSchema, SchemaBaseSchema, EntityBaseSchema
+])
 def review_changes(id: int, review: schemas.ChangeReviewSchema, db: Session = Depends(get_db)):
     # user: User = Depends(get_current_user), 
     user = db.execute(select(User)).scalar()
-    return traceability.review_changes(db=db, change_request_id=id, review=review, reviewed_by=user)
+    try:
+        return traceability.review_changes(db=db, change_request_id=id, review=review, reviewed_by=user)
+    except (
+        exceptions.MissingSchemaCreateRequestException,
+        exceptions.MissingSchemaUpdateRequestException,
+        exceptions.MissingSchemaDeleteRequestException,
+        exceptions.MissingEntityCreateRequestException,
+        exceptions.MissingEntityUpdateRequestException,
+        exceptions.MissingEntityDeleteRequestException
+    ) as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
 @router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.RecentChangeSchema])
