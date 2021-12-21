@@ -44,7 +44,6 @@
 import Pagination from "./Pagination.vue";
 import EntityListTable from "@/components/EntityListTable";
 import SearchPanel from "./SearchPanel.vue";
-import {api} from "@/api";
 
 export default {
   components: {EntityListTable, Pagination, SearchPanel},
@@ -91,7 +90,7 @@ export default {
         this.currentPage = 1;
       }
       this.loading = true;
-      api.getEntities({
+      this.$api.getEntities({
         schemaSlug: this.schema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,

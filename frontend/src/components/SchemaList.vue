@@ -47,7 +47,6 @@
 </template>
 
 <script>
-import {api} from "@/api";
 import BaseLayout from "@/components/layout/BaseLayout";
 
 export default {
@@ -68,7 +67,7 @@ export default {
   methods: {
     async load() {
       this.loading = true;
-      this.schemas = await api.getSchemas();
+      this.schemas = await this.$api.getSchemas();
       this.loading = false;
     }
   }

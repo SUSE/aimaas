@@ -23,8 +23,6 @@
 </template>
 
 <script>
-import { api } from "../api";
-
 const REVIEW_STATUS_BG_MAP = {
   APPROVED: "bg-success",
   PENDING: "bg-primary",
@@ -41,7 +39,7 @@ export default {
     };
   },
   created() {
-    api
+    this.$api
       .getRecentEntityChanges({
         schemaSlug: this.schemaSlug,
         entityIdOrSlug: this.entitySlug,

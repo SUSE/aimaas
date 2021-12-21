@@ -74,7 +74,6 @@ import FloatInput from "@/components/inputs/FloatInput";
 import ReferencedEntitySelect from "@/components/inputs/ReferencedEntitySelect";
 import Spinner from "@/components/layout/Spinner";
 import {TYPE_INPUT_MAP} from "@/utils";
-import {api} from "@/api";
 
 
 export default {
@@ -132,12 +131,12 @@ export default {
       let p;
       this.loading = true;
 
-      p = api.getSchema({slugOrId: this.$route.params.schemaSlug}).then(
+      p = this.$api.getSchema({slugOrId: this.$route.params.schemaSlug}).then(
           details => this.schemaDetails = details
       );
       promises.push(p);
       if (this.$route.params.entitySlug) {
-        p = api.getEntity({
+        p = this.$api.getEntity({
           schemaSlug: this.$route.params.schemaSlug,
           entityIdOrSlug: this.$route.params.entitySlug,
         }).then(data => {
@@ -171,7 +170,7 @@ export default {
           this.loading = false;
           return;
         }
-        api.updateEntity({
+        this.$api.updateEntity({
           schemaSlug: this.$route.params.schemaSlug,
           entityIdOrSlug: this.$route.params.entitySlug,
           body: body,
@@ -180,7 +179,7 @@ export default {
         });
       } else {
         // CREATE NEW ENTITY
-        api.createEntity({
+        this.$api.createEntity({
           schemaSlug: this.$route.params.schemaSlug,
           body: this.entity
         }).finally(() => {

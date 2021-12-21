@@ -38,7 +38,6 @@
 </template>
 
 <script>
-import {api} from "@/api";
 import {ATTR_TYPES_NAMES} from "@/utils";
 import _isEqual from "lodash/isEqual";
 import _cloneDeep from "lodash/cloneDeep";
@@ -62,7 +61,7 @@ export default {
     };
   },
   async created() {
-    this.attributes = await api.getAttributes();
+    this.attributes = await this.$api.getAttributes();
   },
   mounted() {
     if (this.details === null) {
@@ -72,7 +71,7 @@ export default {
   methods: {
     getDetails() {
       if (this.schema) {
-        api.getSchema({slugOrId: this.schema.slug}).then(details => {
+        this.$api.getSchema({slugOrId: this.schema.slug}).then(details => {
           this.details = details;
           this.attributeDefinitions = _cloneDeep(details.attributes);
         });
@@ -95,7 +94,7 @@ export default {
         reviewable: this.details.reviewable,
         attributes: initialData.attributes,
       };
-      const response = await api.createSchema({ body: json });
+      const response = await this.$api.createSchema({ body: json });
       if (response.status === 200) {
         this.$router.push({name: 'schema-view', params: {schemaSlug: json.slug}});
       }
@@ -156,7 +155,7 @@ export default {
       });
       toSend.delete_attributes = remove.map((x) => x.name);
 
-      const response = await api.updateSchema({
+      const response = await this.$api.updateSchema({
         schemaSlug: this.schema.slug,
         body: toSend,
       });

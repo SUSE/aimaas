@@ -1,6 +1,4 @@
-
-
-class API {
+export class API {
     constructor(baseUrl) {
         this.base = baseUrl;
     }
@@ -175,6 +173,3 @@ class API {
     }
 
 }
-
-const api = new API(process.env.VUE_APP_API_BASE);
-export { api }

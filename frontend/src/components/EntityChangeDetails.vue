@@ -77,8 +77,6 @@
 </template>
 
 <script>
-import { api } from "../api";
-
 const STATUS_CLASSES = {
   APPROVED: "bg-success",
   DECLINED: "bg-secondary",
@@ -89,7 +87,7 @@ export default {
   name: "EntityChangeDetails",
   emits: [],
   async created() {
-    const resp = await api.getEntityChangeDetails({
+    const resp = await this.$api.getEntityChangeDetails({
       schemaSlug: this.$route.params.schema,
       entityIdOrSlug: this.$route.params.entity,
       changeId: this.$route.params.changeId,
@@ -112,7 +110,7 @@ export default {
       return new Date(date).toLocaleString();
     },
     async reviewChanges(verdict) {
-      const resp = await api.reviewChanges({
+      const resp = await this.$api.reviewChanges({
         verdict,
         changeId: this.$route.params.changeId,
         changeObject: "ENTITY",

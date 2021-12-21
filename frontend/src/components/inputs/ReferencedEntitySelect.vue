@@ -48,7 +48,6 @@
 </template>
 
 <script>
-import {api} from "@/api";
 import BaseInput from "@/components/layout/BaseInput";
 import EntityList from "@/components/EntityList";
 
@@ -91,7 +90,7 @@ export default {
 
         toQuery.map(i => {
           if (!preselectedIds.includes(i)) {
-            api.getEntity({
+            this.$api.getEntity({
               schemaSlug: this.activeSchema.slug,
               entityIdOrSlug: i
             }).then(response => {

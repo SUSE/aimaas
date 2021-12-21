@@ -37,7 +37,6 @@ import 'bootstrap/dist/js/bootstrap.min.js';
 import "eos-icons/dist/css/eos-icons.css";
 import "suse-bootstrap5-theme/dist/css/suse.css";
 
-import {api} from "@/api";
 import SchemaList from "@/components/SchemaList";
 
 export default {
@@ -45,7 +44,6 @@ export default {
   components: {SchemaList,},
   data: function () {
     return {
-      api: api,
       activeSchema: null
     }
   },
@@ -68,7 +66,7 @@ export default {
   },
   methods: {
     getSchemaFromApi(schemaSlug) {
-      api.getSchema({slugOrId: schemaSlug}).then(schema => {
+      this.$api.getSchema({slugOrId: schemaSlug}).then(schema => {
         this.activeSchema = schema;
       });
     },
