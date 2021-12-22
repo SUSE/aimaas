@@ -22,6 +22,8 @@ from .schemas import (
     EntityListSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
+    AttrDefSchema, 
+    AttrDefUpdateSchema,
     AttributeCreateSchema
 )
 from .exceptions import *
@@ -188,107 +190,113 @@ def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
             raise NoOpChangeException('No-op change: made an attempt to update and delete the same attribute')
 
 
-def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
-    q = select(Schema).where(Schema.deleted == False)
-    if isinstance(id_or_slug, int):
-        q = q.where(Schema.id == id_or_slug)
-    else:
-        q = q.where(Schema.slug == id_or_slug)
+def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema: Schema):
+    ValueModel = attr_def.attribute.type.value.model
+    db.execute(delete(BoundFK).where(BoundFK.attr_def_id == attr_def.id))
+    db.execute(delete(AttributeDefinition).where(AttributeDefinition.id == attr_def.id))
+    db.execute(delete(ValueModel)
+        .where(ValueModel.attribute_id == attr_def.attribute_id)
+        .where(ValueModel.entity_id == Entity.id)
+        .where(Entity.schema_id == schema.id)
+        .execution_options(synchronize_session=False)
+    )
 
-    sch: Schema = db.execute(q).scalar()
-    if sch is None:
+
+def _update_attr_in_schema(db: Session, attr_upd: AttrDefUpdateSchema, attr_def: AttributeDefinition):
+    if attr_def.list and not attr_upd.list:
+        raise ListedToUnlistedException(attr_def_id=attr_def.id)
+    if attr_upd.list:
+        attr_upd.unique = False
+    attr_def.required = attr_upd.required
+    attr_def.unique = attr_upd.unique
+    attr_def.list = attr_upd.list
+    attr_def.key = attr_upd.key
+    attr_def.description = attr_upd.description
+
+    if attr_upd.new_name:
+        attr_def.attribute = create_attribute(
+            db=db, 
+            data=AttributeCreateSchema(name=attr_upd.new_name, type=attr_def.attribute.type.name),
+            commit=False
+        )
+
+
+def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema):
+    attribute = create_attribute(db, attr_schema, commit=False)
+    db.flush()
+    try:
+        attr_def = AttributeDefinition(
+            attribute_id=attribute.id, 
+            schema_id=schema.id,
+            required=attr_schema.required, 
+            list=attr_schema.list, 
+            unique=attr_schema.unique if not attr_schema.list else False,
+            key=attr_schema.key,
+            description=attr_schema.description
+        )
+        db.add(attr_def)
+        db.flush()
+    except sqlalchemy.exc.IntegrityError:
+        db.rollback()
+        raise AttributeAlreadyDefinedException(attr_id=attribute.id, schema_id=schema.id)
+    
+    if attribute.type == AttrType.FK:
+        if attr_schema.bind_to_schema is None:
+            raise NoSchemaToBindException(attr_id=attribute.id)
+        if attr_schema.bind_to_schema == -1:
+            bound_schema = schema
+        else:
+            bound_schema = db.execute(
+                select(Schema)
+                .where(Schema.id == attr_schema.bind_to_schema)
+                .where(Schema.deleted == False)
+            ).scalar()
+        
+        if bound_schema is None:
+            raise MissingSchemaException(obj_id=attr_schema.bind_to_schema)
+        db.add(BoundFK(attr_def_id=attr_def.id, schema_id=bound_schema.id))
+
+
+def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
+    schema = get_schema(db=db, id_or_slug=id_or_slug)
+    if schema.deleted:
         raise MissingSchemaException(obj_id=id_or_slug)
     
     try:
         db.execute(
             update(Schema)
-            .where(Schema.id == sch.id)
+            .where(Schema.id == schema.id)
             .values(
-                name=data.name or sch.name, 
-                slug=data.slug or sch.slug, 
-                reviewable=data.reviewable if data.reviewable is not None else sch.reviewable)
+                name=data.name or schema.name, 
+                slug=data.slug or schema.slug, 
+                reviewable=data.reviewable if data.reviewable is not None else schema.reviewable)
         )
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
     
-    _check_no_op_changes(schema=sch, data=data)
-    _check_attr_names_after_update(schema=sch, data=data)
+    _check_no_op_changes(schema=schema, data=data)
+    _check_attr_names_after_update(schema=schema, data=data)
 
-    attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
+    attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
 
     for attr in data.delete_attributes:
         attr_def = attr_def_names.get(attr)
         if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr, schema_id=sch.id)
-        ValueModel = attr_def.attribute.type.value.model
-        db.execute(delete(BoundFK).where(BoundFK.attr_def_id == attr_def.id))
-        db.execute(delete(AttributeDefinition).where(AttributeDefinition.id == attr_def.id))
-        db.execute(delete(ValueModel)
-            .where(ValueModel.attribute_id == attr_def.attribute_id)
-            .where(ValueModel.entity_id == Entity.id)
-            .where(Entity.schema_id == sch.id)
-            .execution_options(synchronize_session=False)
-        )
+            raise AttributeNotDefinedException(attr_id=attr, schema_id=schema.id)
+        _delete_attr_from_schema(db=db, attr_def=attr_def, schema=schema)
+       
     for attr in data.update_attributes:
         attr_def = attr_def_names.get(attr.name)
         
         if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr.name, schema_id=sch.id)
-        if attr_def.list and not attr.list:
-            raise ListedToUnlistedException(attr_def_id=attr_def.id)
-        if attr.list:
-            attr.unique = False
-        attr_def.required = attr.required
-        attr_def.unique = attr.unique
-        attr_def.list = attr.list
-        attr_def.key = attr.key
-        attr_def.description = attr.description
-
-        if attr.new_name:
-            attr_def.attribute = create_attribute(
-                db=db, 
-                data=AttributeCreateSchema(name=attr.new_name, type=attr_def.attribute.type.name),
-                commit=False
-            )
-                
-
+            raise AttributeNotDefinedException(attr_id=attr.name, schema_id=schema.id)
+        _update_attr_in_schema(db=db, attr_upd=attr, attr_def=attr_def)
     db.flush()
     
     for attr in data.add_attributes:
-        a = create_attribute(db, attr, commit=False)
-        db.flush()
-        try:
-            ad = AttributeDefinition(
-                attribute_id=a.id, 
-                schema_id=sch.id,
-                required=attr.required, 
-                list=attr.list, 
-                unique=attr.unique if not attr.list else False,
-                key=attr.key,
-                description=attr.description
-            )
-            db.add(ad)
-            db.flush()
-        except sqlalchemy.exc.IntegrityError:
-            db.rollback()
-            raise AttributeAlreadyDefinedException(attr_id=a.id, schema_id=sch.id)
-        
-        if a.type == AttrType.FK:
-            if attr.bind_to_schema is None:
-                raise NoSchemaToBindException(attr_id=a.id)
-            if attr.bind_to_schema == -1:
-                s = sch
-            else:
-                s = db.execute(
-                    select(Schema)
-                    .where(Schema.id == attr.bind_to_schema)
-                    .where(Schema.deleted == False)
-                ).scalar()
-            if s is None:
-                raise MissingSchemaException(obj_id=attr.bind_to_schema)
-            bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
-            db.add(bfk)
+        _add_attr_to_schema(db=db, attr_schema=attr, schema=schema)
+    
     try:
         if commit:
             db.commit()
@@ -297,7 +305,7 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
-    return sch
+    return schema
 
 
 def _get_entity_data(db: Session, entity: Entity, attr_names: List[str]) -> Dict[str, Any]:
