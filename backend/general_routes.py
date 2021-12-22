@@ -122,6 +122,8 @@ def update_schema(
         db.commit()
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
         return schema
+    except exceptions.NoOpChangeException as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     except exceptions.MissingAttributeException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except exceptions.MissingSchemaException as e:
@@ -247,21 +249,44 @@ def get_groups(db: Session = Depends(get_db)):
 
 @router.post('/groups', response_model=GroupSchema)
 def create_group(data: CreateGroupSchema, db: Session = Depends(get_db)):
-    return auth.create_group(data=data, db=db)
+    try: 
+        auth.create_group(data=data, db=db)
+    except exceptions.GroupExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.MissingUserException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
 @router.get('/groups/{group_id}', response_model=GroupDetailsSchema)
 def get_group(group_id: int, db: Session = Depends(get_db)):
-    return auth.get_group_details(group_id=group_id, db=db)
+    try:
+        return auth.get_group_details(group_id=group_id, db=db) 
+    except exceptions.MissingGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
 
 @router.get('/groups/{group_id}/members', response_model=List[UserSchema])
 def get_group_members(group_id: int, db: Session = Depends(get_db)):
-    return auth.get_group_members(group_id=group_id, db=db)
+    try:
+        return auth.get_group_members(group_id=group_id, db=db)
+    except exceptions.MissingGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
 @router.put('/groups/{group_id}', response_model=GroupSchema)
 def update_group(group_id: int, data: UpdateGroupSchema, db: Session = Depends(get_db)):
-    return auth.update_group(group_id=group_id, data=data, db=db)
+    try:
+        return auth.update_group(group_id=group_id, data=data, db=db)
+    except exceptions.NoOpChangeException as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    except exceptions.MissingPermissionException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingGroupPermissionException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingUserException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingUserGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
 @router.post('/users', response_model=auth.UserSchema)

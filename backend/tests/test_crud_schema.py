@@ -469,7 +469,7 @@ class TestSchemaUpdate:
             ],
             delete_attributes=['age']
         )
-        with pytest.raises(Exception):
+        with pytest.raises(NoOpChangeException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_deleting_and_updating_same_attr(self, dbsession):
@@ -488,7 +488,7 @@ class TestSchemaUpdate:
             ],
             delete_attributes=['age']
         )
-        with pytest.raises(Exception):
+        with pytest.raises(NoOpChangeException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_no_raise_on_deleting_and_creating_attr_with_same_name_but_different_type(self, dbsession):

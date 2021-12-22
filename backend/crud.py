@@ -182,10 +182,10 @@ def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
     deleted = {i.attribute.name: i.attribute.type.name for i in deleted}
     for attr in data.add_attributes:
         if attr.name in deleted and deleted[attr.name] == attr.type.name:
-            raise Exception('NOOP CHANGE')
+            raise NoOpChangeException('No-op change: made an attempt to add and delete the same attribute')
     for attr in data.update_attributes:
         if attr.name in deleted and deleted[attr.name] == attrs[attr.name]:
-             raise Exception('NOOP CHANGE')
+            raise NoOpChangeException('No-op change: made an attempt to update and delete the same attribute')
 
 
 def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
