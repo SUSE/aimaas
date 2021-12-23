@@ -2,10 +2,8 @@ import enum
 from typing import List, Union, Optional, NamedTuple
 from datetime import datetime
 
-from sqlalchemy import (
-    select, Enum, DateTime, Date,
-    Boolean, Column, ForeignKey, 
-    Integer, String, Float)
+from sqlalchemy import select, Column, ForeignKey
+from sqlalchemy.types import Enum, DateTime, Date, Boolean, Integer, String, Float
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
