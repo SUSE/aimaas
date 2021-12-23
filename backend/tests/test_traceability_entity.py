@@ -42,7 +42,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
     change_1 = Change(
         change_request=change_request,
         object_id=1,
-        change_type=ChangeType.DELETE,
+        change_type=ChangeType.CREATE,
         content_type=ContentType.ENTITY,
         field_name='deleted',
         data_type=ChangeAttrType.STR,
@@ -51,7 +51,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
     change_2 = Change(
         change_request=change_request,
         object_id=1,
-        change_type=ChangeType.DELETE,
+        change_type=ChangeType.CREATE,
         content_type=ContentType.ENTITY,
         field_name='deleted',
         data_type=ChangeAttrType.STR,
@@ -527,5 +527,72 @@ class TestCreateEntityTraceability:
         with pytest.raises(AttributeNotDefinedException):
             apply_entity_create_request(db=dbsession, change_request_id=r.id, reviewed_by=user)
 
-
             
+def make_entity_create_request(db: Session, user: User, time: datetime):
+    person = Entity(name='Jackson', slug='jackson', schema_id=1)
+    db.add(person)
+    db.flush()
+    change_request = ChangeRequest(created_by=user, created_at=time)
+    change_request.status = ChangeStatus.APPROVED
+    change_request.comment = 'approved'
+    name_val = ChangeValueStr(new_value='Jackson')
+    slug_val = ChangeValueStr(new_value='jackson')
+    age_val = ChangeValueInt(new_value=42)
+    color_val_1 = ChangeValueStr(new_value='violet')
+    color_val_2 = ChangeValueStr(new_value='cyan')
+    db.add_all([change_request, name_val, slug_val, age_val, color_val_1, color_val_2])
+    db.flush()
+
+    age = db.execute(
+        select(AttributeDefinition)
+        .where(AttributeDefinition.schema_id == 1)
+        .join(Attribute)
+        .where(Attribute.name == 'age')
+    ).scalar().attribute
+
+    fav_color = db.execute(
+        select(AttributeDefinition)
+        .where(AttributeDefinition.schema_id == 1)
+        .join(Attribute)
+        .where(Attribute.name == 'fav_color')
+    ).scalar().attribute
+
+    change_kwargs = {
+        'change_request': change_request, 
+        'object_id': person.id, 
+        'content_type': ContentType.ENTITY,
+        'change_type': ChangeType.CREATE
+    }
+    name_change = Change(field_name='name', value_id=name_val.id, data_type=ChangeAttrType.STR, **change_kwargs)
+    slug_change = Change(field_name='slug', value_id=slug_val.id, data_type=ChangeAttrType.STR, **change_kwargs)
+    age_change = Change(attribute_id=age.id, value_id=age_val.id, data_type=ChangeAttrType.INT, **change_kwargs)
+    color_change_1 = Change(attribute_id=fav_color.id, value_id=color_val_1.id, data_type=ChangeAttrType.STR, **change_kwargs)
+    color_change_2 = Change(attribute_id=fav_color.id, value_id=color_val_2.id, data_type=ChangeAttrType.STR, **change_kwargs)
+    db.add_all([name_change, slug_change, age_change, color_change_1, color_change_2])
+    db.commit()
+
+
+def test_get_entity_create_details(dbsession: Session):
+    user = dbsession.execute(select(User).where(User.id == 1)).scalar()
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    make_entity_create_request(db=dbsession, user=user, time=now)
+
+    change = entity_change_details(db=dbsession, change_request_id=1)
+    assert change.created_at == now
+    assert change.created_by == user.username
+    assert change.reviewed_at is None
+    assert change.reviewed_by is None
+    assert change.comment == 'approved'
+    assert change.status == ChangeStatus.APPROVED
+    assert change.entity.name == 'Jackson'
+    assert change.entity.slug == 'jackson'
+    assert change.entity.schema_slug == 'person'
+    assert len(change.changes) == 4
+    name = change.changes['name']
+    age = change.changes['age']
+    slug = change.changes['slug']
+    fav_color = change.changes['fav_color']
+    assert name.new == 'Jackson' and name.old is None
+    assert age.new == 42 and age.old is None
+    assert slug.new == 'jackson' and slug.old is None
+    assert fav_color.new == ['violet', 'cyan'] and fav_color.old == fav_color.current == None

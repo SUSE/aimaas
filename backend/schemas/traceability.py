@@ -9,6 +9,7 @@ from .schema import AttrDefSchema, AttrDefUpdateSchema, SchemaBaseSchema
 
 
 class ChangeRequestSchema(BaseModel):
+    id: Optional[int]
     created_at: datetime
     reviewed_at: Optional[datetime]
     created_by: str
@@ -54,19 +55,10 @@ class EntityChangeDetailSchema(ChangeRequestSchema):
     changes: dict[str, EntityChangeSchema]
 
 
-class RecentChangeSchema(BaseModel):
-    created_at: datetime
-    status: ChangeStatus
-    id: int
-
-    class Config:
-        orm_mode = True
-
-
 class SchemaChangesSchema(BaseModel):
-    name: Optional[Dict[str, str]]
-    slug: Optional[Dict[str, str]]
-    reviewable: Optional[Dict[str, bool]]
+    name: Optional[Dict[str, Optional[str]]]
+    slug: Optional[Dict[str, Optional[str]]]
+    reviewable: Optional[Dict[str, Optional[bool]]]
     deleted: Optional[Dict[str, bool]]
     add: Optional[List[AttrDefSchema]]
     update: Optional[List[AttrDefUpdateSchema]]

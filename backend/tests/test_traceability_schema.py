@@ -41,7 +41,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
     change_1 = Change(
         change_request=change_request,
         object_id=1,
-        change_type=ChangeType.DELETE,
+        change_type=ChangeType.CREATE,
         content_type=ContentType.SCHEMA,
         field_name='deleted',
         data_type=ChangeAttrType.STR,
@@ -50,7 +50,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
     change_2 = Change(
         change_request=change_request,
         object_id=1,
-        change_type=ChangeType.DELETE,
+        change_type=ChangeType.CREATE,
         content_type=ContentType.SCHEMA,
         field_name='deleted',
         data_type=ChangeAttrType.STR,
@@ -70,6 +70,111 @@ def test_get_recent_schema_changes(dbsession: Session):
     changes = get_recent_schema_changes(db=dbsession, schema_id=1, count=5)
     for change, i in zip(changes, reversed(range(5, 10))):
         assert change.created_at == (time + timedelta(hours=i)).replace(tzinfo=timezone.utc)
+
+
+def make_schema_create_request(db: Session, user: User, time: datetime):
+    schema = Schema(name='Test', slug='test', reviewable=True)
+    db.add(schema)
+    db.flush()
+    change_request = ChangeRequest(created_by=user, created_at=time, status=ChangeStatus.APPROVED)
+    slug_val = ChangeValueStr(new_value='test')
+    reviewable_val = ChangeValueBool(new_value=True)
+
+    db.add_all([slug_val, reviewable_val])
+    db.flush()
+    schema_data = {
+        'slug': {'old': None, 'new': 'test'}, 
+        'reviewable': {'old': None, 'new': True},
+        'name': {'old': None, 'new': 'Test'}
+    }
+    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
+    for field, type_ in schema_fields:
+        ValueModel = type_.value.model
+        v = ValueModel(new_value=schema_data[field]['new'], old_value=schema_data[field]['old']) 
+        db.add(v)
+        db.flush()
+        db.add(Change(
+            change_request=change_request,
+            field_name=field,
+            value_id=v.id,
+            object_id=schema.id,
+            data_type=type_,
+            content_type=ContentType.SCHEMA,
+            change_type=ChangeType.CREATE
+        ))
+    
+    v = ChangeValueInt(new_value=schema.id)
+    db.add(v)
+    db.flush()
+    db.add(Change(
+        change_request=change_request,
+        field_name='id',
+        value_id=v.id,
+        object_id=schema.id,
+        data_type=ChangeAttrType.INT,
+        content_type=ContentType.SCHEMA,
+        change_type=ChangeType.UPDATE
+    ))
+
+    attr_fields = [
+        ('required', ChangeAttrType.BOOL, False), 
+        ('unique', ChangeAttrType.BOOL, False), 
+        ('list', ChangeAttrType.BOOL, False), 
+        ('key', ChangeAttrType.BOOL, False),
+        ('description', ChangeAttrType.STR, None),
+        ('bind_to_schema', ChangeAttrType.INT, None),
+        ('name', ChangeAttrType.STR, 'test'),
+        ('type', ChangeAttrType.STR, 'STR'),
+    ]
+    test = Attribute(name='test', type=AttrType.STR)
+    db.add(test)
+    db.flush()
+    for attr, data_type, value in attr_fields:
+        ValueModel = data_type.value.model
+        v = ValueModel(new_value=value)
+        db.add(v)
+        db.flush()
+        change = Change(
+                change_request=change_request,
+                content_type=ContentType.ATTRIBUTE_DEFINITION,
+                change_type=ChangeType.CREATE,
+                field_name=attr,
+                object_id=test.id,
+                value_id=v.id,
+                data_type=data_type,
+            )
+        
+        db.add(change)
+    db.commit()
+
+
+def test_get_schema_create_details(dbsession: Session):
+    user = dbsession.execute(select(User).where(User.id == 1)).scalar()
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    make_schema_create_request(db=dbsession, user=user, time=now)
+
+    change = schema_change_details(db=dbsession, change_request_id=1)
+    assert change.created_at == now
+    assert change.created_by == user.username
+    assert change.reviewed_at is None
+    assert change.reviewed_by is None
+    assert change.comment is None
+    assert change.status == ChangeStatus.APPROVED
+    assert change.schema_.name == 'Test' and  change.schema_.slug == 'test'
+    changes = change.changes
+    assert changes.slug['new'] == 'test' and changes.slug['old'] == None
+    assert changes.reviewable['new'] == True and changes.reviewable['old'] == None
+    assert changes.name['new'] == 'Test' and changes.name['old'] == None
+    add = changes.add
+    assert len(add) == 1
+    assert add[0] == AttrDefSchema(
+        name='test',
+        type='STR',
+        required=False,
+        unique=False,
+        list=False,
+        key=False,
+    )
 
 
 def asserts_after_submitting_schema_create_request(db: Session):

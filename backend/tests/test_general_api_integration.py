@@ -23,12 +23,14 @@ from .test_traceability_schema import (
     asserts_after_applying_schema_delete_request,
     asserts_after_submitting_schema_delete_request,
     make_schema_change_objects,
-    make_schema_update_request
+    make_schema_update_request,
+    make_schema_create_request
 )
 from .test_traceability_entity import (
     make_entity_change_objects,
     make_entity_update_request,
-    make_entity_delete_request
+    make_entity_delete_request,
+    make_entity_create_request
 )
 
 class TestRouteAttributes:
@@ -554,7 +556,7 @@ class TestRouteSchemaUpdate:
         response = client.put('/schemas/1', json=data)
         assert response.status_code == 422
 
-        
+
 class TestRouteSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_delete(self, dbsession: Session, client: TestClient, id_or_slug):
@@ -609,8 +611,32 @@ class TestRouteGetEntityChanges:
         assert name['new'] == 'Jackson' and name['old'] == name['current'] == 'Jack'
         assert age['new'] == 42 and age['old'] == age['current'] == 10
         assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
-    # TODO
-    # test for create details
+
+
+    def test_get_create_details(self, dbsession: Session, client: TestClient):
+        user = dbsession.execute(select(User)).scalar()
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        make_entity_create_request(db=dbsession, user=user, time=now)
+
+        response = client.get('/changes/entity/person/jackson/1')
+        change = response.json()
+        assert parser.parse(change['created_at']) == now
+        assert change['created_by'] == user.username
+        assert change['reviewed_at'] == change['reviewed_by'] ==None
+        assert change['status'] == 'APPROVED'
+        assert change['entity']['name'] == 'Jackson'
+        assert change['entity']['slug'] == 'jackson'
+        assert change['entity']['schema'] == 'person'
+        assert len(change['changes']) == 4
+        name = change['changes']['name']
+        slug = change['changes']['slug']
+        age = change['changes']['age']
+        fav_color = change['changes']['fav_color']
+        assert name['new'] == 'Jackson' and name['old'] is None
+        assert slug['new'] == 'jackson' and slug['old'] is None
+        assert age['new'] == 42 and age['old'] is None
+        assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
+
 
     def test_get_delete_details(self, dbsession: Session, client: TestClient):
         user = dbsession.execute(select(User)).scalar()
@@ -710,8 +736,44 @@ class TestRouteGetSchemaChanges:
         assert delete[0] == 'born'
 
 
-    # # TODO
-    # # test for create details
+    def test_get_create_details(self, dbsession: Session, client: TestClient):
+        user = dbsession.execute(select(User)).scalar()
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        make_schema_create_request(db=dbsession, user=user, time=now)
+        response = client.get('/changes/schema/test/1')
+        change = response.json()
+
+        assert parser.parse(change['created_at']) == now
+        assert change['created_by'] == user.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'APPROVED'
+        assert change['schema']['name'] == 'Test'
+        assert change['schema']['slug'] == 'test'
+
+        assert len(change['changes']) == 7
+        assert change['changes']['deleted'] is None
+        name = change['changes']['name']
+        slug = change['changes']['slug']
+        reviewable = change['changes']['reviewable']
+        add = change['changes']['add']
+        update = change['changes']['update']
+        delete = change['changes']['delete']
+
+        assert name['new'] == 'Test' and name['old'] is None
+        assert slug['new'] == 'test' and slug['old'] is None
+        assert reviewable['new'] == True and reviewable['old'] is None
+        assert len(add) == 1
+
+        assert AttrDefSchema(**add[0]) == AttrDefSchema(
+            name='test',
+            type='STR',
+            required=False,
+            unique=False,
+            list=False,
+            key=False,
+        )
+        assert delete == update == []
+
 
     # def test_get_delete_details(self, dbsession: Session, client: TestClient):
     #     user = dbsession.execute(select(User)).scalar()
