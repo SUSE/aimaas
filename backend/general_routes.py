@@ -181,7 +181,7 @@ def review_changes(id: int, review: schemas.ChangeReviewSchema, db: Session = De
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-@router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.RecentChangeSchema])
+@router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.ChangeRequestSchema])
 def get_recent_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
     try:
         schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
@@ -203,7 +203,7 @@ def get_schema_change_details(id_or_slug: Union[int, str], change_id: int, db: S
 
 @router.get(
     '/changes/entity/{schema_id_or_slug}/{entity_id_or_slug}',
-    response_model=List[schemas.RecentChangeSchema]
+    response_model=List[schemas.ChangeRequestSchema]
 )
 def get_recent_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
     try:
