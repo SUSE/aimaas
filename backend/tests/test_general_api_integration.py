@@ -516,7 +516,45 @@ class TestRouteSchemaUpdate:
         assert "Found multiple occurrences of attribute" in response.json()['detail']
         self.assert_no_change_requests_appeared(dbsession)
 
+    def test_raise_on_noop_change(self, dbsession: Session, client: TestClient):
+        # adding and deleting same attr
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'delete_attributes': ['age'],
+            'add_attributes': [
+                {
+                    'name': 'age',
+                    'type': 'INT',
+                    'required':False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        } 
+        response = client.put('/schemas/1', json=data)
+        assert response.status_code == 422
 
+        # updating and deleting same attr
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'delete_attributes': ['age'],
+            'update_attributes': [
+                {
+                    'name': 'age',
+                    'required':False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        } 
+        response = client.put('/schemas/1', json=data)
+        assert response.status_code == 422
+
+        
 class TestRouteSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_delete(self, dbsession: Session, client: TestClient, id_or_slug):

@@ -193,7 +193,7 @@ class Group(Base):
     __tablename__ = 'groups'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(128), nullable=False)
+    name = Column(String(128), unique=True, nullable=False)
     parent_id = Column(Integer, ForeignKey('groups.id'))
     parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
 

@@ -1,16 +1,17 @@
 from typing import Optional, List
 
-from sqlalchemy import select, exists
+import sqlalchemy
+from sqlalchemy import select
 from sqlalchemy.orm.session import Session
-from sqlalchemy.sql.expression import delete
 from sqlalchemy.sql.functions import func
+
+from backend.exceptions import GroupExistsException, MissingGroupException, MissingGroupPermissionException, MissingPermissionException, MissingUserException, MissingUserGroupException, NoOpChangeException
 from .config import settings as s
 from datetime import datetime, timedelta
-from fastapi import FastAPI, status, HTTPException, Depends
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import status, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
 from . import database
 from .models import (
     User, 
@@ -145,7 +146,7 @@ def get_group(group_id: int, db: Session) -> Optional[Group]:
 def get_group_or_raise(group_id: int, db: Session) -> Group:
     group = get_group(group_id=group_id, db=db)
     if group is None:
-        raise Exception('TODO')
+        raise MissingGroupException(obj_id=group_id)
     return group
 
 
@@ -191,30 +192,37 @@ def create_or_get_permission(data: PermissionSchema, db: Session, commit: bool =
     else:
         db.flush()
     return perm
-
+ 
 
 def create_group(data: CreateGroupSchema, db: Session) -> Group:
     group = Group(name=data.name, parent_id=data.parent_id)
     db.add(group)
-    db.flush()
+    try:
+        db.flush()
+    except sqlalchemy.exc.IntegrityError:
+        raise GroupExistsException(name=data.name)
 
     for perm in data.permissions:
         perm = create_or_get_permission(data=perm, db=db, commit=False)
         db.add(GroupPermission(group=group, permission=perm))
+    db.flush()
 
     for user_id in data.members:
         db.add(UserGroup(user_id=user_id, group=group))
-    db.commit()
-    return group
+    try:
+        db.commit()
+        return group
+    except sqlalchemy.exc.IntegrityError as e:
+        raise MissingUserException(obj_id=e.params['user_id'])
 
 
 def _check_no_op_changes(data: UpdateGroupSchema):
     perm_intersection = set(data.add_permissions).intersection(data.delete_permissions)
     if perm_intersection:
-        raise Exception('NOOP CHANGE')
+        raise NoOpChangeException('No-op change: made an attempt to add and delete the same permission')
     user_intersection = set(data.add_users).intersection(data.delete_users)
     if user_intersection:
-        raise Exception('NOOP CHANGE')
+        raise NoOpChangeException('No-op change: made an attempt to add and delete the same user from group')
 
 
 def get_user_by_id(user_id: int, db: Session) -> Optional[User]:
@@ -229,38 +237,37 @@ def update_group(group_id: int, data: UpdateGroupSchema, db: Session) -> Group:
     for perm in data.add_permissions:
         perm = create_or_get_permission(data=perm, db=db, commit=False)
         db.add(GroupPermission(group=group, permission=perm))
-    for perm in data.delete_permissions:
-        perm = get_permission(data=perm, db=db)
+    for perm_ in data.delete_permissions:
+        perm = get_permission(data=perm_, db=db)
         if perm is None:
-            raise Exception('TODO')
+            raise MissingPermissionException(obj_id=f'{perm_.type.name}:{perm_.obj.name}:{perm_.obj_id}')
         group_perm = db.execute(
             select(GroupPermission)
             .where(GroupPermission.group_id == group_id)
             .where(GroupPermission.permission_id == perm.id)
         ).scalar()
         if group_perm is None:
-            raise Exception('TODO')
+            raise MissingGroupPermissionException(obj_id=f'G{group_id}:P{perm.id}')
         db.delete(group_perm)
     db.flush()
     
     for user_id in data.add_users:
         user = get_user_by_id(user_id=user_id, db=db)
         if user is None:
-            raise Exception('TODO')
+            raise MissingUserException(obj_id=user_id)
         db.add(UserGroup(user_id=user_id, group_id=group.id))
 
     for user_id in data.delete_users:
         user = get_user_by_id(user_id=user_id, db=db)
         if user is None:
-            raise Exception('TODO')
+            raise MissingUserException(obj_id=user_id)
         user_group = db.execute(
             select(UserGroup)
             .where(UserGroup.user_id == user_id)
             .where(UserGroup.group_id == group.id)
         ).scalar()
         if user_group is None:
-            raise Exception('TODO')
+            raise MissingUserGroupException(obj_id=f'U{user_id}:G{group.id}')
         db.delete(user_group)
     db.commit()
     return group
-
