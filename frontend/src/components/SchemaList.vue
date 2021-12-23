@@ -3,6 +3,7 @@
     <li class="nav-item dropdown">
       <a class="nav-link dropdown-toggle" href="#" id="nav-schema-dropdown" role="button"
          data-bs-toggle="dropdown" aria-expanded="false">
+        <i class='eos-icons me-1'>namespace</i>
         Schema
       </a>
       <ul class="dropdown-menu" aria-labelledby="nav-schema-dropdown">
@@ -36,11 +37,28 @@
     <div class="container">
       <h1>Schema selection</h1>
       <div class="list-group">
-        <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}"
-                     v-for="schema in schemas" :key="schema.id"
-                     class="list-group-item list-group-item-action">
-          {{ schema.name }}
-        </router-link>
+        <template v-if="schemas.length > 0">
+          <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}"
+                       v-for="schema in schemas" :key="schema.id"
+                       class="list-group-item list-group-item-action">
+            {{ schema.name }}
+          </router-link>
+        </template>
+        <template v-else>
+          <div class="list-group-item">
+            <div class="alert alert-info">
+              No schemas defined. Please define one now.
+            </div>
+          </div>
+          <div class="list-group-item list-group-item-action">
+            <RouterLink
+              :to="{name: 'schema-new'}"
+              class="dropdown-item">
+            <i class='eos-icons me-1'>add_circle</i>
+            New
+          </RouterLink>
+          </div>
+        </template>
       </div>
     </div>
   </template>

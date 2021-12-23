@@ -95,7 +95,7 @@ export default {
         attributes: initialData.attributes,
       };
       const response = await this.$api.createSchema({ body: json });
-      if (response.status === 200) {
+      if (response !== undefined && response !== null) {
         this.$router.push({name: 'schema-view', params: {schemaSlug: json.slug}});
       }
     },

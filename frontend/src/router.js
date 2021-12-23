@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
-import EntityEdit from "@/components/EntityEdit.vue"
+import Entity from "@/components/Entity.vue"
 import EntityChangeDetails from "@/components/EntityChangeDetails.vue";
 import Schema from "@/components/Schema";
 import SchemaList from "@/components/SchemaList";
@@ -25,7 +25,7 @@ export const router = createRouter({
         },
         {
             path: '/:schemaSlug/:entitySlug',
-            component: EntityEdit,
+            component: Entity,
             name: 'entity-view'
         },
         {

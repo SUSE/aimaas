@@ -2,7 +2,7 @@ const ALERT_LEVELS = [
     'primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark', 'cta'
 ];
 
-export class AlertMessage {
+class AlertMessage {
     constructor(level, msg) {
         if (!ALERT_LEVELS.includes(level)){
             throw new TypeError("Invalid alert level.");
@@ -24,21 +24,13 @@ class AlertStore {
         }
     }
 
-    push(alert) {
-        if (!(alert instanceof AlertMessage)) {
-            throw new TypeError("Only instances of AlertMessage are allowed");
-        }
-
+    push(level, msg) {
+        const alert = new AlertMessage(level, msg);
         this.storage[alert.id] = alert;
     }
 
-    pop(alert) {
-        if (alert instanceof AlertMessage) {
-            delete this.storage[alert.id];
-        }
-        else if (alert instanceof String) {
-            delete this.storage[alert];
-        }
+    pop(alertId) {
+        delete this.storage[alertId];
     }
 
     get values() {

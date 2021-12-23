@@ -1,10 +1,14 @@
 <template>
   <BaseLayout>
     <template v-slot:additional_breadcrumbs>
+      <li class="breadcrumb-item">
+        <router-link :to="{name: 'schema-view', params: {schemaSlug: activeSchema?.slug}}">
+          {{ activeSchema?.name || 'n/a' }}
+        </router-link>
+      </li>
       <li class="breadcrumb-item active">{{ title }}</li>
     </template>
   </BaseLayout>
-
   <div class="container">
     <ul class="nav nav-tabs" id="schemaTabs" role="tablist">
       <li v-for="tab in tabs" data-bs-toggle="tooltip" :key="tab.name" :title="tab.tooltip"
@@ -18,9 +22,7 @@
     </ul>
     <div class="tab-content">
       <div class="tab-pane show active border p-2" role="tabpanel">
-        <keep-alive>
-          <component v-bind:is="currentTab" :schema="this.activeSchema"></component>
-        </keep-alive>
+        <component :is="currentTab" v-bind="currentProperties" @update="onUpdate"/>
       </div>
     </div>
   </div>
@@ -29,54 +31,48 @@
 <script>
 import {shallowRef} from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
-import EntityList from "@/components/EntityList";
 import EntityForm from "@/components/inputs/EntityForm";
-import SchemaEdit from "@/components/SchemaEdit";
 import Changes from "@/components/change_review/Changes";
 
 export default {
-  name: "Schema",
-  components: {BaseLayout, EntityList, EntityForm, SchemaEdit},
-  data: function () {
+  name: "Entity",
+  components: {EntityForm, BaseLayout},
+  inject: ["activeSchema"],
+  data() {
     return {
+      title: '',
       tabs: [
         {
-          name: "Entities",
-          component: shallowRef(EntityList),
-          icon: "table_view",
-          tooltip: "Show entities"
-        },
-        {
-          name: "Edit / Show",
-          component: shallowRef(SchemaEdit),
-          icon: "mode_edit",
-          tooltip: "Edit/Show schema structure"
-        },
-        {
-          name: "Add Entity",
+          name: 'Show/Edit',
           component: shallowRef(EntityForm),
-          icon: 'add_circle',
-          tooltip: 'Add new entity'
+          icon: "mode_edit",
+          tooltip: "Edit/show entity details"
         },
         {
           name: "History",
           component: shallowRef(Changes),
-          icon: 'history',
-          tooltip: 'Change history of schema'
+          icon: "history",
+          tooltip: 'Change history of entity'
         }
       ],
-      currentTab: shallowRef(EntityList)
+      currentTab: shallowRef(EntityForm)
+    };
+  },
+  computed: {
+    currentProperties() {
+      let props = {schema: this.activeSchema};
+      console.debug("Current tab", this.currentTab.name, Changes.name)
+      if (this.currentTab.name === Changes.name) {
+        props.entitySlug = this.$route.params.entitySlug
+      }
+      console.debug("Props", props)
+      return props;
     }
   },
-  inject: ['activeSchema'],
-  computed: {
-    title() {
-      try {
-        return this.activeSchema.name;
-      } catch (e) {
-        return "n/a";
-      }
+  methods: {
+    onUpdate(d) {
+      this.title = d.name || 'New';
     }
   }
-}
+};
 </script>

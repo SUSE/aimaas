@@ -38,7 +38,7 @@ export default {
         }
         this.alerts[alert.id] = alert;
         setTimeout(this.hideAlert, 3000, alert.id);
-        this.$alerts.pop(alert);
+        this.$alerts.pop(alert.id);
       }
     },
     hideAlert(alertId) {
@@ -51,13 +51,8 @@ export default {
   },
   mounted() {
     this.getAlerts();
+    setInterval(this.getAlerts, 300);
   },
-  watch: {
-    '$alerts.storage': {
-      handler: "getAlerts",
-      immediate: true
-    }
-  }
 }
 </script>
 
