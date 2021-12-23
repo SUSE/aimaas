@@ -9,7 +9,7 @@ from .schema import AttrDefSchema, AttrDefUpdateSchema, SchemaBaseSchema
 
 
 class ChangeRequestSchema(BaseModel):
-    id: int
+    id: Optional[int]
     created_at: datetime
     reviewed_at: Optional[datetime]
     created_by: str
