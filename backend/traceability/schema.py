@@ -223,6 +223,23 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
     schema = create_schema(db=db, data=data, commit=False)
+    for change in schema_changes:
+        change.object_id = schema.id
+    for change in attr_changes:
+        change.object_id = schema.id
+
+    v = ChangeValueInt(new_value=schema.id)
+    db.add(v)
+    db.flush()
+    db.add(Change(
+        change_request=change_request,
+        field_name='id',
+        value_id=v.id,
+        object_id=schema.id,
+        data_type=ChangeAttrType.INT,
+        content_type=ContentType.SCHEMA,
+        change_type=ChangeType.CREATE
+    ))
     if commit:
         db.commit()
     else:

@@ -64,9 +64,9 @@ class RecentChangeSchema(BaseModel):
 
 
 class SchemaChangesSchema(BaseModel):
-    name: Optional[Dict[str, str]]
-    slug: Optional[Dict[str, str]]
-    reviewable: Optional[Dict[str, bool]]
+    name: Optional[Dict[str, Optional[str]]]
+    slug: Optional[Dict[str, Optional[str]]]
+    reviewable: Optional[Dict[str, Optional[bool]]]
     deleted: Optional[Dict[str, bool]]
     add: Optional[List[AttrDefSchema]]
     update: Optional[List[AttrDefUpdateSchema]]
