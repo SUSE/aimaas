@@ -152,8 +152,8 @@ export default {
     },
     getChanges() {
       const result = {};
-      for (const [attr, value] of Object.entries(this.origEntity)) {
-        if (!_isEqual(value, this.entity[attr])) {
+      for (const [attr, value] of Object.entries(this.entity)) {
+        if (!_isEqual(value, this.origEntity[attr])) {
           result[attr] = value;
         }
       }
