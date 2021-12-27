@@ -142,9 +142,9 @@ export default {
       }
 
       const toSend = {
-        name: this.name,
-        slug: this.slug,
-        reviewable: this.reviewable,
+        name: this.details.name,
+        slug: this.details.slug,
+        reviewable: this.details.reviewable,
       };
       toSend.add_attributes = add;
       toSend.update_attributes = update.map((x) => {
