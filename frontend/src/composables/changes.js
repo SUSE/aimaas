@@ -15,13 +15,18 @@ export async function loadChangeDetails(api, schemaSlug, entitySlug, changeId, t
 }
 
 
-const fixed_headers = ['action', 'name', 'new_name', 'slug'];
+const fixed_headers = ['action', 'name', 'new_name', 'slug', 'new', 'old', 'current'];
 
 
 export function sortChangeHeaders(x, y) {
     const xif = fixed_headers.includes(x);
     const yif = fixed_headers.includes(y);
-    if ((xif && yif) || (!xif && !yif)) {
+    if (xif && yif) {
+        if (fixed_headers.indexOf(x) < fixed_headers.indexOf(y)) {
+            return -1;
+        }
+        return 1;
+    } else if (!xif && !yif) {
         // Both values are a fixed header or none are
         if (x < y) {
             return -1;

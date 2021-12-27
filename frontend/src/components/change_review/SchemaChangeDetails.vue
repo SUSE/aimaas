@@ -82,11 +82,22 @@ export default {
   methods: {
     async transformDetails(details) {
       const transformed = [];
-      for (const action of ['add', 'delete', 'update']) {
+      const actionKeys = ['add', 'delete', 'update'];
+      let change;
+      for (const action of actionKeys) {
         for (let change of details.changes[action]) {
           change.action = action;
           transformed.push(change);
         }
+      }
+      for (const name in details.changes) {
+        if (actionKeys.includes(name) || details.changes[name] === null) {
+          continue;
+        }
+        change = details.changes[name];
+        change.action = 'update';
+        change.name = name;
+        transformed.push(change);
       }
       return transformed;
     },
