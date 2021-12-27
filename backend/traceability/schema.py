@@ -488,7 +488,7 @@ def apply_schema_delete_request(db: Session, change_request_id: int, reviewed_by
         select(Change)
         .where(Change.change_request_id == change_request.id)
         .where(Change.field_name == 'deleted')
-        .where(Change.object_id == 1)
+        .where(Change.object_id != None)
         .where(Change.data_type == ChangeAttrType.BOOL)
         .where(Change.content_type == ContentType.SCHEMA)
         .where(Change.change_type == ChangeType.DELETE)
