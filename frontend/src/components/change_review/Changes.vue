@@ -3,31 +3,40 @@
     <Placeholder :loading="loading">
       <template v-slot:content>
         <li class="list-group-item" v-for="change in changes" :key="change.id">
-          <h5 class="text-black py-2 px-3 d-flex" :class="`bg-${CHANGE_STATUS_MAP[change.status]}`"
-              data-bs-toggle="tooltip" :title="change.status">
-          <span v-if="change.reviewed_at" data-bs-toggle="tooltip" title="Reviewed at"
-                class="flex-grow-1">
-            {{ formatDate(change.reviewed_at) }}
-          </span>
-            <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created at">
-            {{ formatDate(change.created_at) }}
-          </span>
-            <span v-if="change.reviewed_by" data-bs-toggle="tooltip" title="Reviewed by"
-                  class="flex-grow-1">
-            {{ change.reviewed_by }}
-          </span>
-            <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created by">
-            {{ change.created_by }}
-          </span>
-          </h5>
-          <div v-if="change.reviewed_at" class="mb-3">
-            <div class="row">
-              <div class="col-4">Created by:</div>
-              <div class="col-8">{{ change.created_by }}</div>
+          <div class="row text-black p-2" :class="`bg-${CHANGE_STATUS_MAP[change.status]}`">
+            <div class="col-3 d-flex flex-column align-items-end">
+              <small>Created at:</small>
+              <span>{{ formatDate(change.created_at) }}</span>
             </div>
-            <div class="row">
-              <div class="col-4">Created at:</div>
-              <div class="col-8">{{ change.created_at }}</div>
+            <div class="col-2 d-flex flex-column align-items-end">
+              <small>Created by:</small>
+              <span>{{ change.created_by }}</span>
+            </div>
+            <template v-if="change.reviewed_at">
+              <div class="col-3 d-flex flex-column align-items-end border-start border-dark">
+                <small>Reviewed at:</small>
+                <span>{{ formatDate(change.reviewed_at) }}</span>
+              </div>
+              <div class="col-2 d-flex flex-column align-items-end">
+                <small>Reviewed by:</small>
+                <span>{{ change.reviewed_by }}</span>
+              </div>
+              <div class="col-2 d-flex flex-column align-items-end">
+                <small>Comment:</small>
+                <small>{{ change.comment }}</small>
+              </div>
+            </template>
+            <div v-else class="col-7 d-flex gap-3 p-0 m-0">
+              <button type="button" class="btn btn-outline-danger flex-grow-1 shadow-sm"
+                      data-bs-toggle="tooltip" title="Decline request and do not apply changes.">
+                <i class="eos-icons me-1">thumb_down</i>
+                Decline
+              </button>
+              <button type="button" class="btn btn-success flex-grow-1 shadow-sm"
+                      data-bs-toggle="tooltip" title="Accept request and apply changes to database.">
+                <i class="eos-icons me-1">thumb_up</i>
+                Approve
+              </button>
             </div>
           </div>
           <SchemaChangeDetails v-if="!entitySlug" :changeId="change.id" :schema="schema"/>
