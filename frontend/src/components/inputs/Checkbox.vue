@@ -7,7 +7,7 @@
              v-bind="args"/>
       <label class="btn" :class="this.checked? 'btn-primary' : 'btn-light'"
              :for="args.id">
-        {{ label }}
+        {{ label || '&nbsp;'}}
       </label>
         </div>
     </template>

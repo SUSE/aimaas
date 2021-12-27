@@ -61,11 +61,9 @@ export default {
   computed: {
     currentProperties() {
       let props = {schema: this.activeSchema};
-      console.debug("Current tab", this.currentTab.name, Changes.name)
       if (this.currentTab.name === Changes.name) {
-        props.entitySlug = this.$route.params.entitySlug
+        props.entitySlug = this.$route.params.entitySlug;
       }
-      console.debug("Props", props)
       return props;
     }
   },

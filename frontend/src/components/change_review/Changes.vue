@@ -1,72 +1,53 @@
 <template>
   <ul class="list-group">
-    <template v-if="!loading">
-      <li class="list-group-item" v-for="change in changes" :key="change.id">
-        <h5 class="text-black py-2 px-3 d-flex" :class="`bg-${CHANGE_STATUS_MAP[change.status]}`"
-            data-bs-toggle="tooltip" :title="change.status">
+    <Placeholder :loading="loading">
+      <template v-slot:content>
+        <li class="list-group-item" v-for="change in changes" :key="change.id">
+          <h5 class="text-black py-2 px-3 d-flex" :class="`bg-${CHANGE_STATUS_MAP[change.status]}`"
+              data-bs-toggle="tooltip" :title="change.status">
           <span v-if="change.reviewed_at" data-bs-toggle="tooltip" title="Reviewed at"
                 class="flex-grow-1">
             {{ formatDate(change.reviewed_at) }}
           </span>
-          <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created at">
+            <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created at">
             {{ formatDate(change.created_at) }}
           </span>
-          <span v-if="change.reviewed_by" data-bs-toggle="tooltip" title="Reviewed by"
-                class="flex-grow-1">
+            <span v-if="change.reviewed_by" data-bs-toggle="tooltip" title="Reviewed by"
+                  class="flex-grow-1">
             {{ change.reviewed_by }}
           </span>
-          <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created by">
+            <span v-else class="flex-grow-1" data-bs-toggle="tooltip" title="Created by">
             {{ change.created_by }}
           </span>
-        </h5>
-        <div v-if="change.reviewed_at" class="mb-3">
-          <div class="row">
-            <div class="col-4">Created by:</div>
-            <div class="col-8">{{ change.created_by }}</div>
-          </div>
-          <div class="row">
-            <div class="col-4">Created at:</div>
-            <div class="col-8">{{ change.created_at }}</div>
-          </div>
-        </div>
-        <template v-if="change.id in changeDetails">
-          <template v-if="changeDetails[change.id].length > 0">
-            <div v-for="(details, idx) in changeDetails[change.id]" :key="`${change.id}/${idx}`"
-                 class="row border-light border-bottom">
-              <div class="col-1">
-                <i class="eos-icons">{{ CHANGE_STATUS_MAP[details.action] }}</i>
-              </div>
-              <div class="col-11">
-                <div class="row" v-for="(value, key) of details"
-                     :key="`${change.id}/${idx}/${key}`">
-                  <div class="col-4">
-                    {{ key }}
-                  </div>
-                  <div class="col-8">
-                    {{ value }}
-                  </div>
-                </div>
-              </div>
+          </h5>
+          <div v-if="change.reviewed_at" class="mb-3">
+            <div class="row">
+              <div class="col-4">Created by:</div>
+              <div class="col-8">{{ change.created_by }}</div>
             </div>
-          </template>
-          <div v-else class="alert alert-info">No additional details.</div>
-        </template>
-        <button v-else type="button" class="btn btn-link" @click="loadDetails(change.id)">
-          Load details
-        </button>
-      </li>
-    </template>
-    <li v-else class="list-group-item placeholder-glow">
-      <span class="placeholder col-8"></span>
-    </li>
+            <div class="row">
+              <div class="col-4">Created at:</div>
+              <div class="col-8">{{ change.created_at }}</div>
+            </div>
+          </div>
+          <SchemaChangeDetails v-if="!entitySlug" :changeId="change.id" :schema="schema"/>
+          <EntityChangeDetails v-else :changeId="change.id" :schema="schema"
+                               :entitySlug="entitySlug"/>
+        </li>
+      </template>
+    </Placeholder>
   </ul>
 </template>
 
 <script>
 import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
+import Placeholder from "@/components/layout/Placeholder";
+import EntityChangeDetails from "@/components/change_review/EntityChangeDetails";
+import SchemaChangeDetails from "@/components/change_review/SchemaChangeDetails";
 
 export default {
   name: "Changes",
+  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails},
   props: {
     schema: {
       required: true,
@@ -94,38 +75,7 @@ export default {
     this.loading = false;
   },
   methods: {
-    formatDate,
-    async transformSchemaDetails(details) {
-      const transformed = [];
-      for (const action of ['add', 'delete', 'update']) {
-        for (let change of details.changes[action]) {
-          change.action = action;
-          transformed.push(change);
-        }
-      }
-      return transformed;
-    },
-    async transformEntityDetails(details) {
-      const transformed = [];
-
-    },
-    async transformDetails(details) {
-      if (!this.entitySlug) {
-        return this.transformSchemaDetails(details);
-      }
-
-    },
-    async loadDetails(changeId) {
-      if (changeId in this.changeDetails) {
-        return;
-      }
-      const details = await this.$api.getChangeRequestDetails({
-        schemaSlug: this.schema.slug,
-        changeId: changeId,
-        entityIdOrSlug: this.entitySlug
-      });
-      this.changeDetails[changeId] = await this.transformDetails(details);
-    }
+    formatDate
   }
 }
 </script>
