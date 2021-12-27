@@ -11,7 +11,6 @@ from .. import crud
 from .. import dynamic_routes
 
 def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> List[ChangeRequest]:
-    # captures only updates and deletions of entities
     return db.execute(
         select(ChangeRequest)
         .join(Change)
@@ -279,9 +278,9 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
         data=EntityCreateModel(**data).dict(),
         commit=False
     )
-    name_change.object_id = e.id
-    slug_change.object_id = e.id
-    for change in value_changes:
+    name_change.object_id = e.id  # setting object_id is required
+    slug_change.object_id = e.id  # to be able to show details
+    for change in value_changes:  # for this change request
         change.object_id = e.id
     change_request.status = ChangeStatus.APPROVED
     change_request.reviewed_by = reviewed_by

@@ -9,7 +9,6 @@ from .. import crud
 
 
 def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> SchemaChangeDetailSchema:
-    # captures only updates and deletions of schemas
     return db.execute(
         select(ChangeRequest)
         .join(Change)
@@ -223,9 +222,9 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
     schema = create_schema(db=db, data=data, commit=False)
-    for change in schema_changes:
-        change.object_id = schema.id
-    for change in attr_changes:
+    for change in schema_changes:     # setting object_id is required
+        change.object_id = schema.id  # to be able to show details
+    for change in attr_changes:       # for this change request
         change.object_id = schema.id
 
     v = ChangeValueInt(new_value=schema.id)
