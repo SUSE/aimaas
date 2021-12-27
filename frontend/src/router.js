@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
+import Changes from "@/components/change_review/Changes";
 import Entity from "@/components/Entity.vue"
-import EntityChangeDetails from "@/components/EntityChangeDetails.vue";
 import Schema from "@/components/Schema";
 import SchemaList from "@/components/SchemaList";
 
@@ -14,19 +14,19 @@ export const router = createRouter({
             name: 'schema-new'
         },
         {
-            path: '/:schemaSlug',
+            path: '/schema/:schemaSlug',
             component: Schema,
             name: 'schema-view'
         },
         {
-            path: '/changes/entity/:schema/:entity/:changeId',
-            component: EntityChangeDetails,
-            name: 'entity-changes'
-        },
-        {
-            path: '/:schemaSlug/:entitySlug',
+            path: '/schema/:schemaSlug/:entitySlug',
             component: Entity,
             name: 'entity-view'
+        },
+        {
+          path: '/review',
+          component: Changes,
+          name: 'review-list'
         },
         {
             path: '/',

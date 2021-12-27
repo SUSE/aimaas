@@ -12,7 +12,9 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <SchemaList v-model="activeSchema" :as-dropdown="true" ref="schemalist"></SchemaList>
+          <SchemaList v-model="activeSchema" :as-dropdown="true" ref="schemalist"/>
+          <ReviewNav/>
+          <AuthNav/>
         </ul>
       </div>
     </div>
@@ -38,12 +40,14 @@ import 'bootstrap/dist/js/bootstrap.min.js';
 import "eos-icons/dist/css/eos-icons.css";
 import "suse-bootstrap5-theme/dist/css/suse.css";
 
+import AuthNav from "@/components/auth/AuthNav";
 import AlertDisplay from "@/components/alerts/AlertDisplay";
 import SchemaList from "@/components/SchemaList";
+import ReviewNav from "@/components/change_review/ReviewNav";
 
 export default {
   name: 'App',
-  components: {SchemaList, AlertDisplay},
+  components: {SchemaList, AlertDisplay, AuthNav, ReviewNav},
   data: function () {
     return {
       activeSchema: null

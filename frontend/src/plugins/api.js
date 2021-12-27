@@ -2,6 +2,8 @@ class API {
     constructor(baseUrl, alertStorage) {
         this.base = baseUrl;
         this.alerts = alertStorage;
+        this.loggedIn = null;
+        this.token = null;
     }
 
     async _error_to_alert(details) {
@@ -155,14 +157,6 @@ class API {
         return this._fetch({url: url,})
     }
 
-    async getRecentEntityChanges({ schemaSlug, entityIdOrSlug } = {}) {
-        return fetch(`${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}`);
-    }
-
-    async getEntityChangeDetails({ schemaSlug, entityIdOrSlug, changeId } = {}) {
-        return fetch(`${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}/${changeId}`);
-    }
-
     async reviewChanges({ changeId, verdict, changeObject, changeType, comment } = {}) {
         return fetch(`${this.base}/changes/review/${changeId}`, {
             method: "POST",
@@ -176,6 +170,19 @@ class API {
         });
     }
 
+    async login({username, password} = {}) {
+        const url = `${this.base}/login`;
+        const response = await this._fetch({
+            url: url,
+            method: 'POST',
+            body: {username: username, password: password}
+        });
+        console.debug("Logged in", response);
+        this.loggedIn = username;
+        this.token = response.access_token;
+        this.alerts.push("success", `Welcome back, ${username}.`);
+        return response;
+    }
 }
 
 
