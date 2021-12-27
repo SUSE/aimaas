@@ -106,7 +106,8 @@ def populate_db(db: Session):
        |             |            | 
     '''    
     # from .. import auth
-    admin = User(username='admin', email='admin@example.com', password='12345')# password=auth.get_password_hash('admin'))
+    pwd_hash = '$2b$12$haJ9M3leGA/UCMeF2gklcuj9fvNBEYvXC0ENB143HbCR7Z4fMwIoG'  # admin, HS256
+    admin = User(username='admin', email='admin@example.com', password=pwd_hash)# password=auth.get_password_hash('admin'))
     # perm_c_sch = Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.CREATE)
     # perms = [Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.UPDATE),
     #     Permission(obj_id=None, obj_type=PermObject.SCHEMA, name=PermType.DELETE),

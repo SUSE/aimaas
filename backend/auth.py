@@ -1,11 +1,12 @@
 from typing import Optional, List
+from pydantic.fields import T
 
 import sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.functions import func
 
-from backend.exceptions import GroupExistsException, MissingGroupException, MissingGroupPermissionException, MissingPermissionException, MissingUserException, MissingUserGroupException, NoOpChangeException
+from backend.exceptions import CircularGroupReferenceException, GroupExistsException, MissingGroupException, MissingGroupPermissionException, MissingPermissionException, MissingUserException, MissingUserGroupException, NoOpChangeException
 from .config import settings as s
 from datetime import datetime, timedelta
 from fastapi import status, HTTPException, Depends
@@ -64,7 +65,7 @@ def create_access_token(data: dict, expires_delta: timedelta) -> str:
     return jwt.encode(to_encode, key=s.secret, algorithm=s.pwd_hash_alg)
 
 
-async def get_current_user(
+def get_current_user(
     db: Session = Depends(database.get_db), 
     token: str = Depends(oauth2_scheme)) -> User:
     credentials_exception = HTTPException(
@@ -100,7 +101,8 @@ def _traverse_up_batch(groups: List[Group], perm: Permission, db: Session) -> bo
 
 def check_has_perm_in_groups(perm: Permission, user: User, db: Session) -> bool:
     groups = db.execute(
-        select(UserGroup)
+        select(Group)
+        .join(UserGroup)
         .where(UserGroup.user_id == user.id)).scalars().all()
     return _traverse_up_batch(groups=groups, perm=perm, db=db)
     
@@ -135,7 +137,7 @@ def is_authorized(
     return check_has_perm_in_groups(perm=perm, user=user, db=db)
 
 
-def get_groups(db: Session) -> List[GroupSchema]:
+def get_groups(db: Session) -> List[Group]:
     return db.execute(select(Group)).scalars().all()
 
 
@@ -159,10 +161,10 @@ def get_group_details(group_id: int, db: Session) -> GroupDetailsSchema:
         .join(GroupPermission)
         .where(GroupPermission.group_id == group_id)
     ).scalars().all()
-    return {**group.__dict__, 'children': children, 'permissions': perms, 'member_count': member_count}
+    return GroupDetailsSchema(**{**group.__dict__, 'children': children, 'permissions': perms, 'member_count': member_count})
 
 
-def get_group_members(group_id: int, db: Session) -> List[UserSchema]:
+def get_group_members(group_id: int, db: Session) -> List[User]:
     group = get_group_or_raise(group_id=group_id, db=db)
     users = db.execute(
         select(User)
@@ -216,6 +218,10 @@ def create_group(data: CreateGroupSchema, db: Session) -> Group:
         raise MissingUserException(obj_id=e.params['user_id'])
 
 
+def get_user_by_id(user_id: int, db: Session) -> Optional[User]:
+    return db.execute(select(User).where(User.id == user_id)).scalar()
+
+
 def _check_no_op_changes(data: UpdateGroupSchema):
     perm_intersection = set(data.add_permissions).intersection(data.delete_permissions)
     if perm_intersection:
@@ -225,13 +231,31 @@ def _check_no_op_changes(data: UpdateGroupSchema):
         raise NoOpChangeException('No-op change: made an attempt to add and delete the same user from group')
 
 
-def get_user_by_id(user_id: int, db: Session) -> Optional[User]:
-    return db.execute(select(User).where(User.id == user_id)).scalar()
-
+def _is_circular_group_reference(child_id: int, parent_id: int, db: Session):
+    while True:
+        group = db.execute(select(Group).where(Group.id == parent_id)).scalar()
+        if group.parent_id is None:
+            break
+        elif group.parent_id == child_id:
+            return True
+        else:
+            parent_id = group.parent_id
+    return False
 
 def update_group(group_id: int, data: UpdateGroupSchema, db: Session) -> Group:
     group = get_group_or_raise(group_id=group_id, db=db)
+    group.parent_id = data.parent_id or group.parent_id
+    if data.parent_id:
+        cycle = _is_circular_group_reference(child_id=group_id, parent_id=data.parent_id, db=db)
+        if cycle:
+            raise CircularGroupReferenceException
 
+    group.name = data.name or group.name
+    try:
+        db.flush()
+    except sqlalchemy.exc.IntegrityError:
+        raise GroupExistsException(name=data.name)
+    
     _check_no_op_changes(data=data)
     
     for perm in data.add_permissions:
