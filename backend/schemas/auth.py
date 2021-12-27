@@ -62,6 +62,7 @@ class CreateGroupSchema(BaseModel):
 
 
 class UpdateGroupSchema(BaseModel):
+    name: Optional[str]
     parent_id: Optional[int]
     add_permissions: List[PermissionSchema] = []
     delete_permissions: List[PermissionSchema] = []

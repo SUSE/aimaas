@@ -210,3 +210,8 @@ class InvalidFilterAttributeException(Exception):
 
 class NoOpChangeException(Exception):
     pass
+
+
+class CircularGroupReferenceException(Exception):
+    def __str__(self) -> str:
+        return 'Made an attempt to inherit from group which either directly or indirectly inherits from current group'
