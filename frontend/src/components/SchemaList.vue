@@ -35,30 +35,37 @@
   <template v-else>
     <BaseLayout key="/"/>
     <div class="container">
-      <h1>Schema selection</h1>
-      <div class="list-group">
-        <template v-if="schemas.length > 0">
-          <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}"
-                       v-for="schema in schemas" :key="schema.id"
-                       class="list-group-item list-group-item-action">
-            {{ schema.name }}
-          </router-link>
-        </template>
-        <template v-else>
-          <div class="list-group-item">
-            <div class="alert alert-info">
-              No schemas defined. Please define one now.
+      <SelectInput label="Filter:" v-model="listMode" :options="listOptions" @change="load"
+                   :args="{id: 'mode'}"/>
+      <template v-if="schemas && schemas.length > 0">
+        <div class="list-group">
+          <div class="list-group-item d-flex" v-for="schema in schemas" :key="schema.id">
+            <div class="me-3">
+              <input :disabled="schema.deleted" type="checkbox" :data-slug="schema.slug"
+                     class="form-check-input" name="SchemaSelection"
+                     :id="`select-${schema.slug}`" @change="onChange"/>
+            </div>
+            <div class="flex-grow-1">
+              <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}">
+                {{ schema.name }}
+              </router-link>
             </div>
           </div>
-          <div class="list-group-item list-group-item-action">
-            <RouterLink
-              :to="{name: 'schema-new'}"
-              class="dropdown-item">
-            <i class='eos-icons me-1'>add_circle</i>
-            New
-          </RouterLink>
-          </div>
-        </template>
+        </div>
+        <div v-if="numSelected > 0 && listMode !== 'only-deleted'">
+          <ConfirmButton btnClass="btn-outline-danger" :callback="onDelete">
+            <template v-slot:label>
+              <i class="eos-icons me-1">delete</i>
+              Delete {{ numSelected }} schema(s)
+            </template>
+          </ConfirmButton>
+        </div>
+      </template>
+      <div class="alert alert-info" v-else>
+        No schemas defined.
+        <RouterLink :to="{name: 'schema-new'}" v-if="listMode !== 'only-deleted'">
+          Please define one now.
+        </RouterLink>
       </div>
     </div>
   </template>
@@ -66,25 +73,71 @@
 
 <script>
 import BaseLayout from "@/components/layout/BaseLayout";
+import ConfirmButton from "@/components/inputs/ConfirmButton";
+import SelectInput from "@/components/inputs/SelectInput";
 
 export default {
   name: "SchemaList",
-  props: ["modelValue", "asDropdown"],
+  props: {
+    modelValue: {
+      required: false
+    },
+    asDropdown: {
+      type: Boolean,
+      default: false
+    }
+  },
+  components: {SelectInput, BaseLayout, ConfirmButton},
   data: function () {
     return {
       schemas: null,
-      loading: true
+      loading: true,
+      selected: [],
+      listMode: "active",
+      listOptions: [
+        {
+          value: "active",
+          text: "Active"
+        },
+        {
+          value: "all",
+          text: "All"
+        },
+        {
+          value: "only-deleted",
+          text: "Only Deleted"
+        }
+      ],
+      queryOptions: {
+        active: {all: false, deletedOnly: false},
+        all: {all: true, deletedOnly: false},
+        "only-deleted": {all: false, deletedOnly: true},
+      }
     }
   },
-
-  components: {BaseLayout},
   created: function () {
     this.load();
   },
+  computed: {
+    numSelected() {
+      return this.selected.length;
+    }
+  },
   methods: {
+    onChange() {
+      const elems = document.getElementsByName("SchemaSelection");
+      this.selected = Array.prototype.filter.call(elems, e => e.checked).map(e => e.dataset.slug);
+    },
+    onDelete() {
+      const promises = this.selected.map(slug => {
+        this.$api.deleteSchema({slugOrId: slug})
+      });
+      Promise.all(promises).then(this.load)
+
+    },
     load() {
       this.loading = true;
-      this.$api.getSchemas().then(data => {
+      this.$api.getSchemas(this.queryOptions[this.listMode]).then(data => {
         this.schemas = data;
         this.loading = false;
       });

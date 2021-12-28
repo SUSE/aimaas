@@ -84,6 +84,15 @@ class API {
         return response;
     }
 
+    async deleteSchema({ slugOrId } = {}) {
+        const response = await this._fetch({
+            url: `${this.base}/schemas/${slugOrId}`,
+            method: 'DELETE'
+        });
+        this.alerts.push("success", `Schema deleted: ${response.name}`);
+        return response;
+    }
+
     async getEntities({
         schemaSlug,
         limit = 10,
