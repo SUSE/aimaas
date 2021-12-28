@@ -1,5 +1,5 @@
 <template>
-  <BaseInput :label="label" :args="args" :vertical="false">
+  <BaseInput :label="label" :args="args" :vertical="false" :required="required">
     <template v-slot:helptext>
       Start typing to receive suggestions
     </template>
@@ -55,7 +55,7 @@ export default {
   name: "ReferencedEntitySelect",
   components: {BaseInput, EntityList},
   emits: ["changed", "selected", "update:modelValue"],
-  props: ["args", "label", "modelValue", "fkSchemaId", "selectType"],
+  props: ["args", "label", "modelValue", "fkSchemaId", "selectType", "required"],
   inject: ["activeSchema", "availableSchemas"],
   data() {
     return {

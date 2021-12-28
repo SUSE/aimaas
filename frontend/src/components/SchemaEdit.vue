@@ -1,9 +1,9 @@
 <template>
   <div v-if="details">
     <TextInput label="Name" v-model="details.name" :args="{ id: 'name', maxlength: 128 }"
-               @change="hasChanged = true"/>
+               @change="hasChanged = true" :required="true"/>
     <TextInput label="Slug" v-model="details.slug" :args="{ id: 'slug', maxlength: 128 }"
-               @change="hasChanged = true">
+               @change="hasChanged = true" :required="true">
       <template v-slot:helptext>
         URL-friendly ID of schema
       </template>

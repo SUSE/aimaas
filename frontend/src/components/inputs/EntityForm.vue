@@ -1,8 +1,10 @@
 <template>
   <Spinner :loading="loading">
     <div v-if="!loading" class="container">
-      <TextInput label="Name" v-model="entity.name" :args="{ id: 'name', maxlength: 128 }"/>
-      <TextInput label="Slug" v-model="entity.slug" :args="{ id: 'slug', maxlength: 128 }"/>
+      <TextInput label="Name" v-model="entity.name" :args="{ id: 'name', maxlength: 128 }"
+                 :required="true"/>
+      <TextInput label="Slug" v-model="entity.slug" :args="{ id: 'slug', maxlength: 128 }"
+                 :required="true"/>
 
       <h3 class="mt-3">Attributes</h3>
       <template v-for="attr in schemaDetails.attributes" :key="attr.name">
@@ -10,12 +12,14 @@
         <template v-if="attr.type === 'FK'">
           <ReferencedEntitySelect v-model="entity[attr.name]" :label="attr.name"
                                   :args="{id: attr.name}" :fk-schema-id="attr.bind_to_schema"
-                                  :select-type="attr.list ? 'many': 'single'"/>
+                                  :select-type="attr.list ? 'many': 'single'"
+                                  :required="requiredAttrs.includes(attr.name)"/>
         </template>
         <!-- ATTRIBUTE IS SINGLE VALUED -->
         <template v-else-if="!attr.list">
           <component :is="TYPE_INPUT_MAP[attr.type]" v-model="entity[attr.name]"
-                     :label="attr.name" :args="{id: attr.name}"/>
+                     :label="attr.name" :args="{id: attr.name}"
+                     :required="requiredAttrs.includes(attr.name)"/>
         </template>
         <!-- ATTRIBUTE IS MULTI VALUED -->
         <template v-else>
@@ -29,7 +33,8 @@
                     class="list-group-item d-flex">
                   <div class="flex-grow-1">
                     <component :is="TYPE_INPUT_MAP[attr.type]" v-model="entity[attr.name][idx]"
-                               :vertical="true" :args="{id: `${attr.name}-${idx}`}"/>
+                               :vertical="true" :args="{id: `${attr.name}-${idx}`}"
+                               :required="requiredAttrs.includes(attr.name)"/>
                   </div>
                   <div>
                     <button type="button" class="btn btn-outline-cta ms-1"
@@ -102,6 +107,11 @@ export default {
       TYPE_INPUT_MAP
     };
   },
+  computed: {
+    requiredAttrs() {
+      return (this.schemaDetails?.attributes || []).filter(a => a.required).map(a => a.name);
+    }
+  },
   methods: {
     addListItem(attrName) {
       if (this.entity[attrName] instanceof Array) {
@@ -157,6 +167,7 @@ export default {
           result[attr] = value;
         }
       }
+      console.debug("Changes?", this.entity, result)
       return result;
     },
 

@@ -39,22 +39,22 @@
         <div class="container">
           <div class="row g-2">
             <div class="col-md-3">
-              <Checkbox label="Key" v-model="attributes[rowIndex].key" without-offset="true"
+              <Checkbox label="Key" v-model="attributes[rowIndex].key" :without-offset="true"
                         @change="onChange()"
                         :args="{ id: `initialkey${rowIndex}`, tooltip: 'Include attribute in entity listing?' }"/>
             </div>
             <div class="col-md-3">
-              <Checkbox label="Unique" v-model="attributes[rowIndex].unique" without-offset="true"
+              <Checkbox label="Unique" v-model="attributes[rowIndex].unique" :without-offset="true"
                         @change="onChange()"
                         :args="{ id: `initialunique${rowIndex}`, tooltip: 'Must value be unique for all entities in schema?' }"/>
             </div>
             <div class="col-md-3">
               <Checkbox label="Required" v-model="attributes[rowIndex].required"
-                        without-offset="true" @change="onChange()"
+                        :without-offset="true" @change="onChange()"
                         :args="{ id: `initialrequired${rowIndex}`, tooltip: 'Must value be specified?' }"/>
             </div>
             <div class="col-md-3">
-              <Checkbox label="List" v-model="attributes[rowIndex].list" without-offset="true"
+              <Checkbox label="List" v-model="attributes[rowIndex].list" :without-offset="true"
                         @change="onChange()"
                         :args="{ id: `initiallist${rowIndex}`, tooltip: 'May attribute store multiple values?' }"/>
             </div>
