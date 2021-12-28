@@ -1,8 +1,10 @@
+from datetime import timedelta
 import pytest
 
 from ..traceability import *
 from ..models import *
-
+from .test_traceability_entity import make_entity_change_objects
+from .test_traceability_schema import make_schema_change_objects
 
 @pytest.mark.parametrize(['content_type', 'change_type'], [
     (ContentType.ENTITY, ChangeType.CREATE),
@@ -102,3 +104,68 @@ def test_review_changes(dbsession: Session):
     assert change_request.comment == 'test2'
     assert change_request.reviewed_at >= change_request.created_at
     assert change_request.reviewed_by == user
+
+
+def test_get_pending_change_requests(dbsession: Session):
+    now = datetime.utcnow()
+    day_later = now + timedelta(hours=24)
+    user = dbsession.execute(select(User)).scalar()
+    # 10 requests, 9 UPD, 1 CREATE
+    entity_requests = make_entity_change_objects(dbsession, user, now)
+    # 10 requests, 9 UPD, 1 CREATE
+    schema_requests = make_schema_change_objects(dbsession, user, day_later)
+
+    # limit 10 offset 0
+    requests = get_pending_change_requests(dbsession)
+    assert len(requests) == 10
+    assert {i.id for i in schema_requests} == {i.id for i in requests}
+    assert requests[0].created_at > requests[1].created_at, 'requests are supposed to be in descending order'
+
+    # limit 10, offset 10
+    requests = get_pending_change_requests(dbsession, offset=10)
+    assert len(requests) == 10
+    assert {i.id for i in entity_requests} == {i.id for i in requests}
+    assert requests[0].created_at > requests[1].created_at, 'requests are supposed to be in descending order'
+
+    # limit 1, offset 0
+    requests = get_pending_change_requests(dbsession, limit=1)
+    assert requests[0] == schema_requests[-1]
+
+    # limit 1, offset 19
+    requests = get_pending_change_requests(dbsession, limit=1, offset=19)
+    assert requests[0] == entity_requests[0]
+
+    # limit 20, all types
+    requests = get_pending_change_requests(dbsession, limit=20)
+    assert requests == schema_requests[::-1] + entity_requests[::-1]
+
+    # no limit, all types
+    requests = get_pending_change_requests(dbsession, all=True)
+    assert requests == schema_requests[::-1] + entity_requests[::-1]
+
+    # limit 20, offset 20, all types
+    requests = get_pending_change_requests(dbsession, limit=20, offset=20)
+    assert requests == []
+
+    # limit 20, only schemas
+    requests = get_pending_change_requests(dbsession, obj_type=ContentType.SCHEMA, limit=20)
+    assert requests == schema_requests[::-1]
+
+    # limit 1, offset 1, only schemas
+    requests = get_pending_change_requests(dbsession, obj_type=ContentType.SCHEMA, limit=1, offset=1)
+    assert requests == [schema_requests[-2]]
+
+    # limit 20, only entities
+    requests = get_pending_change_requests(dbsession, obj_type=ContentType.ENTITY, limit=20)
+    assert requests == entity_requests[::-1]
+
+    # limit 1, offset 1, only entities
+    requests = get_pending_change_requests(dbsession, obj_type=ContentType.ENTITY, limit=1, offset=1)
+    assert requests == [entity_requests[-2]]
+
+    dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
+    dbsession.commit()
+
+    # no limit, all types
+    requests = get_pending_change_requests(dbsession, all=True)
+    assert requests == []

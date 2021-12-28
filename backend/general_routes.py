@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import select
 
-from backend.models import  Entity, User
+from backend.models import ContentType, PermObject, PermType, User
 from backend.schemas.entity import EntityBaseSchema
 from backend.schemas.schema import SchemaBaseSchema
 from backend.schemas.traceability import ChangeRequestSchema
@@ -179,6 +179,17 @@ def review_changes(id: int, review: schemas.ChangeReviewSchema, db: Session = De
         exceptions.MissingEntityDeleteRequestException
     ) as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/changes/pending', response_model=List[schemas.ChangeRequestSchema])
+def get_pending_change_requests(
+    obj_type: Optional[ContentType] = Query(None),
+    limit: Optional[int] = Query(10),
+    offset: Optional[int] = Query(0),
+    all: Optional[bool] = Query(False),
+    db: Session = Depends(get_db)
+):
+    return traceability.get_pending_change_requests(obj_type=obj_type, limit=limit, offset=offset, all=all, db=db)
 
 
 @router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.ChangeRequestSchema])
