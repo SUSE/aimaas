@@ -41,7 +41,11 @@ def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, l
     ValueModel = entity_change.data_type.value.model
     if attr.id not in listed_changes:
         v = db.execute(select(ValueModel).where(ValueModel.id == entity_change.value_id)).scalar()
-        change['changes'][attr.name] = {'new': v.new_value, 'old': v.old_value, 'current': get_old_value(db, entity, attr.name)}
+        try:
+            current = get_old_value(db, entity, attr.name)
+        except KeyError:
+            current = None
+        change['changes'][attr.name] = {'new': v.new_value, 'old': v.old_value, 'current': current}
         return
     
     if attr.id in checked_listed:
