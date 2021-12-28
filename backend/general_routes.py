@@ -291,7 +291,7 @@ def update_group(group_id: int, data: UpdateGroupSchema, db: Session = Depends(g
 
 @router.post('/users', response_model=auth.UserSchema)
 def create_user(user: UserCreateSchema, db: Session = Depends(get_db)):
-    user_ = User(email=user.email, username=user.username, password=user.password)
+    user_ = User(email=user.email, username=user.username, password=auth.get_password_hash(user.password))
     db.add(user_)
     db.commit()
     return user_

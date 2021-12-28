@@ -94,6 +94,7 @@ class SchemaBaseSchema(BaseModel):
     id: int
     name: str
     slug: str
+    deleted: bool
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 

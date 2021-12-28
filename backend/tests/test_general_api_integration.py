@@ -66,7 +66,9 @@ class TestRouteSchemasGet:
 
         response = client.get('/schemas')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'}]
+        assert response.json() == [
+            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False}
+        ]
 
     def test_get_all(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
@@ -75,11 +77,17 @@ class TestRouteSchemasGet:
 
         response = client.get('/schemas?all=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'}, {'id': 2, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == [
+            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False}, 
+            {'id': 2, 'name': 'Test', 'slug': 'test', 'deleted': True}
+        ]
 
         response = client.get('/schemas?all=True&deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'}, {'id': 2, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == [
+            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False}, 
+            {'id': 2, 'name': 'Test', 'slug': 'test', 'deleted': True}
+        ]
 
     def test_get_deleted_only(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
@@ -88,7 +96,9 @@ class TestRouteSchemasGet:
 
         response = client.get('/schemas?deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 2, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == [
+            {'id': 2, 'name': 'Test', 'slug': 'test', 'deleted': True}
+        ]
 
     def test_raise_on_schema_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/schemas/123456789')
@@ -218,7 +228,7 @@ class TestRouteSchemaCreate:
         assert response.status_code == 200
         json = response.json()
         del json['id']
-        assert json == {'name': 'Car', 'slug': 'car'}
+        assert json == {'name': 'Car', 'slug': 'car', 'deleted': False}
         assert '/dynamic/car' in [i.path for i in client.app.routes]
         asserts_after_applying_schema_create_request(dbsession, change_request_id=1, comment='Autosubmit')
         asserts_after_schema_create(dbsession)
@@ -368,7 +378,7 @@ class TestRouteSchemaUpdate:
             ],
             'delete_attributes': ['friends']
         } 
-        result = {'name': 'Person', 'slug': 'test'}
+        result = {'name': 'Person', 'slug': 'test', 'deleted': False}
         response = client.put('/schemas/1', json=data)
         assert response.status_code == 200
         json = response.json()
@@ -818,7 +828,7 @@ class TestTraceabilityRoutes:
         }
 
         response = client.post(f'/changes/review/{change_request.id}', json=review)
-        assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack'}
+        assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack', 'deleted': False}
 
         change_request.status = ChangeStatus.PENDING
         dbsession.commit()
