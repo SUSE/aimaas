@@ -33,8 +33,6 @@ class ReviewResult(Enum):
 
 class ChangeReviewSchema(BaseModel):
     result: ReviewResult
-    change_object: ChangeObject
-    change_type: ChangeType
     comment: Optional[str]
     
 

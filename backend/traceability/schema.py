@@ -111,7 +111,12 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
     crud.create_schema(db=db, data=data, commit=False)
     db.rollback()
 
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.SCHEMA,
+        change_type=ChangeType.CREATE
+    )
     db.add(change_request)
 
     schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
@@ -251,7 +256,12 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
 
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.SCHEMA,
+        change_type=ChangeType.UPDATE
+    )
     db.add(change_request)
     
     schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
@@ -452,7 +462,12 @@ def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], creat
     crud.delete_schema(db=db, id_or_slug=id_or_slug, commit=False)
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.SCHEMA,
+        change_type=ChangeType.DELETE
+    )
     db.add(change_request)
     v = ChangeValueBool(old_value=schema.deleted, new_value=True)
     db.add(v)

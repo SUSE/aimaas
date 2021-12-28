@@ -171,6 +171,7 @@ def review_changes(id: int, review: schemas.ChangeReviewSchema, db: Session = De
     try:
         return traceability.review_changes(db=db, change_request_id=id, review=review, reviewed_by=user)
     except (
+        exceptions.MissingChangeException,
         exceptions.MissingSchemaCreateRequestException,
         exceptions.MissingSchemaUpdateRequestException,
         exceptions.MissingSchemaDeleteRequestException,
