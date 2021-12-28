@@ -19,12 +19,12 @@
       </div>
     </div>
   </nav>
+  <AlertDisplay/>
   <div class="container mt-2">
     <keep-alive>
       <router-view></router-view>
     </keep-alive>
   </div>
-  <AlertDisplay/>
 
 </template>
 <style>

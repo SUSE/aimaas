@@ -1,12 +1,13 @@
 <template>
-  <div class="container w-50 position-absolute top-0 end-0 m-3" id="alert-contaier">
-    <div v-for="alert of alerts" :key="alert.id"
-         class="alert shadow alert-dismissible fade show" :class="`alert-${alert.level}`"
-         role="alert">
-      <i class="eos-icons me-1">{{ icons[alert.level] }}</i>
-      {{ alert.message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+  <div class="container-fluid fixed-bottom m-3 d-flex flex-column align-items-end"
+       id="alert-contaier">
+      <div v-for="alert of alerts" :key="alert.id"
+           class="alert shadow alert-dismissible fade show w-50 me-3"
+           :class="`alert-${alert.level}`" role="alert">
+        <i class="eos-icons me-1">{{ icons[alert.level] }}</i>
+        {{ alert.message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
   </div>
 </template>
 
@@ -37,7 +38,7 @@ export default {
           continue;
         }
         this.alerts[alert.id] = alert;
-        setTimeout(this.hideAlert, 3000, alert.id);
+        setTimeout(this.hideAlert, 10000, alert.id);
         this.$alerts.pop(alert.id);
       }
     },
