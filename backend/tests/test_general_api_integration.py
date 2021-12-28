@@ -856,3 +856,72 @@ class TestTraceabilityRoutes:
 
         response = client.post(f'/changes/review/23456', json=review)
         assert response.status_code == 404
+
+    def test_get_pending_change_requests(self, dbsession: Session, client: TestClient):
+        import json
+        now = datetime.utcnow()
+        day_later = now + timedelta(hours=24)
+        user = dbsession.execute(select(User)).scalar()
+        # 10 requests, 9 UPD, 1 CREATE
+        entity_requests = make_entity_change_objects(dbsession, user, now)
+        for i in entity_requests:
+            dbsession.refresh(i)
+            i.created_by
+        entity_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in entity_requests]
+        # 10 requests, 9 UPD, 1 CREATE
+        schema_requests = make_schema_change_objects(dbsession, user, day_later)
+        for i in schema_requests:
+            dbsession.refresh(i)
+            i.created_by
+        schema_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in schema_requests]
+        
+        # limit 10 offset 0
+        requests = client.get(f'/changes/pending').json()
+        assert requests == schema_requests[::-1]
+
+        # limit 10, offset 10
+        requests = client.get(f'/changes/pending', params={'offset': 10}).json()
+        assert requests == entity_requests[::-1]
+
+        # limit 1, offset 0
+        requests = client.get(f'/changes/pending', params={'limit': 1}).json()
+        assert requests[0] == schema_requests[-1]
+
+        # limit 1, offset 19
+        requests = client.get(f'/changes/pending', params={'limit': 1, 'offset': 19}).json()
+        assert requests[0] == entity_requests[0]
+
+        # limit 20, all types
+        requests = client.get(f'/changes/pending', params={'limit': 20}).json()
+        assert requests == schema_requests[::-1] + entity_requests[::-1]
+
+        # no limit, all types
+        requests = client.get(f'/changes/pending', params={'all': True}).json()
+        assert requests == schema_requests[::-1] + entity_requests[::-1]
+
+        # limit 20, offset 20, all types
+        requests = client.get(f'/changes/pending', params={'limit': 20, 'offset': 20}).json()
+        assert requests == []
+
+        # limit 20, only schemas
+        requests = client.get(f'/changes/pending', params={'obj_type': 'SCHEMA', 'limit': 20}).json()
+        assert requests == schema_requests[::-1]
+
+        # limit 1, offset 1, only schemas
+        requests = client.get(f'/changes/pending', params={'obj_type': 'SCHEMA', 'limit': 1, 'offset': 1}).json()
+        assert requests == [schema_requests[-2]]
+
+        # limit 20, only entities
+        requests = client.get(f'/changes/pending', params={'obj_type': 'ENTITY', 'limit': 20}).json()
+        assert requests == entity_requests[::-1]
+
+        # limit 1, offset 1, only entities
+        requests = client.get(f'/changes/pending', params={'obj_type': 'ENTITY', 'limit': 1, 'offset': 1}).json()
+        assert requests == [entity_requests[-2]]
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
+        dbsession.commit()
+
+        # no limit, all types
+        requests = requests = client.get(f'/changes/pending', params={'all': True}).json()
+        assert requests == []

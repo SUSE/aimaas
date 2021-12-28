@@ -8,6 +8,7 @@ from ..models import *
 
 
 def make_schema_change_objects(db: Session, user: User, time: datetime):
+    requests = []
     for i in range(9):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
@@ -32,6 +33,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
             value_id=999
         )
         db.add_all([change_request, change_1, change_2])
+        requests.append(change_request)
 
 
     change_request = ChangeRequest(
@@ -57,7 +59,10 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
         value_id=999
     )
     db.add_all([change_request, change_1, change_2])
+    requests.append(change_request)
     db.commit()
+    return requests
+
 
 def test_get_recent_schema_changes(dbsession: Session):
     time = datetime.utcnow()

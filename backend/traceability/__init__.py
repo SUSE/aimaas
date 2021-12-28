@@ -55,3 +55,13 @@ def review_changes(db: Session, change_request_id: int, review: ChangeReviewSche
             return apply_entity_update_request(**kwargs)
         elif review.change_type == ChangeType.DELETE:
             return apply_entity_delete_request(**kwargs)
+
+
+def get_pending_change_requests(db: Session, obj_type: Optional[ContentType] = None, limit: Optional[int] = 10, offset: Optional[int] = 0, all: Optional[bool] = False) -> List[ChangeRequest]:
+    q = select(ChangeRequest).where(ChangeRequest.status == ChangeStatus.PENDING)
+    if obj_type is not None:
+        q = q.join(Change).where(Change.content_type == obj_type).distinct()
+    if not all:
+        q = q.offset(offset).limit(limit)
+    q = q.order_by(ChangeRequest.created_at.desc())
+    return db.execute(q).scalars().all()

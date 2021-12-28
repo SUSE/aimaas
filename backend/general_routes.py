@@ -181,6 +181,17 @@ def review_changes(id: int, review: schemas.ChangeReviewSchema, db: Session = De
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
+@router.get('/changes/pending', response_model=List[schemas.ChangeRequestSchema])
+def get_pending_change_requests(
+    obj_type: Optional[ContentType] = Query(None),
+    limit: Optional[int] = Query(10),
+    offset: Optional[int] = Query(0),
+    all: Optional[bool] = Query(False),
+    db: Session = Depends(get_db)
+):
+    return traceability.get_pending_change_requests(obj_type=obj_type, limit=limit, offset=offset, all=all, db=db)
+
+
 @router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.ChangeRequestSchema])
 def get_recent_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
     try:
