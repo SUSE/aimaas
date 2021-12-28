@@ -52,7 +52,7 @@
             </div>
           </div>
         </div>
-        <div v-if="numSelected > 0 && listMode !== 'only-deleted'">
+        <div v-if="numSelected > 0 && listMode !== 'only-deleted'" class="mt-2">
           <ConfirmButton btnClass="btn-outline-danger" :callback="onDelete">
             <template v-slot:label>
               <i class="eos-icons me-1">delete</i>
@@ -130,9 +130,9 @@ export default {
     },
     onDelete() {
       const promises = this.selected.map(slug => {
-        this.$api.deleteSchema({slugOrId: slug})
+        this.$api.deleteSchema({slugOrId: slug});
       });
-      Promise.all(promises).then(this.load)
+      Promise.all(promises).then(() => this.load());
 
     },
     load() {

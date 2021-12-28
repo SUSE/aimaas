@@ -19,7 +19,7 @@
     <div class="tab-content">
       <div class="tab-pane show active border p-2" role="tabpanel">
         <keep-alive>
-          <component v-bind:is="currentTab" :schema="this.activeSchema"></component>
+          <component :is="currentTab" v-bind="currentProperties"></component>
         </keep-alive>
       </div>
     </div>
@@ -70,6 +70,13 @@ export default {
   },
   inject: ['activeSchema'],
   computed: {
+    currentProperties() {
+      let props = {schema: this.activeSchema};
+      if (this.currentTab.name === EntityList.name) {
+        props.advancedControls = true;
+      }
+      return props;
+    },
     title() {
       try {
         return this.activeSchema.name;

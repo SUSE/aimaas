@@ -1,20 +1,14 @@
 <template>
-  <div class="row">
+  <div class="my-1">
     <nav>
-      <ul class="pagination">
+      <ul class="pagination mb-0">
         <li class="page-item">
           <a class="page-link" v-on:click="tryGoPrevious">
             <span>&laquo;</span>
           </a>
         </li>
-        <li
-            v-for="page in this.pages"
-            :key="page"
-            :class="{
-        'page-item': this.totalEntities,
-        active: page == this.currentPage,
-      }"
-        >
+        <li v-for="page in this.pages" :key="page"
+            :class="{'page-item': this.totalItems, active: page === this.currentPage}">
           <a class="page-link" v-on:click="$emit('goTo', page)">{{ page }}</a>
         </li>
         <li class="page-item">
@@ -30,11 +24,24 @@
 <script>
 export default {
   name: "Pagination",
-  props: ["totalEntities", "entitiesPerPage", "currentPage"],
+  props: {
+    totalItems: {
+      type: Number,
+      required: true
+    },
+    itemsPerPage: {
+      type: Number,
+      required: true
+    },
+    currentPage: {
+      type: Number,
+      default: 1
+    }
+  },
   emits: ["goTo"],
   computed: {
     pages() {
-      return Math.ceil(this.totalEntities / this.entitiesPerPage);
+      return Math.ceil(this.totalItems / this.itemsPerPage);
     }
   },
   methods: {

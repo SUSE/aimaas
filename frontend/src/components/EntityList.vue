@@ -2,51 +2,57 @@
   <SearchPanel
       @search="setFiltersAndSearch"
       :key="schema?.slug"
-      :filterableFields="filterableFields"
-      :operators="operators"/>
-  <Pagination
-      v-if="totalEntities > entitiesPerPage"
-      v-on:goTo="changePage"
-      :totalEntities="totalEntities"
-      :entitiesPerPage="entitiesPerPage"
-      :currentPage="currentPage"/>
-
-  <div class="d-flex mb-1">
-    <div class="flex-grow-1 d-flex">
-      <label for="entitiesLimit" class="me-1"><small>Entities per page</small></label>
-      <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm"
-              style="width: 5.5rem;">
-        <option>10</option>
-        <option>30</option>
-        <option>50</option>
-      </select>
+      :filterable-fields="filterableFields"
+      :operators="operators"
+      :advanced-controls="advancedControls"/>
+  <div class="d-flex align-items-center mt-1 gap-2">
+    <div class="me-auto">
+      <Pagination v-if="totalEntities > entitiesPerPage" v-on:goTo="changePage"
+                  :total-items="totalEntities" :items-per-page="entitiesPerPage"
+                  :currentPage="currentPage"/>
+    </div>
+    <div class="d-flex gap-2">
+      <label for="entitiesLimit" class="me-1"><small>Page size</small></label>
+      <div>
+        <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm"
+                style="width: 5.5rem;" @change="getEntities({resetPage: true})">
+          <option>10</option>
+          <option>30</option>
+          <option>50</option>
+        </select>
+      </div>
     </div>
     <small>{{ totalEntities }} result(s)</small>
   </div>
+
   <EntityListTable
       ref="selector"
       @reorder="reorder"
+      @select="onSelection"
       :entities="entities"
+      :selected="selected"
       :schema="schema"
       :loading="loading"
       :selectType="selectType"/>
-
-  <Pagination
-      v-if="totalEntities > entitiesPerPage"
-      v-on:goTo="changePage"
-      :totalEntities="totalEntities"
-      :entitiesPerPage="entitiesPerPage"
-      :currentPage="currentPage"
-  />
+  <div class="flex-grow-1 align-middle">
+    <ConfirmButton v-if="numSelected > 0 && advancedControls" :callback="onDeletion"
+                   btn-class="btn-outline-danger">
+      <template v-slot:label>
+        <i class="eos-icons me-1">delete</i>
+        Delete {{ numSelected }} {{ numSelected == 1 ? 'entity' : 'entities' }}
+      </template>
+    </ConfirmButton>
+  </div>
 </template>
 
 <script>
-import Pagination from "./Pagination.vue";
+import ConfirmButton from "@/components/inputs/ConfirmButton";
+import Pagination from "./layout/Pagination.vue";
 import EntityListTable from "@/components/EntityListTable";
 import SearchPanel from "./SearchPanel.vue";
 
 export default {
-  components: {EntityListTable, Pagination, SearchPanel},
+  components: {EntityListTable, Pagination, SearchPanel, ConfirmButton},
   name: "EntityList",
   props: {
     schema: Object,
@@ -56,6 +62,10 @@ export default {
       validator(value) {
         return ['many', 'single', 'none'].includes(value);
       }
+    },
+    advancedControls: {
+      type: Boolean,
+      default: false
     }
   },
   computed: {
@@ -64,6 +74,9 @@ export default {
     },
     pages() {
       return Math.ceil(this.totalEntities / this.entitiesPerPage);
+    },
+    numSelected() {
+      return this.selected.length;
     }
   },
   watch: {
@@ -88,6 +101,7 @@ export default {
       let _this = this;
       if (resetPage) {
         this.currentPage = 1;
+        this.selected = [];
       }
       this.loading = true;
       this.$api.getEntities({
@@ -119,6 +133,16 @@ export default {
     getSelected() {
       const selectedIds = this.$refs.selector.getSelected();
       return this.entities.filter(x => selectedIds.includes(x.id));
+    },
+    onSelection() {
+      this.selected = this.$refs.selector.getSelected();
+    },
+    onDeletion() {
+      const promises = this.selected.map(eId => {
+        this.$api.deleteEntity({schemaSlug: this.schema.slug,
+                               entityIdOrSlug: eId});
+      });
+      Promise.all(promises).then(() => this.getEntities({resetPage: true}));
     }
   },
   data() {
@@ -132,7 +156,8 @@ export default {
       filters: {},
       orderBy: "name",
       ascending: true,
-      loading: true
+      loading: true,
+      selected: []
     };
   },
   mounted() {

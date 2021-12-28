@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex mt-2 gap-2">
+  <div class="d-md-flex gap-2">
     <button type="button" class="btn" :class="btnClass" @click="this.show()"
             aria-expanded="false" :aria-controls="id" :disabled="isVisible">
       <slot name="label"></slot>

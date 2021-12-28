@@ -20,7 +20,9 @@
       <tbody>
       <tr v-for="e in entities" :key="e.id">
         <td v-if="showSelectors">
-          <input :type="inputType" class="form-check-input" name="EntitySelection" :value="e.id"/>
+          <input :type="inputType" class="form-check-input" name="EntitySelection" :value="e.id"
+                 @change="$emit('select')" :checked="selected.includes(e.id)"
+                 :disabled="e.deleted"/>
         </td>
         <td v-for="field in displayFields" :key="field">
           <template v-if="field === 'name'">
@@ -52,8 +54,8 @@ const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 
 export default {
   name: 'EntityListTable',
-  props: ['entities', 'schema', 'loading', 'selectType'],
-  emits: ['reorder'],
+  props: ['entities', 'schema', 'loading', 'selectType', 'selected'],
+  emits: ['reorder', 'select'],
   updated() {
     if (this.previousSchema !== this.schema) {
       this.previousSchema = this.schema;

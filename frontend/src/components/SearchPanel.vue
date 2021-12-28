@@ -3,6 +3,18 @@
     <input v-model="searchQuery" type="text" class="form-control" placeholder="search by name"
            :autofocus="true" @keyup.enter="$emit('search', this.filterParams)"
            id="entity-name-search"/>
+    <select class="form-select flex-grow-0" style="width: 10rem;" data-bs-toggle="tooltip"
+            title="Entity state" v-model="listMode">
+      <option>active</option>
+      <option>deleted</option>
+      <option>all</option>
+    </select>
+    <input v-if="advancedControls" type="checkbox" class="btn-check" id="allValues"
+           v-model="allValues" autocomplete="off">
+    <label for="allValues" class="btn" :class="allValues? 'btn-primary' : 'btn-light'"
+           data-bs-toggle="tooltip" title="Show all attribute values">
+      <i class="eos-icons">view_column</i>
+    </label>
     <button @click="$emit('search', this.filterParams)" class="btn btn-primary px-3"
             type="button" data-bs-toggle="tooltip" title="Search">
       <i class='eos-icons'>search</i>
@@ -16,6 +28,9 @@
   <div id="collapsed-filters" class="collapse">
     <div class="card">
       <div class="card-body">
+        <div v-if="advancedControls" class="row border-bottom border-light pb-1 mb-1">
+          Goo!
+        </div>
         <div class="row border-bottom border-light pb-1 mb-1 align-items-end" :key="rowIndex"
              v-for="(row, rowIndex) in this.filters">
           <!-- SELECT FILTER FIELD -->
@@ -83,12 +98,20 @@ import SelectInput from "@/components/inputs/SelectInput.vue";
 
 export default {
   name: "SearchPanel",
-  props: ["filterableFields", "operators"],
+  props: ["filterableFields", "operators", "advancedControls"],
   components: {TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput, SelectInput},
   emits: ["search"],
   computed: {
     filterParams() {
-      const params = {};
+      const params = {
+        all_fields: this.allValues
+      };
+      if (this.listMode === 'deleted') {
+        params.deleted_only = true;
+      }
+      else if (this.listMode === 'all') {
+        params.all = true;
+      }
       if (this.searchQuery !== "") {
         params["name.contains"] = this.searchQuery;
       }
@@ -104,7 +127,6 @@ export default {
         return {value: x}
       });
       r.unshift({value: '', text: '-- select one --'})
-      console.debug("Fields", this.filterableFields, r);
       return r;
     }
   },
@@ -123,7 +145,6 @@ export default {
       this.searchQuery = "";
     },
     updateRow(row) {
-      console.debug("Updating row", row)
       row.operatorOptions = this.getFiltersForRow(row);
       row.component = this.getComponentForRow(row);
     },
@@ -131,7 +152,6 @@ export default {
       if (!row.field) {
         return null;
       }
-      console.debug("FILTERABLE FIELDS", this.filterableFields, row.field);
       try {
         const fieldType = this.filterableFields[row.field].type.toUpperCase();
         return TYPE_INPUT_MAP[fieldType];
@@ -161,6 +181,8 @@ export default {
     return {
       filters: [],
       searchQuery: "",
+      allValues: false,
+      listMode: 'active',
       OPERATOR_DESCRIPTION_MAP,
       TYPE_INPUT_MAP,
     };
