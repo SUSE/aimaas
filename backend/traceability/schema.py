@@ -75,7 +75,7 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     change_['comment'] = change_request.comment
     change_['created_by'] = change_request.created_by.username
     change_['reviewed_by'] = change_request.reviewed_by.username if change_request.reviewed_by else None
-    change_['schema'] = {'slug': schema.slug, 'name': schema.name, 'id': schema.id}
+    change_['schema'] = {'slug': schema.slug, 'name': schema.name, 'id': schema.id, 'deleted': schema.deleted}
 
     deleted = [i for i in schema_changes if i.field_name == 'deleted']
     if deleted:
