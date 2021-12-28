@@ -10,9 +10,8 @@ class API {
         const message = details?.message || "Failed to process request";
         if (this.alerts) {
             this.alerts.push("danger", message);
-        } else {
-            console.error(message);
         }
+        console.error(message);
     }
 
     async _is_response_ok(response) {
@@ -21,7 +20,15 @@ class API {
         }
 
         const detail = await response.json();
-        throw Error(detail);
+        if (Array.isArray(detail.detail)) {
+            throw Error(detail.detail.map(d => `${d.loc}: ${d.msg}`).join(", "));
+        }
+        else if (typeof  detail.detail === "string") {
+            throw Error(detail.detail);
+        } else {
+            console.error("Response indicates a problem", detail);
+            throw Error("Failed to process request. See console for more details.");
+        }
     }
 
     async _fetch({url, headers, body, method} = {}) {
@@ -34,7 +41,7 @@ class API {
                 body: body ? JSON.stringify(body) : null,
                 headers: allheaders
             });
-            this._is_response_ok(response);
+            await this._is_response_ok(response);
             return await response.json();
         } catch (e) {
             this._error_to_alert(e);
@@ -68,9 +75,11 @@ class API {
         const response = await this._fetch({
             url: `${this.base}/schemas`,
             method: 'POST',
-            body: body
+            body: body,
         });
-        this.alerts.push("success", `Schema created: ${body.name}`);
+        if (response !== null) {
+            this.alerts.push("success", `Schema created: ${body.name}`);
+        }
         return response;
     }
 
@@ -80,7 +89,9 @@ class API {
             method: "PUT",
             body: body
         });
-        this.alerts.push("success", `Schema updated: ${schemaSlug}`);
+        if (response !== null) {
+            this.alerts.push("success", `Schema updated: ${schemaSlug}`);
+        }
         return response;
     }
 
@@ -89,7 +100,9 @@ class API {
             url: `${this.base}/schemas/${slugOrId}`,
             method: 'DELETE'
         });
-        this.alerts.push("success", `Schema deleted: ${response.name}`);
+        if (response !== null) {
+            this.alerts.push("success", `Schema deleted: ${response.name}`);
+        }
         return response;
     }
 
@@ -131,22 +144,37 @@ class API {
     }
 
     async createEntity({ schemaSlug, body } = {}) {
-        const response = this._fetch({
+        const response = await this._fetch({
             url: `${this.base}/dynamic/${schemaSlug}`,
             method: 'POST',
             body: body
         });
-        this.alerts.push("success", `Entity created: ${body.name}`);
+        if (response !== null) {
+            this.alerts.push("success", `Entity created: ${body.name}`);
+        }
         return response;
     }
 
     async updateEntity({ schemaSlug, entityIdOrSlug, body } = {}) {
-        const response = this._fetch({
+        const response = await this._fetch({
             url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`,
             method: 'PUT',
             body: body
         });
-        this.alerts.push("success", `Entity updated: ${entityIdOrSlug}`)
+        if (response !== null) {
+            this.alerts.push("success", `Entity updated: ${entityIdOrSlug}`);
+        }
+        return response;
+    }
+
+    async deleteEntity({schemaSlug, entityIdOrSlug} = {}) {
+        const response = await this._fetch({
+            url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`,
+            method: 'DELETE'
+        });
+        if (response !== null) {
+            this.alerts.push("success", `Entity deleted: ${response.name}`);
+        }
         return response;
     }
 
