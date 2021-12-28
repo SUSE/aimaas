@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import select
 
-from backend.models import  Entity, User
+from backend.models import ContentType, PermObject, PermType, User
 from backend.schemas.entity import EntityBaseSchema
 from backend.schemas.schema import SchemaBaseSchema
 from backend.schemas.traceability import ChangeRequestSchema
