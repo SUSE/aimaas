@@ -822,17 +822,16 @@ class TestTraceabilityRoutes:
         # APPROVE
         review = {
             'result': 'APPROVE',
-            'change_object': 'ENTITY',
-            'change_type': 'UPDATE',
             'comment': 'test'
         }
 
         response = client.post(f'/changes/review/{change_request.id}', json=review)
         assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack', 'deleted': False}
 
+        dbsession.commit()
         change_request.status = ChangeStatus.PENDING
         dbsession.commit()
-
+        
         # DECLINE
         review['result'] = 'DECLINE'
         review['comment'] = 'test2'
@@ -842,18 +841,10 @@ class TestTraceabilityRoutes:
         assert json['comment'] == 'test2'
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
-        # raise on existing id but mismatching records
-        change_request = make_change_for_review(dbsession)
         review = {
             'result': 'APPROVE',
-            'change_object': 'SCHEMA',
-            'change_type': 'UPDATE',
             'comment': 'test'
         }
-        response = client.post(f'/changes/review/{change_request.id}', json=review)
-        assert response.status_code == 404
-        # raise on nonexistent id
-
         response = client.post(f'/changes/review/23456', json=review)
         assert response.status_code == 404
 

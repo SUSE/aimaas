@@ -41,7 +41,11 @@ def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, l
     ValueModel = entity_change.data_type.value.model
     if attr.id not in listed_changes:
         v = db.execute(select(ValueModel).where(ValueModel.id == entity_change.value_id)).scalar()
-        change['changes'][attr.name] = {'new': v.new_value, 'old': v.old_value, 'current': get_old_value(db, entity, attr.name)}
+        try:
+            current = get_old_value(db, entity, attr.name)
+        except KeyError:
+            current = None
+        change['changes'][attr.name] = {'new': v.new_value, 'old': v.old_value, 'current': current}
         return
     
     if attr.id in checked_listed:
@@ -121,7 +125,12 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     ).scalar()
 
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.CREATE
+    )
     
     entity_change_kwargs = {
         'change_request': change_request,
@@ -299,7 +308,12 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
         q = select(Entity).where(Entity.slug == id_or_slug)
     entity = db.execute(q).scalar()
     
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.UPDATE
+    )
     db.add(change_request)
     
     entity_fields = {'name': data.pop('name', None), 'slug': data.pop('slug', None)}
@@ -453,7 +467,12 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
     schema = crud.get_schema(db=db, id_or_slug=schema_id)
     entity = crud.get_entity_model(db=db, id_or_slug=id_or_slug, schema=schema)
 
-    change_request = ChangeRequest(created_by=created_by, created_at=datetime.utcnow())
+    change_request = ChangeRequest(
+        created_by=created_by, 
+        created_at=datetime.utcnow(),
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.DELETE
+    )
     db.add(change_request)
 
     val = ChangeValueBool(old_value=entity.deleted, new_value=True)

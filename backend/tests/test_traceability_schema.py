@@ -13,6 +13,8 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
             created_by=user,
+            object_type=ChangeObject.SCHEMA,
+            change_type=ChangeType.UPDATE
         )
         change_1 = Change(
             change_request=change_request,
@@ -39,6 +41,8 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
             created_at=time+timedelta(hours=9),
             created_by=user,
+            object_type=ChangeObject.SCHEMA,
+            change_type=ChangeType.CREATE
     )
     change_1 = Change(
         change_request=change_request,
@@ -81,7 +85,13 @@ def make_schema_create_request(db: Session, user: User, time: datetime):
     schema = Schema(name='Test', slug='test', reviewable=True)
     db.add(schema)
     db.flush()
-    change_request = ChangeRequest(created_by=user, created_at=time, status=ChangeStatus.APPROVED)
+    change_request = ChangeRequest(
+        created_by=user, 
+        created_at=time, 
+        status=ChangeStatus.APPROVED,
+        object_type=ChangeObject.SCHEMA,
+        change_type=ChangeType.CREATE
+    )
     slug_val = ChangeValueStr(new_value='test')
     reviewable_val = ChangeValueBool(new_value=True)
 
@@ -302,7 +312,12 @@ class TestCreateSchemaTraceability:
 
 
 def make_schema_update_request(db: Session, user: User, time: datetime):
-    change_request = ChangeRequest(created_by=user, created_at=time)
+    change_request = ChangeRequest(
+        created_by=user, 
+        created_at=time,
+        object_type=ChangeObject.SCHEMA,
+        change_type=ChangeType.UPDATE
+    )
     slug_val = ChangeValueStr(old_value='person', new_value='test')
     reviewable_val = ChangeValueBool(old_value=False, new_value=True)
     db.add_all([slug_val, reviewable_val])

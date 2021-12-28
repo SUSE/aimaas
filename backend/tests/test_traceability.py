@@ -16,7 +16,12 @@ from .test_traceability_schema import make_schema_change_objects
 ])
 def test_decline_change_request(dbsession: Session, content_type, change_type):
     user = dbsession.execute(select(User)).scalar()
-    change_request = ChangeRequest(created_at=datetime.utcnow(), created_by=user)
+    change_request = ChangeRequest(
+        created_at=datetime.utcnow(), 
+        created_by=user,
+        object_type=ChangeObject[content_type.name],
+        change_type=change_type
+    )
     v = ChangeValueStr()
     dbsession.add_all([change_request, v])
     dbsession.flush()
@@ -48,7 +53,12 @@ def test_decline_change_request(dbsession: Session, content_type, change_type):
 
 def make_change_for_review(db: Session) -> ChangeRequest:
     user = db.execute(select(User)).scalar()
-    change_request = ChangeRequest(created_at=datetime.utcnow(), created_by=user)
+    change_request = ChangeRequest(
+        created_at=datetime.utcnow(), 
+        created_by=user,
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.UPDATE
+    )
     v = ChangeValueStr(new_value='test')
     db.add_all([change_request, v])
     db.flush()
@@ -72,8 +82,6 @@ def test_review_changes(dbsession: Session):
     
     review = ChangeReviewSchema(
         result=ReviewResult.APPROVE,
-        change_object=ChangeObject.ENTITY,
-        change_type=ChangeType.UPDATE,
         comment='test'
     )
     # approve

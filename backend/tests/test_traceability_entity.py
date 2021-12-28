@@ -14,6 +14,8 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
             created_by=user,
+            object_type=ChangeObject.ENTITY,
+            change_type=ChangeType.UPDATE
         )
         change_1 = Change(
             change_request=change_request,
@@ -40,6 +42,8 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
             created_at=time+timedelta(hours=9),
             created_by=user,
+            object_type=ChangeObject.ENTITY,
+            change_type=ChangeType.CREATE
     )
     change_1 = Change(
         change_request=change_request,
@@ -81,7 +85,12 @@ def make_entity_update_request(db: Session, user: User, time: datetime):
     # updating age from 10 to 42
     # updating list of colors to violet and cyan
     # updating name from Jack to Jackson
-    change_request = ChangeRequest(created_by=user, created_at=time)
+    change_request = ChangeRequest(
+        created_by=user, 
+        created_at=time,
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.DELETE
+    )
     name_val = ChangeValueStr(old_value='Jack', new_value='Jackson')
     age_val = ChangeValueInt(old_value=10, new_value=42)
     color_val_1 = ChangeValueStr(new_value='violet')
@@ -224,7 +233,12 @@ class TestUpdateEntityTraceability:
         asserts_after_applying_entity_update_request(dbsession, change_request_id=1)
 
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
-        schema_change = ChangeRequest(created_by=user, created_at=datetime.utcnow())
+        schema_change = ChangeRequest(
+            created_by=user, 
+            created_at=datetime.utcnow(),
+            object_type=ChangeObject.SCHEMA,
+            change_type=ChangeType.UPDATE
+        )
         dbsession.add(schema_change)
         dbsession.flush()
 
@@ -237,7 +251,12 @@ class TestUpdateEntityTraceability:
             apply_entity_update_request(db=dbsession, change_request_id=42, reviewed_by=user)
 
     def test_raise_on_attribute_not_defined(self, dbsession: Session, user: User):
-        r = ChangeRequest(created_by=user, created_at=datetime.utcnow())
+        r = ChangeRequest(
+            created_by=user, 
+            created_at=datetime.utcnow(),
+            object_type=ChangeObject.ENTITY,
+            change_type=ChangeType.UPDATE
+        )
         name_val = ChangeValueStr(new_value='test')
         slug_val = ChangeValueStr(new_value='test')
         schema_val = ChangeValueInt(new_value=1)
@@ -285,7 +304,12 @@ class TestUpdateEntityTraceability:
 
 
 def make_entity_delete_request(db: Session, user: User, time: datetime):
-    change_request = ChangeRequest(created_by=user, created_at=time)
+    change_request = ChangeRequest(
+        created_by=user, 
+        created_at=time,
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.DELETE
+    )
     del_val = ChangeValueBool(old_value=False, new_value=True)
     db.add_all([change_request, del_val])
     db.flush()
@@ -362,7 +386,12 @@ class TestDeleteEntityTraceability:
         asserts_after_applying_entity_delete_request(dbsession, comment='test')
 
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
-        schema_change = ChangeRequest(created_by=user, created_at=datetime.utcnow())
+        schema_change = ChangeRequest(
+            created_by=user, 
+            created_at=datetime.utcnow(),
+            object_type=ChangeObject.SCHEMA,
+            change_type=ChangeType.DELETE
+        )
         dbsession.add(schema_change)
         dbsession.flush()
         
@@ -477,7 +506,12 @@ class TestCreateEntityTraceability:
         asserts_after_applying_entity_create_request(dbsession, change_request_id=change_request.id)
     
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
-        schema_change = ChangeRequest(created_by=user, created_at=datetime.utcnow())
+        schema_change = ChangeRequest(
+            created_by=user, 
+            created_at=datetime.utcnow(),
+            object_type=ChangeObject.SCHEMA,
+            change_type=ChangeType.CREATE
+        )
         dbsession.add(schema_change)
         dbsession.flush()
         
@@ -490,7 +524,12 @@ class TestCreateEntityTraceability:
             apply_entity_create_request(db=dbsession, change_request_id=42, reviewed_by=user)
 
     def test_raise_on_attribute_not_defined(self, dbsession: Session, user: User):
-        r = ChangeRequest(created_by=user, created_at=datetime.utcnow())
+        r = ChangeRequest(
+            created_by=user, 
+            created_at=datetime.utcnow(),
+            object_type=ChangeObject.ENTITY,
+            change_type=ChangeType.CREATE
+        )
         name_val = ChangeValueStr(new_value='test')
         slug_val = ChangeValueStr(new_value='test')
         schema_val = ChangeValueInt(new_value=1)
@@ -536,7 +575,12 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
     person = Entity(name='Jackson', slug='jackson', schema_id=1)
     db.add(person)
     db.flush()
-    change_request = ChangeRequest(created_by=user, created_at=time)
+    change_request = ChangeRequest(
+        created_by=user, 
+        created_at=time,
+        object_type=ChangeObject.ENTITY,
+        change_type=ChangeType.CREATE
+    )
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = 'approved'
     name_val = ChangeValueStr(new_value='Jackson')

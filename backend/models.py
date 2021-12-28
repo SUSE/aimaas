@@ -354,6 +354,8 @@ class ChangeRequest(Base):
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(Enum(ChangeStatus), default=ChangeStatus.PENDING, nullable=False)
     comment = Column(String(1024), nullable=True)
+    object_type = Column(Enum(ChangeObject), nullable=False)
+    change_type = Column(Enum(ChangeType), nullable=False)
 
     created_by = relationship('User', foreign_keys=[created_by_user_id])
     reviewed_by = relationship('User', foreign_keys=[reviewed_by_user_id])
