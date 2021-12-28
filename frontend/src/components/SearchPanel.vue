@@ -3,18 +3,21 @@
     <input v-model="searchQuery" type="text" class="form-control" placeholder="search by name"
            :autofocus="true" @keyup.enter="$emit('search', this.filterParams)"
            id="entity-name-search"/>
-    <select class="form-select flex-grow-0" style="width: 10rem;" data-bs-toggle="tooltip"
-            title="Entity state" v-model="listMode">
-      <option>active</option>
-      <option>deleted</option>
-      <option>all</option>
-    </select>
-    <input v-if="advancedControls" type="checkbox" class="btn-check" id="allValues"
-           v-model="allValues" autocomplete="off">
-    <label for="allValues" class="btn" :class="allValues? 'btn-primary' : 'btn-light'"
-           data-bs-toggle="tooltip" title="Show all attribute values">
-      <i class="eos-icons">view_column</i>
-    </label>
+    <template v-if="advancedControls">
+      <select class="form-select flex-grow-0" style="width: 10rem;" data-bs-toggle="tooltip"
+              title="Entity state" v-model="listMode">
+        <option>active</option>
+        <option>deleted</option>
+        <option>all</option>
+      </select>
+      <input type="checkbox" class="btn-check" id="allValues" v-model="allValues"
+             autocomplete="off">
+      <label for="allValues" class="btn" :class="allValues? 'btn-primary' : 'btn-light'"
+             data-bs-toggle="tooltip" title="Show all attribute values">
+        <i class="eos-icons">view_column</i>
+      </label>
+    </template>
+
     <button @click="$emit('search', this.filterParams)" class="btn btn-primary px-3"
             type="button" data-bs-toggle="tooltip" title="Search">
       <i class='eos-icons'>search</i>
@@ -108,8 +111,7 @@ export default {
       };
       if (this.listMode === 'deleted') {
         params.deleted_only = true;
-      }
-      else if (this.listMode === 'all') {
+      } else if (this.listMode === 'all') {
         params.all = true;
       }
       if (this.searchQuery !== "") {

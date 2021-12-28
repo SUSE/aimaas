@@ -31,6 +31,9 @@
               {{ e[field] }}
             </RouterLink>
           </template>
+          <template v-else-if="field in fkFields">
+            <RefEntity :entity-id="e[field]" :schema-slug="fkFields[field]"/>
+          </template>
           <template v-else>
             {{ e[field] }}
           </template>
@@ -50,17 +53,23 @@
 </template>
 
 <script>
+import RefEntity from "@/components/RefEntity";
 const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 
 export default {
   name: 'EntityListTable',
   props: ['entities', 'schema', 'loading', 'selectType', 'selected'],
+  inject: ["availableSchemas"],
+  components: {RefEntity},
   emits: ['reorder', 'select'],
   updated() {
     if (this.previousSchema !== this.schema) {
       this.previousSchema = this.schema;
       this.ascending = true;
       this.orderBy = 'name';
+      this.$api.getSchema({slugOrId: this.schema.slug}).then(x => {
+        this.schemaDetails = x;
+      });
     }
   },
   computed: {
@@ -77,19 +86,33 @@ export default {
       fields.unshift('name');
       return fields;
     },
+    fkFields() {
+      const fkSchemas = {};
+      for (const attr of (this.schemaDetails?.attributes || [])) {
+        if (attr.type === 'FK') {
+          fkSchemas[attr.name] = this.refSchemaSlug[attr.bind_to_schema];
+        }
+      }
+      return fkSchemas;
+    },
     inputType() {
       if (this.selectType === "many") {
         return "checkbox";
-      }
-      else if (this.selectType === "single") {
+      } else if (this.selectType === "single") {
         return "radio";
-      }
-      else {
+      } else {
         return "hidden";
       }
     },
     showSelectors() {
       return this.inputType !== "hidden";
+    },
+    refSchemaSlug() {
+      const sMap = {};
+      for (const schema of this.availableSchemas) {
+        sMap[schema.id] = schema.slug;
+      }
+      return sMap;
     }
   },
   data() {
@@ -97,8 +120,10 @@ export default {
       orderBy: 'name',
       ascending: true,
       previousSchema: null,
+      schemaDetails: null
     };
-  },
+  }
+  ,
   methods: {
     getSelected() {
       const elem = document.getElementsByName("EntitySelection");
@@ -110,7 +135,8 @@ export default {
         s.push(parseInt(e.value));
       }
       return s;
-    },
+    }
+    ,
     orderByField(field) {
       if (this.orderBy === field) {
         this.ascending = !this.ascending;
@@ -119,7 +145,10 @@ export default {
         this.ascending = true;
       }
       this.$emit('reorder', {orderBy: this.orderBy, ascending: this.ascending})
-    },
-  },
-};
+    }
+    ,
+  }
+  ,
+}
+;
 </script>

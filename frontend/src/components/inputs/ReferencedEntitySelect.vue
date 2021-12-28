@@ -82,23 +82,21 @@ export default {
         return;
       }
       const preselectedIds = this.selected.map(x => x.id);
-      if (this.modelValue) {
-        let toQuery = this.modelValue;
-        if (!(this.modelValue instanceof Array)) {
-          toQuery = [this.modelValue];
-        }
-
-        toQuery.map(i => {
-          if (!preselectedIds.includes(i)) {
-            this.$api.getEntity({
-              schemaSlug: this.activeSchema.slug,
-              entityIdOrSlug: i
-            }).then(response => {
-              this.selected.push(response);
-            });
-          }
-        });
+      let toQuery = this.modelValue;
+      if (!Array.isArray(this.modelValue)) {
+        toQuery = [this.modelValue];
       }
+
+      toQuery.map(i => {
+        if (!preselectedIds.includes(i)) {
+          this.$api.getEntity({
+            schemaSlug: this.activeSchema.slug,
+            entityIdOrSlug: i
+          }).then(response => {
+            this.selected.push(response);
+          });
+        }
+      });
     },
     onSelect() {
       if (this.selectType === 'single') {
@@ -110,12 +108,20 @@ export default {
           this.selected.push(s);
         }
       }
-      this.$emit("update:modelValue", this.selected.map(s => s.id));
+      if (this.selectType === 'single') {
+        this.$emit("update:modelValue", this.selected[0].id);
+      } else {
+        this.$emit("update:modelValue", this.selected.map(s => s.id));
+      }
       this.$emit("changed");
     },
     onClear(eId) {
-      this.selected = this.selected.filter(x => x.id !== eId);
-      this.$emit("update:modelValue", this.selected.map(s => s.id));
+      if (this.selectType === 'single') {
+        this.$emit("update:modelValue", null);
+      } else {
+        this.selected = this.selected.filter(x => x.id !== eId);
+        this.$emit("update:modelValue", this.selected.map(s => s.id));
+      }
       this.$emit("changed");
     }
   },
