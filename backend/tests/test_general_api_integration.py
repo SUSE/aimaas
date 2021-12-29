@@ -605,7 +605,7 @@ class TestRouteGetEntityChanges:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         make_entity_update_request(db=dbsession, user=user, time=now)
 
-        response = client.get('/changes/entity/person/Jack/1')
+        response = client.get('/changes/detail/entity/1')
         change = response.json()
         assert parser.parse(change['created_at']) == now
         assert change['created_by'] == user.username
@@ -628,7 +628,7 @@ class TestRouteGetEntityChanges:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         make_entity_create_request(db=dbsession, user=user, time=now)
 
-        response = client.get('/changes/entity/person/jackson/1')
+        response = client.get('/changes/detail/entity/1')
         change = response.json()
         assert parser.parse(change['created_at']) == now
         assert change['created_by'] == user.username
@@ -653,7 +653,7 @@ class TestRouteGetEntityChanges:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         make_entity_delete_request(db=dbsession, user=user, time=now)
 
-        response = client.get('/changes/entity/person/Jack/1')
+        response = client.get('/changes/detail/entity/1')
         change = response.json()
         assert parser.parse(change['created_at']) == now
         assert change['created_by'] == user.username
@@ -667,21 +667,7 @@ class TestRouteGetEntityChanges:
         assert deleted['new'] == True and deleted['old'] == deleted['current'] == False
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
-        response = client.get('/changes/entity/person/Jack/12345678')
-        assert response.status_code == 404
-
-    def test_raise_on_schema_doesnt_exist(self, dbsession: Session, client: TestClient):
-        response = client.get('/changes/entity/1234567890/Jack/1')
-        assert response.status_code == 404
-
-        response = client.get('/changes/entity/1234567890/Jack')
-        assert response.status_code == 404
-
-    def test_raise_on_entity_doesnt_exist(self, dbsession: Session, client: TestClient):
-        response = client.get('/changes/entity/person/123456789/1')
-        assert response.status_code == 404
-
-        response = client.get('/changes/entity/person/123456789')
+        response = client.get('/changes/detail/entity/12345678')
         assert response.status_code == 404
 
 
@@ -711,7 +697,7 @@ class TestRouteGetSchemaChanges:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         make_schema_update_request(db=dbsession, user=user, time=now)
 
-        response = client.get('/changes/schema/person/1')
+        response = client.get('/changes/detail/schema/1')
         change = response.json()
         assert parser.parse(change['created_at']) == now
         assert change['created_by'] == user.username
@@ -756,7 +742,7 @@ class TestRouteGetSchemaChanges:
         user = dbsession.execute(select(User)).scalar()
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         make_schema_create_request(db=dbsession, user=user, time=now)
-        response = client.get('/changes/schema/test/1')
+        response = client.get('/changes/detail/schema/1')
         change = response.json()
 
         assert parser.parse(change['created_at']) == now
@@ -810,14 +796,7 @@ class TestRouteGetSchemaChanges:
     #     assert deleted['new'] == 'True' and deleted['old'] == deleted['current'] == 'False'
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
-        response = client.get('/changes/schema/person/Jack/12345678')
-        assert response.status_code == 404
-
-    def test_raise_on_schema_doesnt_exist(self, dbsession: Session, client: TestClient):
-        response = client.get('/changes/schema/1234567890/1')
-        assert response.status_code == 404
-
-        response = client.get('/changes/schema/1234567890')
+        response = client.get('/changes/schema/12345678')
         assert response.status_code == 404
 
 
