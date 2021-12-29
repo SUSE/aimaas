@@ -116,11 +116,27 @@ export default {
       }
       this.loading = false;
     },
-    onDecline(event) {
-      console.info("TODO: This needs to be implemented", event.target.value);
+    fakeReview(changeId) {
+      for (let change of this.changes) {
+        if (changeId == change.id) {
+          change.reviewed_at = Date.now();
+        }
+      }
     },
-    onApprove(event) {
-      console.info("TODO: This needs to be implemented", event.target.value);
+    async review(changeId, verdict) {
+      const result = await this.$api.reviewChanges({
+        changeId: changeId,
+        verdict: verdict
+      });
+      if (result) {
+        this.fakeReview(changeId);
+      }
+    },
+    async onDecline(event) {
+      await this.review(event.target.value, 'DECLINE');
+    },
+    async onApprove(event) {
+      await this.review(event.target.value, 'APPROVE');
     }
   },
   watch: {

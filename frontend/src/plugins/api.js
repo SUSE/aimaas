@@ -25,8 +25,7 @@ class API {
         const detail = await response.json();
         if (Array.isArray(detail.detail)) {
             throw Error(detail.detail.map(d => `${d.loc}: ${d.msg}`).join(", "));
-        }
-        else if (typeof  detail.detail === "string") {
+        } else if (typeof detail.detail === "string") {
             throw Error(detail.detail);
         } else {
             console.error("Response indicates a problem", detail);
@@ -40,8 +39,7 @@ class API {
         allheaders = Object.assign(allheaders, headers || {});
         if (body instanceof FormData || typeof body === "string") {
             encoded_body = body;
-        }
-        else if (body) {
+        } else if (body) {
             encoded_body = JSON.stringify(body);
         }
 
@@ -59,18 +57,18 @@ class API {
         }
     }
 
-    async getSchemas({ all = false, deletedOnly = false } = {}) {
+    async getSchemas({all = false, deletedOnly = false} = {}) {
         const params = new URLSearchParams();
         params.set('all', all);
         params.set('deleted_only', deletedOnly);
         return this._fetch({url: `${this.base}/schemas?${params.toString()}`});
     }
 
-    async getSchema({ slugOrId } = {}) {
+    async getSchema({slugOrId} = {}) {
         return this._fetch({url: `${this.base}/schemas/${slugOrId}`});
     }
 
-    async createSchema({ body } = {}) {
+    async createSchema({body} = {}) {
         const response = await this._fetch({
             url: `${this.base}/schemas`,
             method: 'POST',
@@ -82,7 +80,7 @@ class API {
         return response;
     }
 
-    async updateSchema({ schemaSlug, body } = {}) {
+    async updateSchema({schemaSlug, body} = {}) {
         const response = await this._fetch({
             url: `${this.base}/schemas/${schemaSlug}`,
             method: "PUT",
@@ -94,7 +92,7 @@ class API {
         return response;
     }
 
-    async deleteSchema({ slugOrId } = {}) {
+    async deleteSchema({slugOrId} = {}) {
         const response = await this._fetch({
             url: `${this.base}/schemas/${slugOrId}`,
             method: 'DELETE'
@@ -106,17 +104,17 @@ class API {
     }
 
     async getEntities({
-        schemaSlug,
-        limit = 10,
-        offset = 0,
-        all = false,
-        deletedOnly = false,
-        allFields = false,
-        meta = false,
-        filters = {},
-        orderBy = 'name',
-        ascending = true,
-    } = {}) {
+                          schemaSlug,
+                          limit = 10,
+                          offset = 0,
+                          all = false,
+                          deletedOnly = false,
+                          allFields = false,
+                          meta = false,
+                          filters = {},
+                          orderBy = 'name',
+                          ascending = true,
+                      } = {}) {
         const params = new URLSearchParams();
         params.set('limit', limit);
         params.set('offset', offset);
@@ -134,7 +132,7 @@ class API {
         });
     }
 
-    async getEntity({ schemaSlug, entityIdOrSlug, meta = false } = {}) {
+    async getEntity({schemaSlug, entityIdOrSlug, meta = false} = {}) {
         const params = new URLSearchParams();
         params.set('meta', meta);
         return this._fetch({
@@ -142,7 +140,7 @@ class API {
         });
     }
 
-    async createEntity({ schemaSlug, body } = {}) {
+    async createEntity({schemaSlug, body} = {}) {
         const response = await this._fetch({
             url: `${this.base}/dynamic/${schemaSlug}`,
             method: 'POST',
@@ -154,7 +152,7 @@ class API {
         return response;
     }
 
-    async updateEntity({ schemaSlug, entityIdOrSlug, body } = {}) {
+    async updateEntity({schemaSlug, entityIdOrSlug, body} = {}) {
         const response = await this._fetch({
             url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`,
             method: 'PUT',
@@ -177,7 +175,7 @@ class API {
         return response;
     }
 
-    async getChangeRequests({schemaSlug, entityIdOrSlug}= {}) {
+    async getChangeRequests({schemaSlug, entityIdOrSlug} = {}) {
         let url = `${this.base}/changes/schema/${schemaSlug}`;
         if (entityIdOrSlug) {
             url = `${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}`;
@@ -190,22 +188,24 @@ class API {
         return this._fetch({url: url,})
     }
 
-    async getPendingChangeRequests(){
+    async getPendingChangeRequests() {
         let url = `${this.base}/changes/pending?all=true`;
         return this._fetch({url: url});
     }
 
-    async reviewChanges({ changeId, verdict, changeObject, changeType, comment } = {}) {
-        return fetch(`${this.base}/changes/review/${changeId}`, {
+    async reviewChanges({changeId, verdict, comment=null} = {}) {
+        const response = await this._fetch({
+            url: `${this.base}/changes/review/${changeId}`,
             method: "POST",
-            body: JSON.stringify({
+            body: {
                 result: verdict,
-                change_object: changeObject,
-                change_type: changeType,
                 comment: comment || null,
-            }),
-            headers: { "Content-Type": "application/json" },
+            }
         });
+        if (response) {
+            this.alerts.push("success", `Change request ${changeId} successfully reviewed.`);
+        }
+        return response;
     }
 
     async login({username, password} = {}) {
@@ -227,7 +227,7 @@ class API {
 
 export default {
     install: (app) => {
-        app.config.globalProperties.$api =  reactive(new API(process.env.VUE_APP_API_BASE,
-                                                             app.config.globalProperties.$alerts));
+        app.config.globalProperties.$api = reactive(new API(process.env.VUE_APP_API_BASE,
+            app.config.globalProperties.$alerts));
     }
 }
