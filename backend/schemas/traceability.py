@@ -28,6 +28,11 @@ class ChangeRequestSchema(BaseModel):
             return v.username
         return v
 
+class SchemaChangeRequestSchema(BaseModel):
+    schema_changes: List[ChangeRequestSchema]
+    pending_entity_requests: List[ChangeRequestSchema]
+
+
 class ReviewResult(Enum):
     APPROVE = 'APPROVE'
     DECLINE = 'DECLINE'

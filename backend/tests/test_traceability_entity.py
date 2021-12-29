@@ -63,7 +63,19 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
         data_type=ChangeAttrType.STR,
         value_id=999
     )
-    db.add_all([change_request, change_1, change_2])
+    schema_value = ChangeValueInt(new_value=1)
+    db.add(schema_value)
+    db.flush()
+    change_3 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.ENTITY,
+        field_name='schema_id',
+        data_type=ChangeAttrType.INT,
+        value_id=schema_value.id
+    )
+    db.add_all([change_request, change_1, change_2, change_3])
     requests.append(change_request)
     db.commit()
     return requests

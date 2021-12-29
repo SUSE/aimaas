@@ -7,7 +7,7 @@ from sqlalchemy.sql.expression import select
 from backend.models import ContentType, PermObject, PermType, User
 from backend.schemas.entity import EntityBaseSchema
 from backend.schemas.schema import SchemaBaseSchema
-from backend.schemas.traceability import ChangeRequestSchema
+from backend.schemas.traceability import ChangeRequestSchema, SchemaChangeRequestSchema
 
 from . import crud, schemas, exceptions, traceability, auth
 from .database import get_db
@@ -193,11 +193,12 @@ def get_pending_change_requests(
     return traceability.get_pending_change_requests(obj_type=obj_type, limit=limit, offset=offset, all=all, db=db)
 
 
-@router.get('/changes/schema/{id_or_slug}', response_model=List[schemas.ChangeRequestSchema])
+@router.get('/changes/schema/{id_or_slug}', response_model=schemas.SchemaChangeRequestSchema)
 def get_recent_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
     try:
         schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
-        return traceability.get_recent_schema_changes(db=db, schema_id=schema.id, count=count)
+        schema_changes, pending_entity_requests = traceability.get_recent_schema_changes(db=db, schema_id=schema.id, count=count)
+        return SchemaChangeRequestSchema(schema_changes=schema_changes, pending_entity_requests=pending_entity_requests)
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
