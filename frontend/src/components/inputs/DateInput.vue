@@ -16,7 +16,7 @@ export default {
   props: ["label", "modelValue", "args", "vertical", "required"],
   methods: {
     onInput(event) {
-      this.$emit("update:modelValue", event.target.value);
+      this.$emit("update:modelValue", event.target.value || null);
     },
   },
 };

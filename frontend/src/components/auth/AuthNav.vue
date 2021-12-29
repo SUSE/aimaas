@@ -10,7 +10,7 @@
         <li>
           <div class="dropdown-header">
             <i class='eos-icons me-1'>account_circle</i>
-            <b>{{ loggedInAs }}</b>
+            Logged in as: <b>{{ loggedInAs }}</b>
           </div>
         </li>
         <li>
@@ -64,7 +64,7 @@ export default {
     }
   },
   methods: {
-    async logIn() {
+    logIn() {
       this.$api.login({username: this.username, password: this.password});
     }
   }

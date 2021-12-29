@@ -1,3 +1,6 @@
+import {reactive} from "vue";
+
+
 class API {
     constructor(baseUrl, alertStorage) {
         this.base = baseUrl;
@@ -33,12 +36,19 @@ class API {
 
     async _fetch({url, headers, body, method} = {}) {
         let allheaders = {"Content-Type": "application/json"};
+        let encoded_body = null;
         allheaders = Object.assign(allheaders, headers || {});
+        if (body instanceof FormData || typeof body === "string") {
+            encoded_body = body;
+        }
+        else if (body) {
+            encoded_body = JSON.stringify(body);
+        }
 
         try {
             const response = await fetch(url, {
                 method: method || 'GET',
-                body: body ? JSON.stringify(body) : null,
+                body: encoded_body,
                 headers: allheaders
             });
             await this._is_response_ok(response);
@@ -46,17 +56,6 @@ class API {
         } catch (e) {
             this._error_to_alert(e);
             return null;
-        }
-    }
-
-    async getAttributes() {
-        const response = await fetch(`${this.base}/attributes`);
-        try {
-            this._is_response_ok(response);
-            return await response.json()
-        }
-        catch (e) {
-            // TODO: Do something else
         }
     }
 
@@ -209,12 +208,13 @@ class API {
 
     async login({username, password} = {}) {
         const url = `${this.base}/login`;
+        const body = `username=${username}&password=${password}`;
         const response = await this._fetch({
             url: url,
             method: 'POST',
-            body: {username: username, password: password}
+            body: encodeURI(body),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
         });
-        console.debug("Logged in", response);
         this.loggedIn = username;
         this.token = response.access_token;
         this.alerts.push("success", `Welcome back, ${username}.`);
@@ -225,7 +225,7 @@ class API {
 
 export default {
     install: (app) => {
-        app.config.globalProperties.$api =  new API(process.env.VUE_APP_API_BASE,
-                                                    app.config.globalProperties.$alerts);
+        app.config.globalProperties.$api =  reactive(new API(process.env.VUE_APP_API_BASE,
+                                                             app.config.globalProperties.$alerts));
     }
 }
