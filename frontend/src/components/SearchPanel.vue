@@ -31,9 +31,6 @@
   <div id="collapsed-filters" class="collapse">
     <div class="card">
       <div class="card-body">
-        <div v-if="advancedControls" class="row border-bottom border-light pb-1 mb-1">
-          Goo!
-        </div>
         <div class="row border-bottom border-light pb-1 mb-1 align-items-end" :key="rowIndex"
              v-for="(row, rowIndex) in this.filters">
           <!-- SELECT FILTER FIELD -->

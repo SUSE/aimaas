@@ -167,7 +167,6 @@ export default {
           result[attr] = value;
         }
       }
-      console.debug("Changes?", this.entity, result)
       return result;
     },
 
@@ -181,21 +180,19 @@ export default {
           this.loading = false;
           return;
         }
-        this.$api.updateEntity({
+        await this.$api.updateEntity({
           schemaSlug: this.$route.params.schemaSlug,
           entityIdOrSlug: this.$route.params.entitySlug,
           body: body,
-        }).finally(() => {
-          this.loading = false
         });
+        this.loading = false;
       } else {
         // CREATE NEW ENTITY
-        this.$api.createEntity({
+        await this.$api.createEntity({
           schemaSlug: this.$route.params.schemaSlug,
           body: this.entity
-        }).finally(() => {
-          this.loading = false;
-        })
+        });
+        this.loading = false;
       }
     },
   },

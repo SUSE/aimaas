@@ -1,7 +1,8 @@
 <template>
   <Placeholder :loading="loading">
     <template v-slot:content>
-      <RouterLink :to="{name: 'entity-view', params: {schemaSlug: schemaSlug, entitySlug: entityId}}">
+      <RouterLink v-if="entityId"
+                  :to="{name: 'entity-view', params: {schemaSlug: schemaSlug, entitySlug: entityId}}">
         {{ entity.name }}
       </RouterLink>
     </template>

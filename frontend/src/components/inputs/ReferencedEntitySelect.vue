@@ -5,24 +5,25 @@
     </template>
     <template v-slot:field>
       <ul class="list-group">
-        <li class="list-group-item" v-for="e in selected" :key="e.id">
-          {{ e.name }}
-          <button class="btn btn-outline-cta float-end" type="button"
+        <li class="list-group-item d-flex justify-content-between align-items-center"
+            v-for="e in selected" :key="e.id">
+          <span>{{ e.name }}</span>
+          <button class="btn btn-outline-cta" type="button"
                   data-ts-toggle="tooltip" title="Remove" @click="onClear(e.id)">
             <i class="eos-icons">backspace</i>
           </button>
         </li>
       </ul>
       <button type="button" class="btn btn-outline-primary w-100 mt-1" data-bs-toggle="modal"
-              data-bs-target="#entitySelectModal">
+              :data-bs-target="`#${modalId}`">
         <i class='eos-icons me-1'>checklist</i>
-        Select
+        Select {{ selectType }}
       </button>
-      <div class="modal" id="entitySelectModal">
+      <div class="modal" :id="modalId">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title">Select entity</h5>
+              <h5 class="modal-title">Select entity {{ selectType }}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"/>
             </div>
             <div class="modal-body">
@@ -60,7 +61,8 @@ export default {
   data() {
     return {
       loading: true,
-      selected: []
+      selected: [],
+      modalId: `entitySelectModal-${this.label}`
     }
   },
   created() {

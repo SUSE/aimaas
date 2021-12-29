@@ -1,49 +1,55 @@
 <template>
-  <template v-if="changeId in changeDetails">
-    <template v-if="changeDetails[changeId].length > 0">
-      <table class="table">
-        <thead>
-        <tr>
-          <th v-for="heading in tableHeadings" :key="heading">
-            {{ heading }}
-          </th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="(change, idx) in changeDetails[changeId]" :key="`${changeId}/${idx}`">
-          <td v-for="heading in tableHeadings" :key="`${changeId}/${idx}/${heading}`">
-            <template v-if="heading === 'action'">
-              <i class="eos-icons" data-bs-toggle="tooltip" :title="change[heading]">
-                {{ CHANGE_STATUS_MAP[change[heading]] }}
-              </i>
-            </template>
-            <template v-else-if="typeof change[heading] === 'boolean'">
-              <i class="eos-icons" :class="change[heading] ? 'text-success' : 'text-danger'"
-                 data-bs-toggle="tooltip" :title="change[heading]">
-                {{ change[heading] ? 'thumb_up' : 'thumb_down' }}
-              </i>
-            </template>
-            <template v-else>
-              {{ change[heading] }}
-            </template>
-          </td>
-        </tr>
-        </tbody>
-      </table>
+  <Placeholder :loading="loading" :big="true">
+    <template v-slot:content>
+      <template v-if="changeId in changeDetails">
+        <div class="table-responsive" v-if="changeDetails[changeId].length > 0">
+          <table class="table">
+            <thead>
+            <tr>
+              <th v-for="heading in tableHeadings" :key="heading">
+                {{ heading }}
+              </th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="(change, idx) in changeDetails[changeId]" :key="`${changeId}/${idx}`">
+              <td v-for="heading in tableHeadings" :key="`${changeId}/${idx}/${heading}`">
+                <template v-if="heading === 'action'">
+                  <i class="eos-icons" data-bs-toggle="tooltip" :title="change[heading]">
+                    {{ CHANGE_STATUS_MAP[change[heading]] }}
+                  </i>
+                </template>
+                <template v-else-if="typeof change[heading] === 'boolean'">
+                  <i class="eos-icons" :class="change[heading] ? 'text-success' : 'text-danger'"
+                     data-bs-toggle="tooltip" :title="change[heading]">
+                    {{ change[heading] ? 'thumb_up' : 'thumb_down' }}
+                  </i>
+                </template>
+                <template v-else>
+                  {{ change[heading] }}
+                </template>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="alert alert-info">No additional details.</div>
+      </template>
+      <button v-else type="button" class="btn btn-link" @click="loadDetails()">
+        Load details
+      </button>
     </template>
-    <div v-else class="alert alert-info">No additional details.</div>
-  </template>
-  <button v-else type="button" class="btn btn-link" @click="loadDetails()">
-    Load details
-  </button>
+  </Placeholder>
 </template>
 
 <script>
 import {CHANGE_STATUS_MAP} from "@/utils";
 import {loadChangeDetails, sortChangeHeaders} from "@/composables/changes";
+import Placeholder from "@/components/layout/Placeholder";
 
 export default {
   name: "SchemaChangeDetails",
+  components: {Placeholder},
   props: {
     changeId: {
       required: true,
@@ -62,7 +68,8 @@ export default {
   data() {
     return {
       CHANGE_STATUS_MAP,
-      changeDetails: {}
+      changeDetails: {},
+      loading: false
     }
   },
   computed: {
@@ -102,8 +109,10 @@ export default {
       return transformed;
     },
     async loadDetails() {
-      return loadChangeDetails(this.$api, this.schema.slug, this.entitySlug, this.changeId,
+      this.loading = true;
+      await loadChangeDetails(this.$api, "schema", this.changeId,
           this.changeDetails, this.transformDetails);
+      this.loading = false;
     }
   }
 }

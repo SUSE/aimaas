@@ -32,7 +32,9 @@
             </RouterLink>
           </template>
           <template v-else-if="field in fkFields">
-            <RefEntity :entity-id="e[field]" :schema-slug="fkFields[field]"/>
+            <RefEntityList v-if="listFields.includes(field)" :entity-ids="e[field]"
+                           :schema-slug="fkFields[field]"/>
+            <RefEntity v-else :entity-id="e[field]" :schema-slug="fkFields[field]"/>
           </template>
           <template v-else>
             {{ e[field] }}
@@ -54,13 +56,14 @@
 
 <script>
 import RefEntity from "@/components/RefEntity";
+import RefEntityList from "@/components/RefEntityList";
 const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 
 export default {
   name: 'EntityListTable',
   props: ['entities', 'schema', 'loading', 'selectType', 'selected'],
   inject: ["availableSchemas"],
-  components: {RefEntity},
+  components: {RefEntity, RefEntityList},
   emits: ['reorder', 'select'],
   updated() {
     if (this.previousSchema !== this.schema) {
@@ -94,6 +97,9 @@ export default {
         }
       }
       return fkSchemas;
+    },
+    listFields() {
+      return (this.schemaDetails?.attributes || []).filter(a => a.list).map(a => a.name);
     },
     inputType() {
       if (this.selectType === "many") {

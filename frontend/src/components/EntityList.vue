@@ -98,13 +98,12 @@ export default {
       await this.getEntities();
     },
     async getEntities({resetPage = false} = {}) {
-      let _this = this;
       if (resetPage) {
         this.currentPage = 1;
         this.selected = [];
       }
       this.loading = true;
-      this.$api.getEntities({
+      const response = await this.$api.getEntities({
         schemaSlug: this.schema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
@@ -112,14 +111,12 @@ export default {
         orderBy: this.orderBy,
         ascending: this.ascending,
         meta: true
-      }).then(response => {
-        _this.entities = response.entities;
-        _this.totalEntities = response.total;
-        _this.operators = response.meta.filter_fields.operators;
-        _this.filterableFields = response.meta.filter_fields.fields;
-        _this.loading = false
       });
-
+      this.entities = response.entities;
+      this.totalEntities = response.total;
+      this.operators = response.meta.filter_fields.operators;
+      this.filterableFields = response.meta.filter_fields.fields;
+      this.loading = false;
     },
     async setFiltersAndSearch(filters) {
       this.filters = filters;

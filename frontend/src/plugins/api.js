@@ -185,12 +185,14 @@ class API {
         return this._fetch({url: url});
     }
 
-    async getChangeRequestDetails({schemaSlug, entityIdOrSlug, changeId} = {}) {
-        let url = `${this.base}/changes/schema/${schemaSlug}/${changeId}`;
-        if (entityIdOrSlug) {
-            url = `${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}/${changeId}`;
-        }
+    async getChangeRequestDetails({objectType, changeId} = {}) {
+        let url = `${this.base}/changes/detail/${objectType}/${changeId}`;
         return this._fetch({url: url,})
+    }
+
+    async getPendingChangeRequests(){
+        let url = `${this.base}/changes/pending?all=true`;
+        return this._fetch({url: url});
     }
 
     async reviewChanges({ changeId, verdict, changeObject, changeType, comment } = {}) {

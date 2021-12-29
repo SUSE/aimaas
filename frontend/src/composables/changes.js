@@ -1,11 +1,10 @@
-export async function loadChangeDetails(api, schemaSlug, entitySlug, changeId, targetObject, transformCallback) {
+export async function loadChangeDetails(api, objectType, changeId, targetObject, transformCallback) {
     if (changeId in targetObject) {
         return;
     }
     const details = await api.getChangeRequestDetails({
-        schemaSlug: schemaSlug,
-        changeId: changeId,
-        entityIdOrSlug: entitySlug
+        objectType: objectType,
+        changeId: changeId
     });
     if (transformCallback) {
         targetObject[changeId] = await transformCallback(details);

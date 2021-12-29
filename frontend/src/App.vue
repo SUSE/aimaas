@@ -13,7 +13,7 @@
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <SchemaList v-model="activeSchema" :as-dropdown="true" ref="schemalist"/>
-          <ReviewNav/>
+          <ReviewNav ref="pendingrequests"/>
           <AuthNav/>
         </ul>
       </div>
@@ -56,7 +56,8 @@ export default {
   provide() {
     return {
       activeSchema: computed(() => this.activeSchema),
-      availableSchemas: computed(() => this.$refs.schemalist.schemas)
+      availableSchemas: computed(() => this.$refs.schemalist.schemas),
+      pendingRequests: computed(() => this.$refs.pendingrequests.changes)
     }
   },
   computed: {

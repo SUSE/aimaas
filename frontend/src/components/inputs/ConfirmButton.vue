@@ -1,12 +1,12 @@
 <template>
-  <div class="d-md-flex gap-2">
+  <div class="gap-2" :class="wrapperClass">
     <button type="button" class="btn" :class="btnClass" @click="this.show()"
             aria-expanded="false" :aria-controls="id" :disabled="isVisible">
       <slot name="label"></slot>
     </button>
-    <div class="flex-grow-1" :class="isVisible ? '': 'visually-hidden'" :id="id">
+    <div :class="hiddenClass" :id="id">
       <div class="card">
-        <div class="card-body d-flex p-1 align-items-center">
+        <div class="card-body d-flex p-1 gap-2" :class="cardClass">
           <button type="button" class="btn btn-sm btn-outline-dark" aria-label="Cancel"
                   @click="this.hide()">
             Cancel
@@ -16,7 +16,8 @@
               Please confirm that you want to continue.
             </slot>
           </span>
-          <button type="button" class="btn btn-sm btn-cta flex-grow-1" @click="callback">
+          <button type="button" class="btn btn-sm btn-cta flex-grow-1" @click="callback"
+                  :value="value">
             Confirm
           </button>
         </div>
@@ -40,11 +41,33 @@ export default {
     id: {
       type: String,
       default: `confirm-${crypto.randomUUID()}`
+    },
+    vertical: {
+      type: Boolean,
+      default: false
+    },
+    value: {
+      default: null
     }
   },
   data() {
     return {
       isVisible: false
+    }
+  },
+  computed: {
+    wrapperClass() {
+      return this.vertical? 'd-md-flex flex-column' : 'd-md-flex';
+    },
+    hiddenClass() {
+      const classes = [this.vertical? 'flex-grow-0': 'flex-grow-1'];
+      if (!this.isVisible) {
+        classes.push('visually-hidden');
+      }
+      return classes;
+    },
+    cardClass() {
+      return this.vertical? 'flex-column align-items-stretch': 'align-items-center';
     }
   },
   methods: {
