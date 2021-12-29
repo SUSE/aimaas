@@ -2,13 +2,7 @@
   <template v-for="(attr, rowIndex) in attributes" :key="rowIndex">
     <TextInput label="Name" v-model="attributes[rowIndex].name"
                :args="{ id: `initialattrName${rowIndex}`, list: 'attributes' }"
-               @change="onChange()">
-      <template v-slot:datalist>
-        <option v-for="(attr, index) in availableFieldNames" :key="index" :value="attr.name">
-          {{ `${attr.name} (${attr.type})` }}
-        </option>
-      </template>
-    </TextInput>
+               @change="onChange()"/>
     <SelectInput label="Type" v-model="attributes[rowIndex].type" @change="onChange()"
                  :args="{ id: `initialattrType${rowIndex}`, disabled: !attr.isNew }"
                  :options="Object.keys(ATTR_TYPES_NAMES).map((type) => {
@@ -80,7 +74,7 @@ import {ATTR_TYPES_NAMES} from "@/utils";
 
 export default {
   name: "EditAttributes",
-  props: ["schema", "schemas", "availableFieldNames"],
+  props: ["schema", "schemas"],
   emits: ["change"],
   components: {TextInput, Checkbox, SelectInput, Textarea},
   data() {

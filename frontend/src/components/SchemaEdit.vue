@@ -15,7 +15,7 @@
     </Checkbox>
     <h3 class="mt-3">Attributes</h3>
     <EditAttributes ref="initial" :schemas="availableSchemas" :schema="details"
-                    :availableFieldNames="availableFieldNames" @change="hasChanged = true"/>
+                    @change="hasChanged = true"/>
     <div class="d-grid gap-2">
       <button @click="sendData" type="button" class="mt-3 mb-3 btn"
               :class="hasChanged? 'btn-primary' : 'btn-light'"
@@ -55,13 +55,9 @@ export default {
     return {
       details: null,
       attributeDefinitions: [],
-      attributes: [],
       ATTR_TYPES_NAMES,
       hasChanged: false
     };
-  },
-  async created() {
-    this.attributes = await this.$api.getAttributes();
   },
   mounted() {
     if (this.details === null) {
@@ -162,17 +158,6 @@ export default {
       if (response.status === 200) {
         this.$router.push({name: 'schema-view', params: {schemaSlug: this.schema.slug}});
       }
-    },
-  },
-
-  computed: {
-    availableFieldNames() {
-      const usedNames = this.attributeDefinitions.map(
-          (attr_def) => attr_def.name
-      );
-      return this.attributes
-          .filter((attr) => !usedNames.includes(attr.name))
-          .sort((a, b) => (a.name > b.name ? 1 : -1));
     },
   },
   watch: {
