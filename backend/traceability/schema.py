@@ -69,6 +69,8 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     attr_create = {k: [i for i in v] for k, v in groupby(attr_create, key=lambda x: x.object_id)}
 
     change_ = {'changes': {'add': [], 'update': [], 'delete': []}}
+    change_['object_type'] = change_request.object_type.name
+    change_['change_type'] = change_request.change_type.name
     change_['reviewed_at'] = change_request.reviewed_at
     change_['created_at'] = change_request.created_at
     change_['status'] = change_request.status
