@@ -22,6 +22,8 @@ def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> Li
 
 
 def _fill_in_change_request_info(change: dict, change_request: ChangeRequest, entity: Entity):
+    change['object_type'] = change_request.object_type.name
+    change['change_type'] = change_request.change_type.name
     change['reviewed_at'] = change_request.reviewed_at
     change['created_at'] = change_request.created_at
     change['status'] = change_request.status

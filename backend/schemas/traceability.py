@@ -16,6 +16,8 @@ class ChangeRequestSchema(BaseModel):
     reviewed_by: Optional[str]
     status: ChangeStatus
     comment: Optional[str]
+    object_type: ChangeObject
+    change_type: ChangeType
 
     class Config:
         orm_mode = True
