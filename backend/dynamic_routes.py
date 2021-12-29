@@ -291,7 +291,7 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
     entity_create_schema = _create_entity_request_model(schema=schema)
     @router.post(
         f'/{schema.slug}',
-        response_model=schemas.EntityBaseSchema,
+        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Create new {schema.name} entity',
         responses={
@@ -334,7 +334,7 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
             if not schema.reviewable:
                 return traceability.apply_entity_create_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
-            return {}
+            return change
         except exceptions.MissingSchemaException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.EntityExistsException as e:
@@ -385,7 +385,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
     entity_update_schema = _update_entity_request_model(schema=schema)
     @router.put(
         f'/{schema.slug}/{{id_or_slug}}',
-        response_model=Union[schemas.EntityBaseSchema, dict],
+        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Update {schema.name} entity',
         responses={
@@ -432,7 +432,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             if not schema.reviewable:
                 return traceability.apply_entity_update_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
-            return {}
+            return change
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.MissingSchemaException as e:
@@ -450,7 +450,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
 def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
     @router.delete(
         f'/{schema.slug}/{{id_or_slug}}',
-        response_model=schemas.EntityBaseSchema,
+        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Delete {schema.name} entity',
         responses={
@@ -475,7 +475,7 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
             if not schema.reviewable:
                 return traceability.apply_entity_delete_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
-            return {}
+            return change
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         
