@@ -607,7 +607,7 @@ def create_entity(db: Session, schema_id: int, data: dict, commit: bool = True) 
         values = _convert_values(attr_def=attr_def, value=value, caster=caster)
         if attr.type == AttrType.FK:
             _check_fk_value(db=db, attr_def=attr_def, entity_ids=values)
-        if attr_def.unique and not attr_def.list:
+        if attr_def.unique and not attr_def.list and values:
             _check_unique_value(db=db, attr_def=attr_def, model=model, value=values[0])
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
@@ -657,7 +657,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
         values = _convert_values(attr_def=attr_def, value=value, caster=caster)
         if attr.type == AttrType.FK:
             _check_fk_value(db=db, attr_def=attr_def, entity_ids=values)
-        if attr_def.unique and not attr_def.list:
+        if attr_def.unique and not attr_def.list and values:
             _check_unique_value(db=db, attr_def=attr_def, model=model, value=values[0])
         
         db.execute(
