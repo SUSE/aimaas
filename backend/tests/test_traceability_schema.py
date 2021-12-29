@@ -6,6 +6,7 @@ import pytest
 from ..traceability import *
 from ..models import *
 
+from .test_traceability_entity import make_entity_change_objects
 
 def make_schema_change_objects(db: Session, user: User, time: datetime):
     requests = []
@@ -72,13 +73,15 @@ def test_get_recent_schema_changes(dbsession: Session):
     time = datetime.utcnow()
     user = dbsession.execute(select(User)).scalar()
     make_schema_change_objects(db=dbsession, user=user, time=time)
-
-    changes = get_recent_schema_changes(db=dbsession, schema_id=1, count=1)
+    entities =  make_entity_change_objects(db=dbsession, user=user, time=time)
+    changes, entity_requests = get_recent_schema_changes(db=dbsession, schema_id=1, count=1)
     assert changes[0].created_at == (time + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+    assert len(entity_requests) == 1 and entity_requests[0] == entities[-1]
 
-    changes = get_recent_schema_changes(db=dbsession, schema_id=1, count=5)
+    changes, entity_requests = get_recent_schema_changes(db=dbsession, schema_id=1, count=5)
     for change, i in zip(changes, reversed(range(5, 10))):
         assert change.created_at == (time + timedelta(hours=i)).replace(tzinfo=timezone.utc)
+    assert len(entity_requests) == 1 and entity_requests[0] == entities[-1]
 
 
 def make_schema_create_request(db: Session, user: User, time: datetime):

@@ -690,14 +690,20 @@ class TestRouteGetSchemaChanges:
         user = dbsession.execute(select(User)).scalar()
         now = datetime.utcnow()
         make_schema_change_objects(db=dbsession, user=user, time=now)
-
+        entities = make_entity_change_objects(db=dbsession, user=user, time=now)
         response = client.get('/changes/schema/person?count=1')
         changes = response.json()
-        assert parser.parse(changes[0]['created_at']).replace(tzinfo=timezone.utc) == (now + timedelta(hours=9)).replace(tzinfo=timezone.utc)
-        
+        assert parser.parse(changes['schema_changes'][0]['created_at']).replace(tzinfo=timezone.utc) == (now + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+        entity_requests = changes['pending_entity_requests']
+        assert len(entity_requests) == 1
+        assert entities[-1].id == entity_requests[0]['id']
+
         response = client.get('/changes/schema/person')
         changes = response.json()
-        for change, i in zip(changes, reversed(range(5, 10))):
+        entity_requests = changes['pending_entity_requests']
+        assert len(entity_requests) == 1
+        assert entities[-1].id == entity_requests[0]['id']
+        for change, i in zip(changes['schema_changes'], reversed(range(5, 10))):
             assert parser.parse(change['created_at']).replace(tzinfo=timezone.utc) == (now + timedelta(hours=i)).replace(tzinfo=timezone.utc)
     
     def test_get_update_details(self, dbsession: Session, client: TestClient):

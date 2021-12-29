@@ -8,8 +8,22 @@ from ..crud import *
 from .. import crud
 
 
-def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> SchemaChangeDetailSchema:
-    return db.execute(
+def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> List[ChangeRequest]:
+    q = (
+        select(ChangeRequest)
+        .where(ChangeRequest.status == ChangeStatus.PENDING)
+        .where(ChangeRequest.change_type == ChangeType.CREATE)
+        .where(ChangeRequest.object_type == ChangeObject.ENTITY)
+        .join(Change)
+        .where(Change.field_name == 'schema_id')
+        .join(ChangeValueInt, Change.value_id == ChangeValueInt.id)
+        .where(ChangeValueInt.new_value == schema_id)
+    )
+    return db.execute(q).scalars().all()
+
+
+def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> Tuple[List[ChangeRequest], List[ChangeRequest]]:
+    schema_changes = db.execute(
         select(ChangeRequest)
         .join(Change)
         .where(Change.object_id == schema_id)
@@ -17,6 +31,8 @@ def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> Sc
         .order_by(ChangeRequest.created_at.desc()).limit(count)
         .distinct()
     ).scalars().all()
+    pending_entity_requests = get_pending_entity_create_requests_for_schema(db=db, schema_id=schema_id)
+    return schema_changes, pending_entity_requests
 
 
 def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDetailSchema:
