@@ -1,8 +1,11 @@
 <template>
   <BaseInput :label="label" :args="args" :vertical="vertical" :required="required">
     <template v-slot:field>
-      <input class="form-control" type="number" step="1" :value="modelValue"
-             @input="onInput" v-bind="args"/>
+      <select @change="onInput" class="form-control" v-bind="args" :value="modelValue">
+        <option v-for="opt in options" :key="opt?.value" :value="opt?.value">
+          {{ opt?.text || opt?.value }}
+        </option>
+      </select>
     </template>
   </BaseInput>
 </template>
@@ -11,9 +14,9 @@
 import BaseInput from "@/components/layout/BaseInput";
 
 export default {
-  name: "IntegerInput",
+  name: "SelectInput",
   components: {BaseInput},
-  props: ["label", "modelValue", "args", "vertical", "required"],
+  props: ["label", "modelValue", "args", "options", "vertical", "required"],
   methods: {
     onInput(event) {
       this.$emit("update:modelValue", event.target.value);

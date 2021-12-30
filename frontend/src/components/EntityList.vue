@@ -1,103 +1,72 @@
 <template>
-  <div class="row">
-    <div class="col-lg-2">
-      <RouterLink
-        to="/createSchema"
-        class="btn btn-sm btn-outline-primary mt-1 mb-1 d-grid"
-        style="text-decoration: none"
-        >Create schema</RouterLink
-      >
-      <SchemaList
-        v-on:selectSchema="this.selectSchema"
-        :schemas="this.schemas"
-        :selectedSchema="this.selectedSchema"
-      />
+  <SearchPanel
+      @search="setFiltersAndSearch"
+      :key="schema?.slug"
+      :filterable-fields="filterableFields"
+      :operators="operators"
+      :advanced-controls="advancedControls"/>
+  <div class="d-flex align-items-center mt-1 gap-2">
+    <div class="me-auto">
+      <Pagination v-if="totalEntities > entitiesPerPage" v-on:goTo="changePage"
+                  :total-items="totalEntities" :items-per-page="entitiesPerPage"
+                  :currentPage="currentPage"/>
     </div>
-    <div class="col-lg-10 table-responsive">
-      <h2 v-if="this.selectedSchema" class="mt-1">
-        Schema {{ this.selectedSchema.name }}
-        <RouterLink
-          v-if="this.selectedSchema"
-          :to="`/${this.selectedSchema.slug}`"
-          class="btn btn-sm btn-primary"
-          style="text-decoration: none"
-          >View schema</RouterLink
-        >
-        <RouterLink
-          v-if="this.selectedSchema"
-          :to="`/edit/${this.selectedSchema.slug}`"
-          class="btn btn-sm btn-primary ms-1"
-          style="text-decoration: none"
-          >Edit schema</RouterLink
-        >
-        <RouterLink
-          :to="`/${this.selectedSchema?.slug}/entities/new`"
-          class="btn btn-sm btn-primary ms-1"
-          style="text-decoration: none"
-          >Create new entity</RouterLink
-        >
-      </h2>
-      <SearchPanel
-        @search="setFiltersAndSearch"
-        :key="this.selectedSchema?.slug"
-        :filterableFields="this.filterableFields"
-        :operators="this.operators"
-      />
-      <Pagination
-        v-if="this.totalEntities > this.entitiesPerPage"
-        v-on:goTo="changePage"
-        :totalEntities="this.totalEntities"
-        :entitiesPerPage="this.entitiesPerPage"
-        :currentPage="this.currentPage"
-      />
-
-      <div class="row">
-        <div class="col-11">
-          <label for="entitiesLimit"><small>Entities per page</small></label>
-          <select v-model="entitiesPerPage" id="entitiesLimit">
-            <option>10</option>
-            <option>30</option>
-            <option>50</option>
-          </select>
-        </div>
-        <div class="col">
-          <p>
-            <small>{{ this.totalEntities }} results</small>
-          </p>
-        </div>
+    <div class="d-flex gap-2">
+      <label for="entitiesLimit" class="me-1"><small>Page size</small></label>
+      <div>
+        <select v-model="entitiesPerPage" id="entitiesLimit" class="form-select form-select-sm"
+                style="width: 5.5rem;" @change="getEntities({resetPage: true})">
+          <option>10</option>
+          <option>30</option>
+          <option>50</option>
+        </select>
       </div>
-
-      <EntityListTable
-        @reorder="this.reorder"
-        :entities="this.entities"
-        :schemaSlug="this.selectedSchema?.slug"
-      />
-      <Pagination
-        v-if="this.totalEntities > this.entitiesPerPage"
-        v-on:goTo="changePage"
-        :totalEntities="this.totalEntities"
-        :entitiesPerPage="this.entitiesPerPage"
-        :currentPage="this.currentPage"
-      />
     </div>
+    <small>{{ totalEntities }} result(s)</small>
+  </div>
+
+  <EntityListTable
+      ref="selector"
+      @reorder="reorder"
+      @select="onSelection"
+      :entities="entities"
+      :selected="selected"
+      :schema="schema"
+      :loading="loading"
+      :selectType="selectType"/>
+  <div class="flex-grow-1 align-middle">
+    <ConfirmButton v-if="numSelected > 0 && advancedControls" :callback="onDeletion"
+                   btn-class="btn-outline-danger">
+      <template v-slot:label>
+        <i class="eos-icons me-1">delete</i>
+        Delete {{ numSelected }} {{ numSelected == 1 ? 'entity' : 'entities' }}
+      </template>
+    </ConfirmButton>
   </div>
 </template>
 
 <script>
-import Pagination from "./Pagination.vue";
-import EntityListTable from "./EntityListTable.vue";
-import SchemaList from "./SchemaList.vue";
+import ConfirmButton from "@/components/inputs/ConfirmButton";
+import Pagination from "./layout/Pagination.vue";
+import EntityListTable from "@/components/EntityListTable";
 import SearchPanel from "./SearchPanel.vue";
-import { api } from "../api";
 
 export default {
-  components: { Pagination, EntityListTable, SchemaList, SearchPanel },
+  components: {EntityListTable, Pagination, SearchPanel, ConfirmButton},
   name: "EntityList",
-  async created() {
-    const response = await api.getSchemas();
-    const json = await response.json();
-    this.schemas = json.sort((a, b) => (a.name > b.name ? 1 : -1));
-    if (this.schemas.length) await this.selectSchema(this.schemas[0]);
+  props: {
+    schema: Object,
+    selectType: {
+      type: String,
+      default: "many",
+      validator(value) {
+        return ['many', 'single', 'none'].includes(value);
+      }
+    },
+    advancedControls: {
+      type: Boolean,
+      default: false
+    }
   },
   computed: {
     offset() {
@@ -106,62 +75,75 @@ export default {
     pages() {
       return Math.ceil(this.totalEntities / this.entitiesPerPage);
     },
+    numSelected() {
+      return this.selected.length;
+    }
   },
   watch: {
     entitiesPerPage() {
-      this.getEntities({ resetPage: true });
+      this.getEntities({resetPage: true});
     },
+    schema() {
+      if (!this.schema) {
+        return
+      }
+      this.orderBy = 'name';
+      this.ascending = true;
+      this.getEntities({resetPage: true});
+    }
   },
   methods: {
-    async selectSchema(schema) {
-      this.selectedSchema = schema;
-      this.filters = {};
-      const response = await api.getEntities({
-        schemaSlug: schema.slug,
-        limit: this.entitiesPerPage,
-        offset: this.offset,
-        meta: true,
-      });
-      const json = await response.json();
-      this.entities = json.entities;
-      this.totalEntities = json.total;
-      this.operators = json.meta.filter_fields.operators;
-      this.filterableFields = json.meta.filter_fields.fields;
-    },
     async changePage(page) {
       this.currentPage = page;
       await this.getEntities();
     },
-    async getEntities({ resetPage = false } = {}) {
+    async getEntities({resetPage = false} = {}) {
       if (resetPage) {
         this.currentPage = 1;
+        this.selected = [];
       }
-      const response = await api.getEntities({
-        schemaSlug: this.selectedSchema.slug,
+      this.loading = true;
+      const response = await this.$api.getEntities({
+        schemaSlug: this.schema.slug,
         limit: this.entitiesPerPage,
         offset: this.offset,
         filters: this.filters,
         orderBy: this.orderBy,
         ascending: this.ascending,
+        meta: true
       });
-      const json = await response.json();
-      this.entities = json.entities;
-      this.totalEntities = json.total;
+      this.entities = response.entities;
+      this.totalEntities = response.total;
+      this.operators = response.meta.filter_fields.operators;
+      this.filterableFields = response.meta.filter_fields.fields;
+      this.loading = false;
     },
     async setFiltersAndSearch(filters) {
       this.filters = filters;
-      this.getEntities({ resetPage: true });
+      this.getEntities({resetPage: true});
     },
-    async reorder({ orderBy, ascending } = {}) {
+    async reorder({orderBy, ascending} = {}) {
       this.orderBy = orderBy;
       this.ascending = ascending;
       this.getEntities();
     },
+    getSelected() {
+      const selectedIds = this.$refs.selector.getSelected();
+      return this.entities.filter(x => selectedIds.includes(x.id));
+    },
+    onSelection() {
+      this.selected = this.$refs.selector.getSelected();
+    },
+    onDeletion() {
+      const promises = this.selected.map(eId => {
+        this.$api.deleteEntity({schemaSlug: this.schema.slug,
+                               entityIdOrSlug: eId});
+      });
+      Promise.all(promises).then(() => this.getEntities({resetPage: true}));
+    }
   },
   data() {
     return {
-      schemas: [],
-      selectedSchema: null,
       entities: [],
       entitiesPerPage: 10,
       totalEntities: 0,
@@ -171,14 +153,10 @@ export default {
       filters: {},
       orderBy: "name",
       ascending: true,
+      loading: true,
+      selected: []
     };
-  },
+  }
 };
 </script>
 
-<style scoped>
-.list-group {
-  max-height: 100vh;
-  overflow: scroll;
-}
-</style>
