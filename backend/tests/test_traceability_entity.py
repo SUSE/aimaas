@@ -600,7 +600,8 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
     age_val = ChangeValueInt(new_value=42)
     color_val_1 = ChangeValueStr(new_value='violet')
     color_val_2 = ChangeValueStr(new_value='cyan')
-    db.add_all([change_request, name_val, slug_val, age_val, color_val_1, color_val_2])
+    schema_val = ChangeValueInt(new_value=1)
+    db.add_all([change_request, name_val, schema_val, slug_val, age_val, color_val_1, color_val_2])
     db.flush()
 
     age = db.execute(
@@ -616,7 +617,6 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
         .join(Attribute)
         .where(Attribute.name == 'fav_color')
     ).scalar().attribute
-
     change_kwargs = {
         'change_request': change_request, 
         'object_id': person.id, 
@@ -626,9 +626,10 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
     name_change = Change(field_name='name', value_id=name_val.id, data_type=ChangeAttrType.STR, **change_kwargs)
     slug_change = Change(field_name='slug', value_id=slug_val.id, data_type=ChangeAttrType.STR, **change_kwargs)
     age_change = Change(attribute_id=age.id, value_id=age_val.id, data_type=ChangeAttrType.INT, **change_kwargs)
+    schema_change = Change(field_name='schema_id', value_id=schema_val.id, data_type=ChangeAttrType.INT, **change_kwargs)
     color_change_1 = Change(attribute_id=fav_color.id, value_id=color_val_1.id, data_type=ChangeAttrType.STR, **change_kwargs)
     color_change_2 = Change(attribute_id=fav_color.id, value_id=color_val_2.id, data_type=ChangeAttrType.STR, **change_kwargs)
-    db.add_all([name_change, slug_change, age_change, color_change_1, color_change_2])
+    db.add_all([name_change, slug_change, schema_change, age_change, color_change_1, color_change_2])
     db.commit()
 
 
@@ -647,7 +648,7 @@ def test_get_entity_create_details(dbsession: Session):
     assert change.entity.name == 'Jackson'
     assert change.entity.slug == 'jackson'
     assert change.entity.schema_slug == 'person'
-    assert len(change.changes) == 4
+    assert len(change.changes) == 5
     name = change.changes['name']
     age = change.changes['age']
     slug = change.changes['slug']
