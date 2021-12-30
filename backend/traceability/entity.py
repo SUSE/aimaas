@@ -70,8 +70,13 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
 
     changes_query = (select(Change)
         .where(Change.change_request_id == change_request.id)
-        .where(Change.content_type == ContentType.ENTITY)
-        .where(Change.object_id != None))
+        .where(Change.content_type == ContentType.ENTITY))
+    
+    if change_request.change_type == ChangeType.CREATE and change_request.status != ChangeStatus.APPROVED:
+        changes_query = changes_query.where(Change.object_id == None)
+    else:
+        changes_query = changes_query.where(Change.object_id != None)
+
     entity_changes = db.execute(changes_query.where(Change.field_name != None)).scalars().all()
     fields_changes = db.execute(changes_query.where(Change.attribute_id != None)).scalars().all()
     if not entity_changes and not fields_changes:
@@ -79,7 +84,19 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
     
     # WARNING: technically, these changes within one ChangeRequest can reference different entities
     # although, they should not
-    if entity_changes:
+    if change_request.change_type == ChangeType.CREATE and change_request.status != ChangeStatus.APPROVED:
+        entity = Entity(name='', slug='', deleted=None)
+        schema_change = db.execute(
+            changes_query
+            .where(Change.change_type == ChangeType.CREATE)
+            .where(Change.field_name == 'schema_id')
+            .where(Change.data_type == ChangeAttrType.INT)
+        ).scalar()
+        schema_id = db.execute(select(ChangeValueInt).where(ChangeValueInt.id == schema_change.value_id)).scalar()
+        schema = get_schema(db=db, id_or_slug=schema_id.new_value)
+        entity.schema = schema
+        entity.schema_id = schema_id.new_value
+    elif entity_changes:
         entity = crud.get_entity_by_id(db=db, entity_id=entity_changes[0].object_id)
     else:
         entity = crud.get_entity_by_id(db=db, entity_id=fields_changes[0].object_id)
@@ -108,6 +125,7 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
     
     for change in fields_changes:
         _fill_in_field_change(change=change_, entity_change=change, entity=entity, listed_changes=listed_changes, checked_listed=checked_listed, db=db)
+    db.expunge_all()
     return EntityChangeDetailSchema(**change_)
 
 
@@ -291,6 +309,7 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
     )
     name_change.object_id = e.id  # setting object_id is required
     slug_change.object_id = e.id  # to be able to show details
+    schema_change.object_id = e.id
     for change in value_changes:  # for this change request
         change.object_id = e.id
     change_request.status = ChangeStatus.APPROVED

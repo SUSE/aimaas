@@ -600,17 +600,11 @@ class TestRouteGetEntityChanges:
         for change, i in zip(changes, reversed(range(5, 10))):
             assert parser.parse(change['created_at']).replace(tzinfo=timezone.utc) == (now + timedelta(hours=i)).replace(tzinfo=timezone.utc)
 
-    def test_get_update_details(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_entity_update_request(db=dbsession, user=user, time=now)
 
-        response = client.get('/changes/detail/entity/1')
-        change = response.json()
-        assert parser.parse(change['created_at']) == now
-        assert change['created_by'] == user.username
+    def common_asserts_for_update_details(self, change, created_at, created_by):
+        assert parser.parse(change['created_at']) == created_at
+        assert change['created_by'] == created_by.username
         assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
-        assert change['status'] == 'PENDING'
         assert change['entity']['name'] == 'Jack'
         assert change['entity']['slug'] == 'Jack'
         assert change['entity']['schema'] == 'person'
@@ -622,6 +616,47 @@ class TestRouteGetEntityChanges:
         assert age['new'] == 42 and age['old'] == age['current'] == 10
         assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
 
+    def test_get_update_details(self, dbsession: Session, client: TestClient):
+        user = dbsession.execute(select(User)).scalar()
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        make_entity_update_request(db=dbsession, user=user, time=now)
+
+        response = client.get('/changes/detail/entity/1')
+        change = response.json()
+        self.common_asserts_for_update_details(change, now, user)
+        assert change['status'] == 'PENDING'
+        
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
+        dbsession.commit()
+
+        response = client.get('/changes/detail/entity/1')
+        change = response.json()
+        self.common_asserts_for_update_details(change, now, user)
+        assert change['status'] == 'APPROVED'
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
+        dbsession.commit()
+
+        response = client.get('/changes/detail/entity/1')
+        change = response.json()
+        self.common_asserts_for_update_details(change, now, user)
+        assert change['status'] == 'DECLINED'
+
+    def common_asserts_for_create_details(self, change, created_at, created_by):
+        assert parser.parse(change['created_at']) == created_at
+        assert change['created_by'] == created_by.username
+        assert change['reviewed_at'] == change['reviewed_by'] ==None
+        
+        assert len(change['changes']) == 5
+        name = change['changes']['name']
+        slug = change['changes']['slug']
+        age = change['changes']['age']
+        fav_color = change['changes']['fav_color']
+        assert name['new'] == 'Jackson' and not name['old']
+        assert slug['new'] == 'jackson' and not slug['old']
+        assert age['new'] == 42 and age['old'] is None
+        assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
+
 
     def test_get_create_details(self, dbsession: Session, client: TestClient):
         user = dbsession.execute(select(User)).scalar()
@@ -630,22 +665,34 @@ class TestRouteGetEntityChanges:
 
         response = client.get('/changes/detail/entity/1')
         change = response.json()
-        assert parser.parse(change['created_at']) == now
-        assert change['created_by'] == user.username
-        assert change['reviewed_at'] == change['reviewed_by'] ==None
+        self.common_asserts_for_create_details(change, now, user)
         assert change['status'] == 'APPROVED'
         assert change['entity']['name'] == 'Jackson'
         assert change['entity']['slug'] == 'jackson'
         assert change['entity']['schema'] == 'person'
-        assert len(change['changes']) == 4
-        name = change['changes']['name']
-        slug = change['changes']['slug']
-        age = change['changes']['age']
-        fav_color = change['changes']['fav_color']
-        assert name['new'] == 'Jackson' and name['old'] is None
-        assert slug['new'] == 'jackson' and slug['old'] is None
-        assert age['new'] == 42 and age['old'] is None
-        assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color['current'] == None
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.PENDING))
+        dbsession.execute(update(Change).values(object_id=None))
+        dbsession.commit()
+
+        response = client.get('/changes/detail/entity/1')
+        change = response.json()
+        self.common_asserts_for_create_details(change, now, user)
+        assert change['status'] == 'PENDING'
+        assert change['entity']['name'] == ''
+        assert change['entity']['slug'] == ''
+        assert change['entity']['schema'] == 'person'
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
+        dbsession.commit()
+
+        response = client.get('/changes/detail/entity/1')
+        change = response.json()
+        self.common_asserts_for_create_details(change, now, user)
+        assert change['status'] == 'DECLINED'
+        assert change['entity']['name'] == ''
+        assert change['entity']['slug'] == ''
+        assert change['entity']['schema'] == 'person'
 
 
     def test_get_delete_details(self, dbsession: Session, client: TestClient):
