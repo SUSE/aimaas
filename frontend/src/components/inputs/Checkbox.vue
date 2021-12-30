@@ -35,7 +35,6 @@ export default {
   },
   methods: {
     onInput() {
-      console.debug("CHECK?!", this.checked)
       this.checked = !this.checked;
       this.$emit("update:modelValue", this.checked);
     },
