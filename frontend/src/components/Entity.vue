@@ -22,7 +22,8 @@
     </ul>
     <div class="tab-content">
       <div class="tab-pane show active border p-2" role="tabpanel">
-        <component :is="currentTab" v-bind="currentProperties" @update="onUpdate"/>
+        <component :is="currentTab" v-bind="currentProperties" @update="onUpdate"
+                   @pending-reviews="$emit('pending-reviews')"/>
       </div>
     </div>
   </div>
@@ -38,6 +39,7 @@ export default {
   name: "Entity",
   components: {EntityForm, BaseLayout},
   inject: ["activeSchema"],
+  emits: ["pending-reviews"],
   data() {
     return {
       title: '',

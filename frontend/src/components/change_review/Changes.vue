@@ -1,5 +1,5 @@
 <template>
-  <BaseLayout v-if="withBreadcrumbs">
+  <BaseLayout v-if="!isBound">
     <template v-slot:additional_breadcrumbs>
       <li class="breadcrumb-item active">Pending reviews</li>
     </template>
@@ -62,7 +62,7 @@
           <SchemaChangeDetails v-if="change.object_type === 'SCHEMA'" :changeId="change.id"
                                :schema="schema"/>
           <EntityChangeDetails v-else-if="change.object_type === 'ENTITY'" :changeId="change.id"
-                               :schema="schema" :entitySlug="entitySlug"/>
+                               :schema="schema" :entitySlug="entitySlug" :is-bound="isBound"/>
         </li>
         <li v-if="changes.length < 1" class="list-group-item">
           <div class="alert alert-info m-0">No changes to display.</div>
@@ -73,6 +73,7 @@
 </template>
 
 <script>
+import {computed} from "vue";
 import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
 import BaseLayout from "@/components/layout/BaseLayout";
 import ConfirmWithComment from "@/components/inputs/ConfirmWithComment";
@@ -85,6 +86,7 @@ export default {
   components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmWithComment,
                BaseLayout},
   inject: ["pendingRequests"],
+  emits: ["pending-reviews"],
   props: {
     schema: {
       required: false,
@@ -106,12 +108,11 @@ export default {
     }
   },
   computed: {
-    withBreadcrumbs() {
-      console.debug("show bc?", this.schema, this.entitySlug, !this.schema && !this.entitySlug);
-      return !this.schema && !this.entitySlug;
+    isBound() {
+      return !(!this.schema && !this.entitySlug);
     }
   },
-  async created() {
+  async mounted() {
     await this.load();
   },
   methods: {
@@ -122,7 +123,7 @@ export default {
     async load() {
       this.loading = true;
       if (!this.schema) {
-        this.changes = this.pendingRequests;
+        this.changes = computed(() => this.pendingRequests);
       } else {
         const response = await this.$api.getChangeRequests({
           schemaSlug: this.schema.slug,
@@ -156,6 +157,7 @@ export default {
       });
       if (result) {
         this.fakeReview(changeId, verdict);
+        this.$emit("pending-reviews");
       }
     },
     async onDecline(event, comment) {

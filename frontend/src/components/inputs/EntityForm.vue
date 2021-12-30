@@ -89,7 +89,7 @@ export default {
   },
   props: ["schema"],
   inject: ["activeSchema"],
-  emits: ["update"],
+  emits: ["update", "pending-reviews"],
   created() {
     this.updateSchemaMeta();
   },
@@ -172,6 +172,7 @@ export default {
 
     async sendBody() {
       this.loading = true;
+      let response;
       if (this.$route.params.entitySlug) {
         // UPDATE EXISTING ENTITY
         const body = this.getChanges();
@@ -180,7 +181,7 @@ export default {
           this.loading = false;
           return;
         }
-        await this.$api.updateEntity({
+        response = await this.$api.updateEntity({
           schemaSlug: this.$route.params.schemaSlug,
           entityIdOrSlug: this.$route.params.entitySlug,
           body: body,
@@ -188,11 +189,14 @@ export default {
         this.loading = false;
       } else {
         // CREATE NEW ENTITY
-        await this.$api.createEntity({
+        response = await this.$api.createEntity({
           schemaSlug: this.$route.params.schemaSlug,
           body: this.entity
         });
         this.loading = false;
+      }
+      if (response) {
+        this.$emit("pending-reviews");
       }
     },
   },

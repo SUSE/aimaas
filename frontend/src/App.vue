@@ -22,7 +22,7 @@
   <AlertDisplay/>
   <div class="container mt-2">
     <keep-alive>
-      <router-view></router-view>
+      <router-view @pending-reviews="onPendingReviews"></router-view>
     </keep-alive>
   </div>
 
@@ -72,6 +72,9 @@ export default {
     }
   },
   methods: {
+    onPendingReviews() {
+        this.$refs.pendingrequests.load();
+    },
     getSchemaFromApi(schemaSlug) {
       this.$api.getSchema({slugOrId: schemaSlug}).then(schema => {
         this.activeSchema = schema;

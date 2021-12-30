@@ -2,9 +2,10 @@ import {reactive} from "vue";
 
 
 class API {
-    constructor(baseUrl, alertStorage) {
+    constructor(baseUrl, app) {
         this.base = baseUrl;
-        this.alerts = alertStorage;
+        this.app = app;
+        this.alerts = app.config.globalProperties.$alerts;
         this.loggedIn = null;
         this.token = null;
     }
@@ -227,7 +228,6 @@ class API {
 
 export default {
     install: (app) => {
-        app.config.globalProperties.$api = reactive(new API(process.env.VUE_APP_API_BASE,
-            app.config.globalProperties.$alerts));
+        app.config.globalProperties.$api = reactive(new API(process.env.VUE_APP_API_BASE, app));
     }
 }

@@ -29,8 +29,13 @@ export default {
       return "";
     }
   },
-  async mounted() {
-    this.changes = await this.$api.getPendingChangeRequests();
+  async created() {
+    await this.load();
+  },
+  methods: {
+    async load() {
+      this.changes = await this.$api.getPendingChangeRequests();
+    }
   }
 }
 </script>

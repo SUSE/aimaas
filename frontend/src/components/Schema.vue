@@ -19,7 +19,8 @@
     <div class="tab-content">
       <div class="tab-pane show active border p-2" role="tabpanel">
         <keep-alive>
-          <component :is="currentTab" v-bind="currentProperties"></component>
+          <component :is="currentTab" v-bind="currentProperties"
+                     @pending-reviews="$emit('pending-reviews')"/>
         </keep-alive>
       </div>
     </div>
