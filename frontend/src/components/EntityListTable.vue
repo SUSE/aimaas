@@ -36,6 +36,13 @@
                            :schema-slug="fkFields[field]"/>
             <RefEntity v-else :entity-id="e[field]" :schema-slug="fkFields[field]"/>
           </template>
+          <template v-else-if="listFields.includes(field)">
+            <div class="d-flex flex-wrap gap-3">
+              <div v-for="(value, idx) in e[field]" :key="`${field}-${idx}`">
+                {{ value }}
+              </div>
+            </div>
+          </template>
           <template v-else>
             {{ e[field] }}
           </template>
@@ -57,6 +64,7 @@
 <script>
 import RefEntity from "@/components/RefEntity";
 import RefEntityList from "@/components/RefEntityList";
+
 const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 
 export default {
