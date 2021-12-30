@@ -17,6 +17,23 @@ def gen_users(count: int, db: Session):
     return users
 
 
+def asserts_after_create_group(db: Session, group: Group, group2: Group, users: List[User]):
+    assert group.name == 'test' and group.parent_id is None
+    group_perms = db.execute(select(GroupPermission).where(GroupPermission.group_id == group.id)).scalars().all()
+    assert len(group_perms) == 2
+    perm1, perm2 = [i.permission for i in group_perms]
+    assert perm1.obj_id is None and perm1.obj == PermObject.SCHEMA and perm1.type == PermType.CREATE_ENTITIES
+    assert perm2.obj_id == 1 and perm2.obj == PermObject.ENTITY and perm2.type == PermType.UPDATE
+
+    group_users = db.execute(select(UserGroup).where(UserGroup.group_id == group.id)).scalars().all()
+    assert len(group_users) == len(users)
+    assert {i.user_id for i in group_users} == {i.id for i in users} 
+
+    assert group2.name == 'test2' and group2.parent_id == group.id
+    group_perms = db.execute(select(GroupPermission).where(GroupPermission.group_id == group2.id)).scalars().all()
+    group_users = db.execute(select(UserGroup).where(UserGroup.group_id == group2.id)).scalars().all()
+    assert not group_perms and not group_users
+
 
 def test_create_group(dbsession: Session):
     users = gen_users(10, dbsession)
@@ -36,24 +53,9 @@ def test_create_group(dbsession: Session):
         members=[i.id for i in users]
     )
     group = create_group(db=dbsession, data=data)
-    
-    assert group.name == 'test' and group.parent_id is None
-    group_perms = dbsession.execute(select(GroupPermission).where(GroupPermission.group_id == group.id)).scalars().all()
-    assert len(group_perms) == 2
-    perm1, perm2 = [i.permission for i in group_perms]
-    assert perm1.obj_id is None and perm1.obj == PermObject.SCHEMA and perm1.type == PermType.CREATE_ENTITIES
-    assert perm2.obj_id == 1 and perm2.obj == PermObject.ENTITY and perm2.type == PermType.UPDATE
-
-    group_users = dbsession.execute(select(UserGroup).where(UserGroup.group_id == group.id)).scalars().all()
-    assert len(group_users) == len(users)
-    assert {i.user_id for i in group_users} == {i.id for i in users} 
-
     data = CreateGroupSchema(name='test2', permissions=[], members=[], parent_id=group.id)
     group2 = create_group(db=dbsession, data=data)
-    assert group2.name == 'test2' and group2.parent_id == group.id
-    group_perms = dbsession.execute(select(GroupPermission).where(GroupPermission.group_id == group2.id)).scalars().all()
-    group_users = dbsession.execute(select(UserGroup).where(UserGroup.group_id == group2.id)).scalars().all()
-    assert not group_perms and not group_users
+    asserts_after_create_group(dbsession, group, group2, users)
 
 
 def test_create_group_raise_on_already_exists(dbsession: Session):
@@ -84,6 +86,34 @@ def make_group(name: str, db: Session):
     db.commit()
     return group
     
+
+def asserts_after_update_group_first(db: Session, group: Group, updated: Group, new_permissions, users: List[User]):
+    assert updated.id == group.id
+    assert updated.name == 'test2'
+
+    perms = db.execute(select(GroupPermission).where(GroupPermission.group_id == updated.id)).scalars().all()
+    assert len(perms) == 2
+    assert {PermissionSchema(**i.permission.__dict__) for i in perms} == {i for i in new_permissions}
+
+    group_users = db.execute(select(UserGroup).where(UserGroup.group_id == updated.id)).scalars().all()
+    assert len(group_users) == 10
+    group_users = [i.user_id for i in group_users]
+    assert 1 not in group_users
+    assert group_users == [i.id for i in users]
+    user_1 = db.execute(select(User).where(User.id == 1)).scalar()
+    assert user_1 is not None, 'This user must still be present in DB'
+
+
+def asserts_after_update_group_second(db: Session, group: Group, updated: Group):
+    # just update users
+    assert updated.id == group.id
+    assert updated.name == 'test2'
+    perms = db.execute(select(GroupPermission).where(GroupPermission.group_id == updated.id)).scalars().all()
+    assert len(perms) == 2
+    group_users = db.execute(select(UserGroup).where(UserGroup.group_id == updated.id)).scalars().all()
+    assert len(group_users) == 1
+
+
 def test_update_group(dbsession: Session):
     users = gen_users(10, dbsession)
     group = make_group(name='test', db=dbsession)
@@ -110,30 +140,12 @@ def test_update_group(dbsession: Session):
         delete_users=[1]
     )
     updated = update_group(group_id=group.id, data=data, db=dbsession)
-    assert updated.id == group.id
-    assert updated.name == 'test2'
-
-    perms = dbsession.execute(select(GroupPermission).where(GroupPermission.group_id == updated.id)).scalars().all()
-    assert len(perms) == 2
-    assert {PermissionSchema(**i.permission.__dict__) for i in perms} == {i for i in data.add_permissions}
-
-    group_users = dbsession.execute(select(UserGroup).where(UserGroup.group_id == updated.id)).scalars().all()
-    assert len(group_users) == 10
-    group_users = [i.user_id for i in group_users]
-    assert 1 not in group_users
-    assert group_users == [i.id for i in users]
-    user_1 = dbsession.execute(select(User).where(User.id == 1)).scalar()
-    assert user_1 is not None, 'This user must still be present in DB'
+    asserts_after_update_group_first(dbsession, group, updated, data.add_permissions, users)
 
     # just update users
-    data = UpdateGroupSchema(delete_users=[i.id for i in users], add_users=[1])
-    updated = update_group(group_id=updated.id, data=data, db=dbsession)
-    assert updated.id == group.id
-    assert updated.name == 'test2'
-    perms = dbsession.execute(select(GroupPermission).where(GroupPermission.group_id == updated.id)).scalars().all()
-    assert len(perms) == 2
-    group_users = dbsession.execute(select(UserGroup).where(UserGroup.group_id == updated.id)).scalars().all()
-    assert len(group_users) == 1
+    data2 = UpdateGroupSchema(delete_users=[i.id for i in users], add_users=[1])
+    updated2 = update_group(group_id=updated.id, data=data2, db=dbsession)
+    asserts_after_update_group_second(dbsession, group, updated2)
 
 
 def test_upd_grp_raise_on_group_cycle(dbsession: Session):

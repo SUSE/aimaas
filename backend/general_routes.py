@@ -258,7 +258,7 @@ def get_groups(db: Session = Depends(get_db)):
 @router.post('/groups', response_model=GroupSchema)
 def create_group(data: CreateGroupSchema, db: Session = Depends(get_db)):
     try: 
-        auth.create_group(data=data, db=db)
+        return auth.create_group(data=data, db=db)
     except exceptions.GroupExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingUserException as e:
@@ -285,6 +285,10 @@ def get_group_members(group_id: int, db: Session = Depends(get_db)):
 def update_group(group_id: int, data: UpdateGroupSchema, db: Session = Depends(get_db)):
     try:
         return auth.update_group(group_id=group_id, data=data, db=db)
+    except exceptions.CircularGroupReferenceException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.GroupExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.NoOpChangeException as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     except exceptions.MissingPermissionException as e:
