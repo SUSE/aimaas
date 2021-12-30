@@ -1,5 +1,9 @@
 export function formatDate(date) {
-    return new Date(date).toLocaleString();
+    if (date instanceof Date) {
+        return date.toLocaleString();
+    } else {
+        return new Date(date).toLocaleString();
+    }
 }
 
 
@@ -44,6 +48,7 @@ export const CHANGE_STATUS_MAP = {
     DECLINED: 'warning',
     APPROVED: 'success',
     add: 'add',
+    create: 'add',
     delete: 'remove',
     update: 'mode_edit'
 }

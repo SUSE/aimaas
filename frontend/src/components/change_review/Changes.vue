@@ -4,9 +4,11 @@
       <template v-slot:content>
         <li class="list-group-item" v-for="change in changes" :key="change.id">
           <div class="row text-black p-2" :class="`bg-${CHANGE_STATUS_MAP[change.status]}`">
-            <div class="col-md-1 d-flex flex-column align-items-end">
-              <small>Action:</small>
-              <span>{{ change.change_type }}</span>
+            <div class="col-md-1 d-flex flex-column align-self-center">
+              <h4 class="p-0 m-0" data-bs-toggle="tooltip"
+                  :title="`${change.change_type} ${change.object_type}`">
+                <i class="eos-icons">{{ actionIcon(change.change_type) }}</i>
+              </h4>
             </div>
             <div class="col-md-2 d-flex flex-column align-items-end">
               <small>Created at:</small>
@@ -31,23 +33,25 @@
               </div>
             </template>
             <div v-else class="col-md-7 d-flex gap-3 p-0 m-0">
-              <ConfirmButton :callback="onDecline" btn-class="btn-outline-danger shadow-sm"
-                             class="flex-grow-1" data-bs-toggle="tooltip" :vertical="true"
-                             title="Decline request and do not apply changes." :value="change.id">
+              <ConfirmWithComment :callback="onDecline" btn-class="btn-outline-danger shadow-sm"
+                                  class="flex-grow-1" data-bs-toggle="tooltip" :vertical="true"
+                                  title="Decline request and do not apply changes."
+                                  :value="change.id"
+                                  placeholder="Sorry, I have to decline.">
                 <template v-slot:label>
                   <i class="eos-icons me-1">thumb_down</i>
                   Decline
                 </template>
-              </ConfirmButton>
-              <ConfirmButton :callback="onApprove" btn-class="btn-success shadow-sm"
+              </ConfirmWithComment>
+              <ConfirmWithComment :callback="onApprove" btn-class="btn-success shadow-sm"
                              class="flex-grow-1" data-bs-toggle="tooltip" :vertical="true"
                              title="Accept request and apply changes to database."
-                             :value="change.id">
+                             :value="change.id" placeholder="Looks good to me.">
                 <template v-slot:label>
                   <i class="eos-icons me-1">thumb_up</i>
                   Approve
                 </template>
-              </ConfirmButton>
+              </ConfirmWithComment>
             </div>
           </div>
           <SchemaChangeDetails v-if="change.object_type === 'SCHEMA'" :changeId="change.id"
@@ -62,14 +66,14 @@
 
 <script>
 import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
+import ConfirmWithComment from "@/components/inputs/ConfirmWithComment";
 import Placeholder from "@/components/layout/Placeholder";
 import EntityChangeDetails from "@/components/change_review/EntityChangeDetails";
 import SchemaChangeDetails from "@/components/change_review/SchemaChangeDetails";
 
 export default {
   name: "Changes",
-  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmButton},
+  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmWithComment},
   inject: ["pendingRequests"],
   props: {
     schema: {
@@ -96,6 +100,9 @@ export default {
   },
   methods: {
     formatDate,
+    actionIcon(actionType) {
+      return this.CHANGE_STATUS_MAP[actionType.toLowerCase()];
+    },
     async load() {
       this.loading = true;
       if (!this.schema) {
@@ -116,27 +123,30 @@ export default {
       }
       this.loading = false;
     },
-    fakeReview(changeId) {
+    fakeReview(changeId, verdict) {
       for (let change of this.changes) {
         if (changeId == change.id) {
           change.reviewed_at = Date.now();
+          change.reviewed_by = 'me';
+          change.status = `${verdict}D`;
         }
       }
     },
-    async review(changeId, verdict) {
+    async review(changeId, verdict, comment) {
       const result = await this.$api.reviewChanges({
         changeId: changeId,
-        verdict: verdict
+        verdict: verdict,
+        comment: comment
       });
       if (result) {
-        this.fakeReview(changeId);
+        this.fakeReview(changeId, verdict);
       }
     },
-    async onDecline(event) {
-      await this.review(event.target.value, 'DECLINE');
+    async onDecline(event, comment) {
+      await this.review(event.target.value, 'DECLINE', comment);
     },
-    async onApprove(event) {
-      await this.review(event.target.value, 'APPROVE');
+    async onApprove(event, comment) {
+      await this.review(event.target.value, 'APPROVE', comment);
     }
   },
   watch: {
