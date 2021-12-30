@@ -27,6 +27,8 @@
 </template>
 
 <script>
+import {randomUUID} from "@/utils";
+
 export default {
   name: "ConfirmButton",
   props: {
@@ -40,7 +42,7 @@ export default {
     },
     id: {
       type: String,
-      default: `confirm-${crypto.randomUUID()}`
+      default: `confirm-${randomUUID()}`
     },
     vertical: {
       type: Boolean,

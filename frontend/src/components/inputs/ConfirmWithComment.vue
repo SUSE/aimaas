@@ -12,6 +12,7 @@
 </template>
 
 <script>
+import {randomUUID} from "@/utils";
 import ConfirmButton from "@/components/inputs/ConfirmButton";
 
 export default {
@@ -28,7 +29,7 @@ export default {
     },
     id: {
       type: String,
-      default: `confirm-${crypto.randomUUID()}`
+      default: `confirm-${randomUUID()}`
     },
     vertical: {
       type: Boolean,

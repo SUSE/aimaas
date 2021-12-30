@@ -1,3 +1,6 @@
+import {randomUUID} from "@/utils";
+
+
 const ALERT_LEVELS = [
     'primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark', 'cta'
 ];
@@ -9,7 +12,7 @@ class AlertMessage {
         }
         this.level = level;
         this.message = msg;
-        this.id = `alert-${crypto.randomUUID()}`;
+        this.id = `alert-${randomUUID()}`;
     }
 }
 
