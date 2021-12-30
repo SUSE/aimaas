@@ -648,7 +648,7 @@ def test_get_entity_create_details(dbsession: Session):
     assert change.entity.name == 'Jackson'
     assert change.entity.slug == 'jackson'
     assert change.entity.schema_slug == 'person'
-    assert len(change.changes) == 4
+    assert len(change.changes) == 5
     name = change.changes['name']
     age = change.changes['age']
     slug = change.changes['slug']
