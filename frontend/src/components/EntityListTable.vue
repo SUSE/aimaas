@@ -152,6 +152,9 @@ export default {
     }
     ,
     orderByField(field) {
+      if (this.listFields.includes(field) || field in this.fkFields) {
+        return;
+      }
       if (this.orderBy === field) {
         this.ascending = !this.ascending;
       } else {

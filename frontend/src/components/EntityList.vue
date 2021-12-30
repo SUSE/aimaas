@@ -89,7 +89,7 @@ export default {
       }
       this.orderBy = 'name';
       this.ascending = true;
-      this.getEntities();
+      this.getEntities({resetPage: true});
     }
   },
   methods: {
@@ -156,11 +156,6 @@ export default {
       loading: true,
       selected: []
     };
-  },
-  mounted() {
-    if (this.schema) {
-      this.getEntities();
-    }
   }
 };
 </script>
