@@ -1,4 +1,9 @@
 <template>
+  <BaseLayout v-if="withBreadcrumbs">
+    <template v-slot:additional_breadcrumbs>
+      <li class="breadcrumb-item active">Pending reviews</li>
+    </template>
+  </BaseLayout>
   <ul class="list-group">
     <Placeholder :loading="loading">
       <template v-slot:content>
@@ -59,6 +64,9 @@
           <EntityChangeDetails v-else-if="change.object_type === 'ENTITY'" :changeId="change.id"
                                :schema="schema" :entitySlug="entitySlug"/>
         </li>
+        <li v-if="changes.length < 1" class="list-group-item">
+          <div class="alert alert-info m-0">No changes to display.</div>
+        </li>
       </template>
     </Placeholder>
   </ul>
@@ -66,6 +74,7 @@
 
 <script>
 import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
+import BaseLayout from "@/components/layout/BaseLayout";
 import ConfirmWithComment from "@/components/inputs/ConfirmWithComment";
 import Placeholder from "@/components/layout/Placeholder";
 import EntityChangeDetails from "@/components/change_review/EntityChangeDetails";
@@ -73,7 +82,8 @@ import SchemaChangeDetails from "@/components/change_review/SchemaChangeDetails"
 
 export default {
   name: "Changes",
-  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmWithComment},
+  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmWithComment,
+               BaseLayout},
   inject: ["pendingRequests"],
   props: {
     schema: {
@@ -93,6 +103,12 @@ export default {
       changes: [],
       changeDetails: {},
       CHANGE_STATUS_MAP
+    }
+  },
+  computed: {
+    withBreadcrumbs() {
+      console.debug("show bc?", this.schema, this.entitySlug, !this.schema && !this.entitySlug);
+      return !this.schema && !this.entitySlug;
     }
   },
   async created() {
