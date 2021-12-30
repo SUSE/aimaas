@@ -1,13 +1,17 @@
 <template>
   <BaseInput :label="label" :args="args" :vertical="false" :required="required">
     <template v-slot:helptext>
-      Start typing to receive suggestions
+      Click button to open the selection dialog.
     </template>
     <template v-slot:field>
       <ul class="list-group">
         <li class="list-group-item d-flex justify-content-between align-items-center"
             v-for="e in selected" :key="e.id">
-          <span>{{ e.name }}</span>
+          <span>
+            <router-link :to="{name: 'entity-view', params: {schemaSlug: fkSchema.slug, entitySlug: e.slug}}">
+              {{ e.name }}
+            </router-link>
+          </span>
           <button class="btn btn-outline-cta" type="button"
                   data-ts-toggle="tooltip" title="Remove" @click="onClear(e.id)">
             <i class="eos-icons">backspace</i>
@@ -92,7 +96,7 @@ export default {
       toQuery.map(i => {
         if (!preselectedIds.includes(i)) {
           this.$api.getEntity({
-            schemaSlug: this.activeSchema.slug,
+            schemaSlug: this.fkSchema.slug,
             entityIdOrSlug: i
           }).then(response => {
             this.selected.push(response);
