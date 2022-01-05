@@ -2,8 +2,9 @@ import {reactive} from "vue";
 
 
 class API {
-    constructor(baseUrl, app) {
-        this.base = baseUrl;
+    constructor(app) {
+        console.debug(document);
+        this.base = "/api";
         this.app = app;
         this.alerts = app.config.globalProperties.$alerts;
         this.loggedIn = null;
@@ -23,14 +24,22 @@ class API {
             return null;
         }
 
-        const detail = await response.json();
+        let detail;
+        try {
+            detail = await response.json();
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                throw new Error(response.statusText);
+            }
+            throw error;
+        }
         if (Array.isArray(detail.detail)) {
-            throw Error(detail.detail.map(d => `${d.loc}: ${d.msg}`).join(", "));
+            throw new Error(detail.detail.map(d => `${d.loc}: ${d.msg}`).join(", "));
         } else if (typeof detail.detail === "string") {
-            throw Error(detail.detail);
+            throw new Error(detail.detail);
         } else {
             console.error("Response indicates a problem", detail);
-            throw Error("Failed to process request. See console for more details.");
+            throw new Error("Failed to process request. See console for more details.");
         }
     }
 
@@ -240,6 +249,6 @@ class API {
 
 export default {
     install: (app) => {
-        app.config.globalProperties.$api = reactive(new API(process.env.VUE_APP_API_BASE, app));
+        app.config.globalProperties.$api = reactive(new API(app));
     }
 }
