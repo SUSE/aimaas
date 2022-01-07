@@ -18,6 +18,15 @@ class EntityExistsException(Exception):
     def __str__(self) -> str:
         return f'Entity with slug `{self.slug}` already exists in this schema'
 
+
+class GroupExistsException(Exception):
+    def __init__(self, name: str):
+        self.name = name
+
+    def __str__(self) -> str:
+        return f'Group with name {self.name} already exists'
+
+
 class MissingObjectException(Exception):
     obj_type: str
 
@@ -35,6 +44,26 @@ class MissingEntityException(MissingObjectException):
 
 class MissingAttributeException(MissingObjectException):
     obj_type = 'Attribute'
+
+class MissingUserException(MissingObjectException):
+    obj_type = 'User'
+
+
+class MissingPermissionException(MissingObjectException):
+    obj_type = 'Permission'
+
+
+class MissingGroupPermissionException(MissingObjectException):
+    obj_type = 'Group permission'
+
+
+class MissingGroupException(MissingObjectException):
+    obj_type = 'Group'
+
+
+class MissingUserGroupException(MissingObjectException):
+    obj_type = 'User group'
+
 
 class MultipleAttributeOccurencesException(Exception):
     def __init__(self, attr_name: str):
@@ -152,3 +181,12 @@ class InvalidFilterAttributeException(Exception):
 
     def __str__(self) -> str:
         return f"Can't filter current schema by attribute `{self.attr}`. Allowed attributes: {', '.join(self.allowed_attrs)}"
+
+
+class NoOpChangeException(Exception):
+    pass
+
+
+class CircularGroupReferenceException(Exception):
+    def __str__(self) -> str:
+        return 'Made an attempt to inherit from group which either directly or indirectly inherits from current group'

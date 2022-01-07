@@ -1,7 +1,9 @@
 from typing import List
+from datetime import timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
 
@@ -38,4 +40,21 @@ def create_app() -> FastAPI:
     for schema in schemas:
         create_dynamic_router(schema=schema, app=app, get_db=database.get_db)
     app.include_router(router)
+
+    from . import auth
+    from .schemas.auth import Token
+    @app.post('/login', response_model=Token)
+    async def login(db: Session = Depends(database.get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+        user = auth.authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Incorrect username or password',
+                headers={'WWW-Authenticate': 'Bearer'},
+            )
+        expires = timedelta(minutes=auth.s.token_exp_minutes)
+        access_token = auth.create_access_token(
+            data={'sub': user.username}, expires_delta=expires
+        )
+        return {'access_token': access_token, 'token_type': 'bearer'}
     return app

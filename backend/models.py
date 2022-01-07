@@ -6,7 +6,7 @@ from sqlalchemy import (
     select, Enum, DateTime,
     Boolean, Column, ForeignKey, 
     Integer, String, Float)
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql.schema import UniqueConstraint
@@ -178,4 +178,87 @@ class AttributeDefinition(Base):
 
     __table_args__ = (
         UniqueConstraint('schema_id', 'attribute_id'),
+    )
+
+
+class Group(Base):
+    __tablename__ = 'groups'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), unique=True, nullable=False)
+    parent_id = Column(Integer, ForeignKey('groups.id'))
+    parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
+
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    username = Column(String(128), unique=True, nullable=False)
+    email = Column(String(128), unique=True, nullable=False)
+    password = Column(String, nullable=False)
+
+
+class PermObject(enum.Enum):
+    SCHEMA = 'SCHEMA'
+    ENTITY = 'ENTITY'
+
+
+class PermType(enum.Enum):
+    CREATE = 'CREATE'
+    UPDATE = 'UPDATE'
+    DELETE = 'DELETE'
+    READ = 'READ'
+
+    CREATE_ENTITIES = 'CREATE_ENTITIES'
+    UPDATE_ENTITIES = 'UPDATE_ENTITIES'
+    DELETE_ENTITIES = 'DELETE_ENTITIES'
+
+
+class Permission(Base):
+    __tablename__ = 'permissions'
+    id = Column(Integer, primary_key=True)
+    obj_id = Column(Integer)
+    obj = Column(Enum(PermObject), nullable=False)
+    type = Column(Enum(PermType), nullable=False)
+
+
+class GroupPermission(Base):
+    __tablename__ = 'group_permissions'
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
+    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
+
+    group = relationship('Group')
+    permission = relationship('Permission')
+
+    __table_args__ = (
+        UniqueConstraint('group_id', 'permission_id'),
+    )
+
+
+class UserPermission(Base):
+    __tablename__ = 'user_permissions'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
+
+    user = relationship('User')
+    permission = relationship('Permission')
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'permission_id'),
+    )
+
+
+class UserGroup(Base):
+    __tablename__ = 'user_groups'
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+
+    group = relationship('Group')
+    user = relationship('User')
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'group_id'),
     )

@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     test_pg_db:  Optional[str]
 
     timezone_offset: Union[str, int] = "utc"
+    secret: str = "this is an insecure dummy. replace it in production!"
+
+    pwd_hash_alg: str = 'HS256'  # list of options can be found in jose.jwt.ALGORITHMS
+    token_exp_minutes: int = 120
+
 
     class Config:
         env_file = '.env'

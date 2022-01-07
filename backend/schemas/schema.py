@@ -4,7 +4,7 @@ from typing import List, Optional, Union, Any
 
 from pydantic import BaseModel, validator, Field
 
-from .models import AttrType, AttributeDefinition
+from backend.models import AttrType, AttributeDefinition
 
 class AttrTypeMapping(Enum):
     STR = 'STR'

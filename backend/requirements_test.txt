@@ -1,3 +1,5 @@
 requests
 pytest
 pytest-cov
+pytest-mock==3.6.1
+python-dateutil

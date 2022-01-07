@@ -3,9 +3,19 @@ from typing import Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 
-from . import crud, schemas, exceptions
+from . import crud, schemas, exceptions, auth
 from .database import get_db
+from .models import PermObject, PermType, User
 from .dynamic_routes import create_dynamic_router
+# from .auth import get_current_user, is_authorized
+from .schemas.auth import (
+    GroupSchema,
+    GroupDetailsSchema,
+    UserSchema,
+    UserCreateSchema,
+    CreateGroupSchema,
+    UpdateGroupSchema
+)
 
 
 router = APIRouter()
@@ -122,3 +132,67 @@ def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
         return crud.delete_schema(db=db, id_or_slug=id_or_slug)
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/groups', response_model=List[GroupSchema])
+def get_groups(db: Session = Depends(get_db)):
+    return auth.get_groups(db=db)
+
+
+@router.post('/groups', response_model=GroupSchema)
+def create_group(data: CreateGroupSchema, db: Session = Depends(get_db)):
+    try:
+        return auth.create_group(data=data, db=db)
+    except exceptions.GroupExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.MissingUserException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/groups/{group_id}', response_model=GroupDetailsSchema)
+def get_group(group_id: int, db: Session = Depends(get_db)):
+    try:
+        return auth.get_group_details(group_id=group_id, db=db)
+    except exceptions.MissingGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/groups/{group_id}/members', response_model=List[UserSchema])
+def get_group_members(group_id: int, db: Session = Depends(get_db)):
+    try:
+        return auth.get_group_members(group_id=group_id, db=db)
+    except exceptions.MissingGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.put('/groups/{group_id}', response_model=GroupSchema)
+def update_group(group_id: int, data: UpdateGroupSchema, db: Session = Depends(get_db)):
+    try:
+        return auth.update_group(group_id=group_id, data=data, db=db)
+    except exceptions.CircularGroupReferenceException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.GroupExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.NoOpChangeException as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    except exceptions.MissingPermissionException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingGroupPermissionException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingUserException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.MissingUserGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.post('/users', response_model=auth.UserSchema)
+def create_user(user: UserCreateSchema, db: Session = Depends(get_db)):
+    user_ = User(email=user.email, username=user.username, password=auth.get_password_hash(user.password))
+    db.add(user_)
+    db.commit()
+    return user_
+
+
+@router.get('/users', response_model=List[UserSchema])
+def get_users(db: Session = Depends(get_db)):
+    return auth.get_users(db=db)
