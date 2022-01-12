@@ -4,20 +4,21 @@ from typing import List, Union, Optional, NamedTuple
 
 from sqlalchemy import (
     select, Enum, DateTime,
-    Boolean, Column, ForeignKey, 
+    Boolean, Column, ForeignKey,
     Integer, String, Float)
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql.schema import UniqueConstraint
 
+from .auth.enum import PermissionType, PermissionTargetType, RecipientType
 from .config import settings
 from .database import Base
 
 
 class Value(Base):
     __abstract__ = True
-    
+
     id = Column(Integer, primary_key=True, index=True)
 
     @declared_attr
@@ -92,7 +93,7 @@ class BoundFK(Base):
 
     attr_def = relationship('AttributeDefinition')
     schema = relationship(
-        'Schema', 
+        'Schema',
         doc='''Points to schema that is bound 
             to BoundFK.attr_def which is 
             not necessarily the same as 
@@ -110,11 +111,11 @@ class Schema(Base):
 
     entities = relationship('Entity', back_populates='schema')
     attr_defs = relationship('AttributeDefinition', back_populates='schema')
-    
+
 
 class Entity(Base):
     __tablename__ = 'entities'
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(128), nullable=False)
     slug = Column(String(128), nullable=False)
@@ -189,65 +190,64 @@ class Group(Base):
     parent_id = Column(Integer, ForeignKey('groups.id'))
     parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
 
+    def __str__(self):
+        return self.name
+
 
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     username = Column(String(128), unique=True, nullable=False)
     email = Column(String(128), unique=True, nullable=False)
-    password = Column(String, nullable=False)
+    password = Column(String, nullable=True)
+    firstname = Column(String(128), nullable=True)
+    lastname = Column(String(128), nullable=True)
+    is_active = Column(Boolean, default=True)
 
-
-class PermObject(enum.Enum):
-    SCHEMA = 'SCHEMA'
-    ENTITY = 'ENTITY'
-
-
-class PermType(enum.Enum):
-    CREATE = 'CREATE'
-    UPDATE = 'UPDATE'
-    DELETE = 'DELETE'
-    READ = 'READ'
-
-    CREATE_ENTITIES = 'CREATE_ENTITIES'
-    UPDATE_ENTITIES = 'UPDATE_ENTITIES'
-    DELETE_ENTITIES = 'DELETE_ENTITIES'
+    def __str__(self):
+        return self.username
 
 
 class Permission(Base):
     __tablename__ = 'permissions'
     id = Column(Integer, primary_key=True)
-    obj_id = Column(Integer)
-    obj = Column(Enum(PermObject), nullable=False)
-    type = Column(Enum(PermType), nullable=False)
+    recipient_type = Column(Enum(RecipientType), nullable=False)
+    recipient_id = Column(Integer, nullable=False)
+    obj_type = Column(Enum(PermissionTargetType), nullable=True)
+    obj_id = Column(Integer, nullable=True)
+    permission = Column(Enum(PermissionType), nullable=False)
 
-
-class GroupPermission(Base):
-    __tablename__ = 'group_permissions'
-    id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
-    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
-
-    group = relationship('Group')
-    permission = relationship('Permission')
+    user = relationship('User',
+                        primaryjoin="and_(User.id == foreign(Permission.recipient_id), "
+                                    "Permission.recipient_type == 'USER')",
+                        overlaps="group")
+    group = relationship('Group',
+                         primaryjoin="and_(Group.id == foreign(Permission.recipient_id), "
+                                     "Permission.recipient_type == 'GROUP')",
+                         overlaps="user")
+    schema = relationship('Schema',
+                          primaryjoin="and_(Schema.id == foreign(Permission.obj_id), "
+                                      "Permission.obj_type == 'SCHEMA')",
+                          overlaps="entity, managed_group"
+                          )
+    entity = relationship('Entity',
+                          primaryjoin="and_(Entity.id == foreign(Permission.obj_id), "
+                                      "Permission.obj_type == 'ENTITY')",
+                          overlaps="schema, managed_group"
+                          )
+    managed_group = relationship('Group',
+                                 primaryjoin="and_(Group.id == foreign(Permission.obj_id), "
+                                             "Permission.obj_type == 'GROUP')",
+                                 overlaps="schema, entity"
+                                 )
 
     __table_args__ = (
-        UniqueConstraint('group_id', 'permission_id'),
+        UniqueConstraint('recipient_type', 'recipient_id', 'obj_type', 'obj_id', 'permission'),
     )
 
-
-class UserPermission(Base):
-    __tablename__ = 'user_permissions'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False)
-
-    user = relationship('User')
-    permission = relationship('Permission')
-
-    __table_args__ = (
-        UniqueConstraint('user_id', 'permission_id'),
-    )
+    @property
+    def recipient_name(self):
+        return self.user.username if self.recipient_type == RecipientType.USER else self.group.name
 
 
 class UserGroup(Base):

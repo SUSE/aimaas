@@ -5,10 +5,52 @@ class API {
     constructor(app) {
         console.debug(document);
         this.base = "/api";
+        this.storageprefix = "aimaas";
         this.app = app;
         this.alerts = app.config.globalProperties.$alerts;
-        this.loggedIn = null;
-        this.token = null;
+    }
+
+    set token(val) {
+        if (val) {
+            window.localStorage.setItem(this.storageprefix + "Token", val);
+        } else {
+            window.localStorage.removeItem(this.storageprefix + "Token");
+        }
+    }
+
+    get token() {
+        return window.localStorage.getItem(this.storageprefix + "Token");
+    }
+
+    set loggedIn(val) {
+        if (val) {
+            window.localStorage.setItem(this.storageprefix + "User", val);
+        } else {
+            window.localStorage.removeItem(this.storageprefix + "User");
+        }
+    }
+
+    get loggedIn() {
+        return window.localStorage.getItem(this.storageprefix + "User");
+    }
+
+    set expires(val) {
+        if (!(val instanceof Date)) {
+           val = new Date(val);
+        }
+        if (val) {
+            window.localStorage.setItem(this.storageprefix + "Expires", val);
+        } else {
+            window.localStorage.removeItem(this.storageprefix + "Expires");
+        }
+    }
+
+    get expires() {
+        let val = window.localStorage.getItem(this.storageprefix + "Expires");
+        if (!(val instanceof Date)) {
+           val = new Date(val);
+        }
+        return val
     }
 
     async _error_to_alert(details) {
@@ -22,6 +64,11 @@ class API {
     async _is_response_ok(response) {
         if (response.ok && response.status < 400) {
             return null;
+        }
+
+        if (response.status === 401 && this.token) {
+            // Token has expired. Automatic log out.
+            await this.logout();
         }
 
         let detail;
@@ -45,6 +92,10 @@ class API {
 
     async _fetch({url, headers, body, method} = {}) {
         let allheaders = {"Content-Type": "application/json"};
+        const token = this.token;
+        if (token) {
+            allheaders["Authorization"] = `Bearer ${token}`;
+        }
         let encoded_body = null;
         allheaders = Object.assign(allheaders, headers || {});
         if (body instanceof FormData || typeof body === "string") {
@@ -227,14 +278,51 @@ class API {
             body: encodeURI(body),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'}
         });
-        this.loggedIn = username;
-        this.token = response.access_token;
-        this.alerts.push("success", `Welcome back, ${username}.`);
+        if (response !== null) {
+            this.loggedIn = username;
+            this.token = response.access_token;
+            this.expires = response.expiration_date;
+            this.alerts.push("success", `Welcome back, ${username}.`);
+        }
         return response;
+    }
+
+    async logout() {
+        this.token = null;
+        this.loggedIn = null;
+        this.expires = null;
     }
 
     async getUsers() {
         return await this._fetch({url: `${this.base}/users`});
+    }
+
+    async getUserMemberships({username}) {
+        return await this._fetch({
+            url: `${this.base}/users/${username}/memberships`
+        }) ;
+    }
+
+    async activate_user({username}) {
+        const response = await this._fetch({
+            url: `${this.base}/users/${username}`,
+            method: "PATCH"
+        });
+        if (response !== null) {
+            this.alerts.push("success", `User activated: ${username}`);
+        }
+        return response
+    }
+
+    async deactivate_user({username}) {
+        const response = await this._fetch({
+            url: `${this.base}/users/${username}`,
+            method: "DELETE"
+        });
+        if (response !== null) {
+            this.alerts.push("success", `User deactivated: ${username}`);
+        }
+        return response
     }
 
     async getGroups() {
@@ -243,6 +331,112 @@ class API {
 
     async getMembers({groupId}) {
         return await this._fetch({url: `${this.base}/groups/${groupId}/members`});
+    }
+
+    async createGroup({body}) {
+        const response = await this._fetch({
+            url: `${this.base}/groups`,
+            body: body,
+            method: "POST"
+        });
+        if (response !== null) {
+            this.alerts.push("success", `Created new group: ${response.name}`);
+        }
+        return response;
+    }
+
+    async updateGroup({groupId, body}) {
+        const response = await this._fetch({
+          url:  `${this.base}/groups/${groupId}`,
+          body: body,
+          method: "PUT"
+        });
+        if (response !== null) {
+          this.alerts.push("success", `Changes to group have been saved: ${body.name}`)
+        }
+        return response;
+    }
+
+    async addMembers({groupId, userIds}) {
+        const response = await this._fetch({
+            url: `${this.base}/groups/${groupId}/members`,
+            body: userIds,
+            method: "PATCH"
+        });
+        if (response !== null) {
+            if (response) {
+                this.alerts.push("success", "New members were added to group.");
+            } else {
+                this.alerts.push("warning", "No new members added to group because requested users are already members.");
+            }
+        }
+        return response;
+    }
+
+    async removeMembers({groupId, userIds}) {
+        const response = await this._fetch({
+            url: `${this.base}/groups/${groupId}/members`,
+            body: userIds,
+            method: "DELETE"
+        });
+        if (response !== null) {
+            if (response) {
+                this.alerts.push("success", "Members were removed from group.");
+            } else {
+                this.alerts.push("warning", "No members were removed from group because requested users were no members.");
+            }
+        }
+        return response;
+    }
+
+    async getPermissions({recipientType=null, recipientId=null, objType=null, objId=null}) {
+        const params = new URLSearchParams();
+        if (recipientId) {
+            params.set("recipient_id", recipientId);
+        }
+        if (recipientType) {
+            params.set("recipient_type", recipientType);
+        }
+        if (objType) {
+            params.set("obj_type", objType);
+        }
+        if (objId) {
+            params.set("obj_id", objId);
+        }
+        return await this._fetch({url: `${this.base}/permissions?${params.toString()}`});
+    }
+
+    async grantPermission({recipientType, recipientName, objType, objId, permission}) {
+        const response = await this._fetch({
+            url: `${this.base}/permissions`,
+            method: 'POST',
+            body: {
+                recipient_type: recipientType,
+                recipient_name: recipientName,
+                obj_type: objType,
+                obj_id: objId,
+                permission: permission
+            }
+        })
+        if (response) {
+            this.alerts.push("success", "Permission granted.")
+        } else {
+            this.alerts.push("warning", "Granting of permission not possible.")
+        }
+    }
+
+    async revokePermissions({permissionIds}) {
+        const response = this._fetch({
+            url: `${this.base}/permissions`,
+            body: permissionIds,
+            method: 'DELETE'
+        });
+        if (response != null) {
+            this.alerts.push("success", "Selected permissions revoked.");
+        } else {
+            this.alerts.push("warning", "Not able to revoke selected permissions.");
+        }
+        return response;
     }
 }
 

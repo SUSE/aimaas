@@ -1,70 +1,83 @@
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
 
-from ..models import PermType, PermObject
+from ..auth.enum import PermissionType, RecipientType, PermissionTargetType
+from ..database import Base
 
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expiration_date: datetime
 
 
-class UserSchema(BaseModel):
-    id: int
+class BaseUserSchema(BaseModel):
     username: str
     email: str
+
+
+class UserIDSchema(BaseModel):
+    id: int
+
+
+class UserNameMixin(BaseModel):
+    firstname: Optional[str]
+    lastname: Optional[str]
+
+
+class UserSchema(UserIDSchema, UserNameMixin, BaseUserSchema):
+    is_active: bool
 
     class Config:
         orm_mode = True
 
 
-class UserCreateSchema(BaseModel):
-    email: str
-    username: str
-    password: str
+class UserCreateSchema(UserNameMixin, BaseUserSchema):
+    password: Optional[str]
+
+
+class RequirePermission(BaseModel):
+    permission: PermissionType
+    target: Optional[Base]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class PermissionSchema(BaseModel):
+    recipient_type: RecipientType
+    recipient_name: str
+    obj_type: Optional[PermissionTargetType]
     obj_id: Optional[int]
-    obj: PermObject
-    type: PermType
+    permission: PermissionType
+
+    def __str__(self) -> str:
+        return ":".join(str(x or "") for x in (self.permission, self.obj_type, self.obj_id,
+                                               self.recipient_type, self.recipient_name))
 
     def __hash__(self) -> int:
-        return hash(f'{self.obj_id}${self.obj.name}${self.type.name}')
+        return hash(str(self))
 
     class Config:
         orm_mode = True
 
 
-class GroupSchema(BaseModel):
+class PermissionWithIdSchema(PermissionSchema):
     id: int
-    name: str
-    parent_id: Optional[int]
 
     class Config:
         orm_mode = True
 
 
-class GroupDetailsSchema(BaseModel):
+class BaseGroupSchema(BaseModel):
+    name: str
+    parent_id: Optional[int]
+
+
+class GroupSchema(BaseGroupSchema):
     id: int
-    name: str
-    children: List[GroupSchema]
-    permissions: List[PermissionSchema]
-    member_count: int
 
-
-class CreateGroupSchema(BaseModel):
-    name: str
-    parent_id: Optional[int]
-    permissions: List[PermissionSchema]
-    members: List[int] 
-
-
-class UpdateGroupSchema(BaseModel):
-    name: Optional[str]
-    parent_id: Optional[int]
-    add_permissions: List[PermissionSchema] = []
-    delete_permissions: List[PermissionSchema] = []
-    add_users: List[int] = []
-    delete_users: List[int] = []
+    class Config:
+        orm_mode = True

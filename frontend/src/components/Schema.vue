@@ -17,6 +17,7 @@ import EntityForm from "@/components/inputs/EntityForm";
 import SchemaEdit from "@/components/SchemaEdit";
 import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
+import PermissionList from "@/components/auth/PermissionList";
 
 export default {
   name: "Schema",
@@ -43,6 +44,12 @@ export default {
           tooltip: 'Add new entity'
         },
         {
+          name: "Permissions",
+          component: PermissionList,
+          icon: "security",
+          tooltip: "Manage permissions on the schema"
+        },
+        {
           name: "History",
           component: shallowRef(Changes),
           icon: 'history',
@@ -55,8 +62,13 @@ export default {
   inject: ['activeSchema'],
   computed: {
     currentProperties() {
-      let props = {schema: this.activeSchema};
       const currIndex = this.$refs.schematabbing?.currentTab || 0;
+      if (this.tabs[currIndex].component.name === "PermissionList") {
+        return {objectType: "Schema", objectId: this.activeSchema.id};
+      }
+
+      const props = {schema: this.activeSchema};
+
       if (this.tabs[currIndex].component.name === "EntityList") {
         props.advancedControls = true;
       }

@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional, Union
 
 from .models import Entity
 
@@ -28,10 +28,11 @@ class GroupExistsException(Exception):
 
 
 class MissingObjectException(Exception):
-    obj_type: str
+    obj_type: str = "Object"
 
-    def __init__(self, obj_id: int):
+    def __init__(self, obj_id: Union[int, str], obj_type: Optional[str] = None):
         self.obj_id = obj_id
+        self.obj_type = obj_type or self.obj_type
 
     def __str__(self) -> str:
         return f"{self.obj_type} with id {self.obj_id} doesn't exist or was deleted"
@@ -62,7 +63,12 @@ class MissingGroupException(MissingObjectException):
 
 
 class MissingUserGroupException(MissingObjectException):
-    obj_type = 'User group'
+    def __init__(self, user_id, group_id):
+        self.user_id = user_id
+        self.group_id = group_id
+
+    def __str__(self):
+        return f"User {self.user_id} is not a member of group {self.group_id}"
 
 
 class MultipleAttributeOccurencesException(Exception):

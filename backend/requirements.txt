@@ -1,10 +1,11 @@
 alembic
-pydantic
-SQLAlchemy
-python-dotenv
 fastapi
-psycopg2-binary
-uvicorn
-python-jose[cryptography]
+ldap3
 passlib[bcrypt]
+psycopg2-binary
+pydantic
+python-dotenv
+python-jose[cryptography]
 python-multipart
+SQLAlchemy
+uvicorn

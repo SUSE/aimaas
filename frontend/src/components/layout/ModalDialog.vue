@@ -1,12 +1,12 @@
 <template>
   <button type="button" class="btn" :class="toggleButton.css" data-bs-toggle="modal"
-          :data-bs-target="`#${modalId}`">
+          :data-bs-target="`#${uniqueId}`">
     <slot name="button">
       <i v-if="toggleButton.icon" class='eos-icons me-1'>{{ toggleButton.icon }}</i>
       {{ toggleButton.text }}
     </slot>
   </button>
-  <div class="modal" :id="modalId">
+  <div class="modal" :id="uniqueId">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
@@ -60,8 +60,7 @@ export default {
     },
     modalId: {
       required: false,
-      type: String,
-      default: `modal-${randomUUID()}`
+      type: String
     },
     modalTitle: {
       required: false,
@@ -69,6 +68,11 @@ export default {
       default: ""
     }
   },
+  computed: {
+    uniqueId() {
+      return this.modalId || `modal-${randomUUID()}`;
+    }
+  }
 }
 </script>
 

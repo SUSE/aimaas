@@ -7,7 +7,9 @@ from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
 from pydantic.main import ModelMetaclass
 
-from .models import AttrType, Schema, AttributeDefinition
+from .auth import authorized_user
+from .auth.enum import PermissionType
+from .models import AttrType, Schema, AttributeDefinition, User, Entity
 from . import crud, exceptions, schemas
 
 
@@ -267,7 +269,8 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
             }
         }
     )
-    def create_entity(data: entity_create_schema, db: Session = Depends(get_db)):
+    def create_entity(data: entity_create_schema, db: Session = Depends(get_db),
+                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.CREATE_ENTITY, target=Schema())))):
         try:
             return crud.create_entity(db=db, schema_id=schema.id, data=data.dict())
         except exceptions.MissingSchemaException as e:
@@ -351,7 +354,9 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             }
         }
     )
-    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema, db: Session = Depends(get_db)):
+    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema,
+                      db: Session = Depends(get_db),
+                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.UPDATE_ENTITY, target=Entity())))):
         try:
             return crud.update_entity(db=db, id_or_slug=id_or_slug, schema_id=schema.id, data=data.dict(exclude_unset=True))
         except exceptions.MissingEntityException as e:
@@ -380,7 +385,8 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
             }
         }
     )
-    def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
+    def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db),
+                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.DELETE_ENTITY, target=Entity())))):
         try:
             return crud.delete_entity(db=db, id_or_slug=id_or_slug, schema_id=schema.id)
         except exceptions.MissingEntityException as e:

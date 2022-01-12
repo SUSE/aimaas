@@ -19,6 +19,7 @@ import BaseLayout from "@/components/layout/BaseLayout";
 import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
+import PermissionList from "@/components/auth/PermissionList";
 
 export default {
   name: "Entity",
@@ -36,6 +37,12 @@ export default {
           tooltip: "Edit/show entity details"
         },
         {
+          name: "Permissions",
+          component: PermissionList,
+          icon: "security",
+          tooltip: "Manage permissions on the entity"
+        },
+        {
           name: "History",
           component: shallowRef(Changes),
           icon: "history",
@@ -48,6 +55,9 @@ export default {
   computed: {
     currentProperties() {
       const currIndex = this.$refs.entitytabbing?.currentTab || 0;
+      if (this.tabs[currIndex].component.name === "PermissionList") {
+        return {objectType: "Entity", objectId: this.activeSchema.id};
+      }
       let props = {schema: this.activeSchema};
 
       if (this.tabs[currIndex].component.name === "Changes") {

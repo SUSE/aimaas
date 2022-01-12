@@ -29,18 +29,11 @@
 export default {
   name: "GroupListItem",
   emits: ["groupSelected"],
+  inject: ["groups", "tree"],
   props: {
     group: {
       required: true,
       type: Object,
-    },
-    groups: {
-      required: true,
-      type: Object
-    },
-    tree: {
-      required: true,
-      type: Object
     }
   },
   computed: {

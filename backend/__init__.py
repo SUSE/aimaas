@@ -1,34 +1,35 @@
-from typing import List
-from datetime import timedelta
+from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
 
-from . import database
+from .config import settings
+from .database import SessionLocal
 from .dynamic_routes import create_dynamic_router
 from .models import Schema, AttributeDefinition
 from .general_routes import router
 
 
-def load_schemas() -> List[models.Schema]:
-    try:
-        db: Session = database.SessionLocal()
-        schemas = db.execute(
-            select(Schema)
-            .options(
-                subqueryload(Schema.attr_defs)
-                .subqueryload(AttributeDefinition.attribute)
-            )
-        ).scalars().all()
-        return schemas
-    finally:
-        db.close()
+def load_schemas(db: Session) -> List[models.Schema]:
+    schemas = db.execute(
+        select(Schema)
+        .options(
+            subqueryload(Schema.attr_defs)
+            .subqueryload(AttributeDefinition.attribute)
+        )
+    ).scalars().all()
+    return schemas
 
 
-def create_app() -> FastAPI:
+def load_dynamic_routes(db: Session, app: FastAPI):
+    schemas = load_schemas(db)
+    for schema in schemas:
+        create_dynamic_router(schema=schema, app=app, get_db=lambda: db)
+
+
+def create_app(session: Optional[Session] = None) -> FastAPI:
     app = FastAPI()
     origins = ['*']
     app.add_middleware(CORSMiddleware,
@@ -36,25 +37,12 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=['*'],
         allow_headers=['*'])
-    schemas = load_schemas()
-    for schema in schemas:
-        create_dynamic_router(schema=schema, app=app, get_db=database.get_db)
-    app.include_router(router)
 
-    from . import auth
-    from .schemas.auth import Token
-    @app.post('/login', response_model=Token)
-    async def login(db: Session = Depends(database.get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-        user = auth.authenticate_user(db, form_data.username, form_data.password)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail='Incorrect username or password',
-                headers={'WWW-Authenticate': 'Bearer'},
-            )
-        expires = timedelta(minutes=auth.s.token_exp_minutes)
-        access_token = auth.create_access_token(
-            data={'sub': user.username}, expires_delta=expires
-        )
-        return {'access_token': access_token, 'token_type': 'bearer'}
+    if session:
+        load_dynamic_routes(db=session, app=app)
+    else:
+        with SessionLocal() as db:
+            load_dynamic_routes(db=db, app=app)
+
+    app.include_router(router)
     return app
