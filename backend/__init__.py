@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
 
@@ -27,6 +28,12 @@ def load_schemas() -> List[models.Schema]:
 
 def create_app() -> FastAPI:
     app = FastAPI()
+    origins = ['*']
+    app.add_middleware(CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'])
     schemas = load_schemas()
     for schema in schemas:
         create_dynamic_router(schema=schema, app=app, get_db=database.get_db)
