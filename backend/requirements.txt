@@ -3,5 +3,5 @@ pydantic
 SQLAlchemy
 python-dotenv
 fastapi
-psycopg2
+psycopg2-binary
 uvicorn
