@@ -13,16 +13,11 @@ from ..schemas.auth import BaseGroupSchema, PermissionSchema, GroupSchema, \
 from .enum import PermissionType, PermissionTargetType, RecipientType
 
 
-def _is_circular_group_reference(child_id: int, parent_id: int, db: Session) -> bool:
-    while True:
-        group = db.execute(select(Group).where(Group.id == parent_id)).scalar()
-        if group.parent_id is None:
-            break
-        elif group.parent_id == child_id:
-            return True
-        else:
-            parent_id = group.parent_id
-    return False
+def _is_circular_group_reference(child_id: int, parent_id: int, db: Session) -> None:
+    all_parent_ids = [x[0] for x in db.execute(STATEMENTS.all_parent_groups,
+                                               {"groupids": [parent_id]})]
+    if child_id in all_parent_ids:
+        raise exceptions.CircularGroupReferenceException()
 
 
 def get_users(db: Session) -> List[User]:
@@ -132,12 +127,9 @@ def create_group(data: BaseGroupSchema, db: Session) -> Group:
 
 def update_group(group_id: int, data: BaseGroupSchema, db: Session) -> [Group, bool]:
     group = get_group_or_raise(group_id=group_id, db=db)
-    group.parent_id = data.parent_id or group.parent_id
     has_changed = False
     if data.parent_id and data.parent_id != group.parent_id:
-        cycle = _is_circular_group_reference(child_id=group_id, parent_id=data.parent_id, db=db)
-        if cycle:
-            raise exceptions.CircularGroupReferenceException
+        _is_circular_group_reference(child_id=group_id, parent_id=data.parent_id, db=db)
         group.parent_id = data.parent_id
         has_changed = True
 
@@ -332,16 +324,3 @@ def revoke_permissions(ids: List[int], db: Session) -> bool:
     count = db.query(Permission).filter(Permission.id.in_(ids)).delete()
     db.commit()
     return count > 0
-
-
-# def create_or_get_permission(data: PermissionSchema, db: Session, commit: bool = True) -> Permission:
-#     exists = get_permission(data=data, db=db)
-#     if exists:
-#         return exists
-#     perm = Permission(**data.dict())
-#     db.add(perm)
-#     if commit:
-#         db.commit()
-#     else:
-#         db.flush()
-#     return perm
