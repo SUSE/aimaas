@@ -127,7 +127,7 @@ class TestSchemaCreate:
         create_schema(dbsession, data=test)
         
         schemas = dbsession.execute(select(Schema)).scalars().all()
-        assert len(schemas) == 2
+        assert len(schemas) == 3
 
         schema = dbsession.execute(select(Schema).where(Schema.name == 'Test')).scalar()
         assert schema is not None
@@ -309,7 +309,7 @@ class TestSchemaRead:
 
         schema = dbsession.execute(select(Schema).where(Schema.name == 'Person')).scalar()
         schemas = get_schemas(dbsession)
-        assert len(schemas) == 1
+        assert len(schemas) == 2
         assert schemas[0] == schema
 
     def test_get_all(self, dbsession):
@@ -318,7 +318,7 @@ class TestSchemaRead:
         dbsession.flush()
 
         schemas = get_schemas(dbsession, all=True)
-        assert len(schemas) == 2
+        assert len(schemas) == 3
 
     def test_get_deleted_only(self, dbsession):
         test = Schema(name='Test', slug='test', deleted=True)
@@ -745,8 +745,8 @@ class TestSchemaDelete:
     def test_delete(self, dbsession, id_or_slug):
         delete_schema(dbsession, id_or_slug=id_or_slug)
 
-        schemas = dbsession.execute(select(Schema)).scalars().all()
-        assert len(schemas) == 1
+        schemas = dbsession.execute(select(Schema).order_by(Schema.id)).scalars().all()
+        assert len(schemas) == 2
         assert schemas[0].deleted
 
         entities = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()

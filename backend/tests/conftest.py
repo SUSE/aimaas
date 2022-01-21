@@ -1,11 +1,32 @@
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
+from ..auth import get_password_hash, authenticated_user, authorized_user
+from ..auth.crud import get_or_create_user, get_user, grant_permission
+from ..auth.enum import RecipientType, PermissionType
+from ..database import get_db
 from ..models import *
 from ..config import settings as s
-from .. import database
+from ..schemas.auth import UserCreateSchema, PermissionSchema
+from .. import create_app
+
+
+TEST_USER = UserCreateSchema(
+    username="tester",
+    password=get_password_hash("password"),
+    email="tester@tests.org",
+    firstname="Test",
+    lastname="Test"
+)
+
+
+def fake_authenticated_user(db: Session, username_override: Optional[str] = None):
+    async def _auth_user():
+        return get_user(db=db, username=username_override or TEST_USER.username)
+
+    return _auth_user
 
 
 def populate_db(db: Session):
@@ -50,6 +71,13 @@ def populate_db(db: Session):
       2  | Jane   | 12  |   -  |   [1]   | jane     | Jane | red, black
     
     '''
+    user, _ = get_or_create_user(db=db, data=TEST_USER)
+    grant_permission(data=PermissionSchema(
+        recipient_type=RecipientType.USER,
+        recipient_name=user.username,
+        permission=PermissionType.SUPERUSER
+    ), db=db)
+
     age_float = Attribute(name='age', type=AttrType.FLOAT)
     age_int = Attribute(name='age', type=AttrType.INT)
     age_str = Attribute(name='age', type=AttrType.STR)
@@ -128,6 +156,10 @@ def populate_db(db: Session):
     p2_fav_color_2 = ValueStr(value='black', entity_id=p2.id, attribute_id=fav_color.id)
 
     db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2, p2_fav_color_1, p2_fav_color_2])
+
+    unperson = Schema(name="UnPerson", slug="unperson")
+    db.add(unperson)
+    db.flush()
     db.commit()
 
 
@@ -150,31 +182,31 @@ def tables(engine):
 
 
 @pytest.fixture
-def dbsession(engine, tables):
+def dbsession(engine, tables) -> Session:
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = TestingSessionLocal()
-    yield session
-    session.close()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
-def client_(engine):
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    def override_get_db():
-        try:
-            db = TestingSessionLocal()
-            yield db
-        finally:
-            db.close()
-            
-    database.get_db = override_get_db
-    database.SessionLocal = TestingSessionLocal
-    from .. import create_app
-    app = create_app()
-
-    client = TestClient(app)
-    return client
-    
 @pytest.fixture
-def client(engine):
-    yield client_(engine)
+def client(dbsession):
+    app = create_app(session=dbsession)
+    app.dependency_overrides[get_db] = lambda: dbsession
+    client = TestClient(app)
+    yield client
 
+
+@pytest.fixture
+def authenticated_client(client, dbsession):
+    client.app.dependency_overrides[authenticated_user] = fake_authenticated_user(db=dbsession)
+    yield client
+
+
+@pytest.fixture
+def authorized_client(authenticated_client, dbsession):
+    client = authenticated_client
+    client.app.dependency_overrides[authorized_user] = fake_authenticated_user(db=dbsession)
+    yield client

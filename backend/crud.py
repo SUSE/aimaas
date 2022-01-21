@@ -94,52 +94,56 @@ def create_schema(db: Session, data: SchemaCreateSchema) -> Schema:
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
-    
-    attr_names = set()
-    for attr in data.attributes:
-        if isinstance(attr, AttrDefSchema):
-            a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
-            if a is None:
-                raise MissingAttributeException(attr.attr_id)
-        elif isinstance(attr, AttrDefWithAttrDataSchema):
-            a = create_attribute(db, attr, commit=False)
-            db.flush()
-        
-        if a.name in attr_names:
-            raise MultipleAttributeOccurencesException(a.name)
-        attr_names.add(a.name)
 
-        ad = AttributeDefinition(
-            attribute_id=a.id, 
-            schema_id=sch.id,
-            required=attr.required, 
-            list=attr.list, 
-            unique=attr.unique,
-            key=attr.key,
-            description=attr.description
-        )
-        db.add(ad)
-        db.flush()
-        if a.type == AttrType.FK:
-            if attr.bind_to_schema is None:
-                raise NoSchemaToBindException(attr_id=a.id)
-            if attr.bind_to_schema == -1:
-                s = sch
-            else:
-                s = db.execute(
-                    select(Schema)
-                    .where(Schema.id == attr.bind_to_schema)
-                    .where(Schema.deleted == False)
-                ).scalar()
-            if s is None:
-                raise MissingSchemaException(obj_id=attr.bind_to_schema)
-            bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
-            db.add(bfk)
     try:
+        attr_names = set()
+        for attr in data.attributes:
+            if isinstance(attr, AttrDefSchema):
+                a: Attribute = db.execute(select(Attribute).where(Attribute.id == attr.attr_id)).scalar()
+                if a is None:
+                    raise MissingAttributeException(attr.attr_id)
+            elif isinstance(attr, AttrDefWithAttrDataSchema):
+                a = create_attribute(db, attr, commit=False)
+                db.flush()
+
+            if a.name in attr_names:
+                raise MultipleAttributeOccurencesException(a.name)
+            attr_names.add(a.name)
+
+            ad = AttributeDefinition(
+                attribute_id=a.id,
+                schema_id=sch.id,
+                required=attr.required,
+                list=attr.list,
+                unique=attr.unique,
+                key=attr.key,
+                description=attr.description
+            )
+            db.add(ad)
+            db.flush()
+            if a.type == AttrType.FK:
+                if attr.bind_to_schema is None:
+                    raise NoSchemaToBindException(attr_id=a.id)
+                if attr.bind_to_schema == -1:
+                    s = sch
+                else:
+                    s = db.execute(
+                        select(Schema)
+                        .where(Schema.id == attr.bind_to_schema)
+                        .where(Schema.deleted == False)
+                    ).scalar()
+                if s is None:
+                    raise MissingSchemaException(obj_id=attr.bind_to_schema)
+                bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
+                db.add(bfk)
+
         db.commit()
     except sqlalchemy.exc.IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
+    except:
+        db.rollback()
+        raise
     return sch
 
 

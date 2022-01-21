@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional, Union
 
 from .models import Entity
 
@@ -18,11 +18,21 @@ class EntityExistsException(Exception):
     def __str__(self) -> str:
         return f'Entity with slug `{self.slug}` already exists in this schema'
 
-class MissingObjectException(Exception):
-    obj_type: str
 
-    def __init__(self, obj_id: int):
+class GroupExistsException(Exception):
+    def __init__(self, name: str):
+        self.name = name
+
+    def __str__(self) -> str:
+        return f'Group with name {self.name} already exists'
+
+
+class MissingObjectException(Exception):
+    obj_type: str = "Object"
+
+    def __init__(self, obj_id: Union[int, str], obj_type: Optional[str] = None):
         self.obj_id = obj_id
+        self.obj_type = obj_type or self.obj_type
 
     def __str__(self) -> str:
         return f"{self.obj_type} with id {self.obj_id} doesn't exist or was deleted"
@@ -35,6 +45,31 @@ class MissingEntityException(MissingObjectException):
 
 class MissingAttributeException(MissingObjectException):
     obj_type = 'Attribute'
+
+class MissingUserException(MissingObjectException):
+    obj_type = 'User'
+
+
+class MissingPermissionException(MissingObjectException):
+    obj_type = 'Permission'
+
+
+class MissingGroupPermissionException(MissingObjectException):
+    obj_type = 'Group permission'
+
+
+class MissingGroupException(MissingObjectException):
+    obj_type = 'Group'
+
+
+class MissingUserGroupException(MissingObjectException):
+    def __init__(self, user_id, group_id):
+        self.user_id = user_id
+        self.group_id = group_id
+
+    def __str__(self):
+        return f"User {self.user_id} is not a member of group {self.group_id}"
+
 
 class MultipleAttributeOccurencesException(Exception):
     def __init__(self, attr_name: str):
@@ -152,3 +187,12 @@ class InvalidFilterAttributeException(Exception):
 
     def __str__(self) -> str:
         return f"Can't filter current schema by attribute `{self.attr}`. Allowed attributes: {', '.join(self.allowed_attrs)}"
+
+
+class NoOpChangeException(Exception):
+    pass
+
+
+class CircularGroupReferenceException(Exception):
+    def __str__(self) -> str:
+        return 'Made an attempt to inherit from group which either directly or indirectly inherits from current group'
