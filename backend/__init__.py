@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, subqueryload
 from .config import settings
 from .database import SessionLocal
 from .dynamic_routes import create_dynamic_router
-from .models import Schema, AttributeDefinition
+from .models import Schema, AttributeDefinition, BoundFK
 from .general_routes import router
 
 
@@ -17,10 +17,22 @@ def load_schemas(db: Session) -> List[models.Schema]:
         select(Schema)
         .options(
             subqueryload(Schema.attr_defs)
-            .subqueryload(AttributeDefinition.attribute)
+            .subqueryload(AttributeDefinition.bound_fk)
+            .subqueryload(BoundFK.schema)
         )
     ).scalars().all()
     return schemas
+
+
+def generate_api_description() -> str:
+    description = '# Filters\n\n**Filters list**:'
+    for filter, desc in dynamic_routes.FILTER_DESCRIPTION.items():
+        description += '\n* `{}` - {}'.format(filter, desc)
+
+    description += '\n\n**Available filters for each type**:'
+    for type, filters in crud.ALLOWED_FILTERS.items():
+        description += '\n* `{}`: {}'.format(type.name, ', '.join([f'`{i}`' for i in filters]))
+    return description
 
 
 def load_dynamic_routes(db: Session, app: FastAPI):
@@ -30,7 +42,7 @@ def load_dynamic_routes(db: Session, app: FastAPI):
 
 
 def create_app(session: Optional[Session] = None) -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(description=generate_api_description())
     origins = ['*']
     app.add_middleware(CORSMiddleware,
         allow_origins=origins,

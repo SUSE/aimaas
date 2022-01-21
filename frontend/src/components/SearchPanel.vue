@@ -22,9 +22,9 @@
             type="button" data-bs-toggle="tooltip" title="Search">
       <i class='eos-icons'>search</i>
     </button>
-    <button class="btn btn-dark px-3 disabled" type="button" data-bs-toggle="collapse"
+    <button class="btn btn-dark px-3" type="button" data-bs-toggle="collapse"
             data-bs-target="#collapsed-filters" aria-expanded="false"
-            aria-controls="collapsed-filters" title="Click to expand more filter options (Not implemented yet)">
+            aria-controls="collapsed-filters" title="Click to expand more filter options">
       <i class="eos-icons">more_vert</i>
     </button>
   </div>

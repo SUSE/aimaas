@@ -46,6 +46,40 @@ class MissingEntityException(MissingObjectException):
 class MissingAttributeException(MissingObjectException):
     obj_type = 'Attribute'
 
+
+class MissingChangeException(MissingObjectException):
+    obj_type = 'Change'
+
+class MissingEntityUpdateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity update request with id {self.obj_id}'
+
+
+class MissingEntityDeleteRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity delete request with id {self.obj_id}'
+
+
+class MissingEntityCreateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity create request with id {self.obj_id}'
+
+
+class MissingSchemaCreateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema create request with id {self.obj_id}'
+
+
+class MissingSchemaUpdateRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema update request with id {self.obj_id}'
+
+
+class MissingSchemaDeleteRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no schema delete request with id {self.obj_id}'
+
+
 class MissingUserException(MissingObjectException):
     obj_type = 'User'
 
@@ -160,15 +194,6 @@ class ReservedAttributeException(Exception):
 
     def __str__(self) -> str:
         return f"Can't create attribute `{self.attr_name}`. List of reserved attribute names: {', '.join(self.reserved)}"
-
-
-class ReservedSchemaSlugException(Exception):
-    def __init__(self, slug: str, reserved: List[str]):
-        self.slug = slug
-        self.reserved = reserved
-
-    def __str__(self) -> str:
-        return f"Can't create schema with slug `{self.slug}`. List of reserved schema slugs: {', '.join(self.reserved)}"
 
 
 class InvalidFilterOperatorException(Exception):

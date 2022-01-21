@@ -6,6 +6,20 @@ from ..models import *
 from ..exceptions import *
 
 
+def asserts_after_entities_create(db: Session):
+    born = datetime(1990, 6, 30, tzinfo=timezone.utc)
+    tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
+    persons = db.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
+    assert len(persons) == 5
+    assert persons[-2].name == 'John'
+    assert persons[-2].slug == 'John'
+    assert persons[-2].get('nickname', db).value == 'john'
+    assert persons[-2].get('age', db).value == 10
+    assert persons[-2].get('born', db).value == born
+    assert isinstance(persons[-2].get('age', db), ValueInt)
+    assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
+    assert persons[-1].get('born', db).value == tz_born
+
 class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
@@ -27,6 +41,7 @@ class TestEntityCreate:
             'born': born
         }
         p2 = create_entity(dbsession, schema_id=1, data=p2)
+
         p3 = {
             'name': 'Pumpkin Jack',
             'slug': 'pumpkin-jack',
@@ -37,17 +52,29 @@ class TestEntityCreate:
         }
         p3 = create_entity(dbsession, schema_id=1, data=p3)
 
-        persons = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
-        assert len(persons) == 5
-        assert persons[-2].name == 'John'
-        assert persons[-2].slug == 'John'
-        assert persons[-2].get('nickname', dbsession).value == 'john'
-        assert persons[-2].get('age', dbsession).value == 10
-        assert persons[-2].get('born', dbsession).value == born
-        assert isinstance(persons[-2].get('age', dbsession), ValueInt)
-        assert [i.value for i in persons[-2].get('friends', dbsession)] == [p1.id, 1]
-        assert persons[-1].get('born', dbsession).value == tz_born
+        asserts_after_entities_create(dbsession)
     
+    def test_no_raise_with_empty_optional_single_fk_field(self, dbsession):
+        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
+        attr_def = AttributeDefinition(
+            schema_id=1,
+            attribute=attr,
+            required=False,
+            key=False,
+            unique=False,
+            list=False
+        )
+        dbsession.add(attr_def)
+        dbsession.commit()
+        data = {
+            'name': 'Mike',
+            'slug': 'Mike',
+            'nickname': 'mike',
+            'age': 10,
+            'friends': []
+        }
+        create_entity(dbsession, schema_id=1, data=data)
+
     def test_raise_on_non_unique_slug(self, dbsession):
         p1 = {
             'name': 'Jack',
@@ -228,7 +255,7 @@ class TestEntityRead:
         s = Schema(name='test', slug='test')
         dbsession.add(s)
         dbsession.flush()
-        with pytest.raises(MismatchingSchemaException):
+        with pytest.raises(MissingEntityException):
             get_entity(dbsession, id_or_slug=1, schema=s)
 
     def test_get_entities(self, dbsession):
@@ -397,6 +424,31 @@ class TestEntityRead:
             get_entities(dbsession, schema=schema, filters=filters).entities
 
 
+def asserts_after_entities_update(db: Session, born_time: datetime):
+    e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
+    assert e.slug == 'test'
+    assert e.get('age', db).value == 10
+    assert e.get('born', db).value.replace(tzinfo=timezone.utc) == born_time
+    assert [i.value for i in e.get('friends', db)] == [1, 2]
+    assert e.get('nickname', db) is None
+    nicknames = db.execute(
+        select(ValueStr)
+        .where(Attribute.name == 'nickname')
+        .join(Attribute)
+    ).scalars().all()
+    assert len(nicknames) == 1, "nickname for entity 1 wasn't deleted from database"
+
+    e = db.execute(select(Entity).where(Entity.id == 2)).scalar()
+    assert e.slug == 'test2'
+    assert e.get('nickname', db).value == 'test'
+    nicknames = db.execute(
+        select(ValueStr)
+        .where(Attribute.name == 'nickname')
+        .join(Attribute)
+    ).scalars().all()
+    assert len(nicknames) == 1, "nickname for entity 2 wasn't deleted from database"
+
+
 class TestEntityUpdate:
     def test_update(self, dbsession):
         time = datetime.now(timezone(timedelta(hours=-4)))
@@ -407,33 +459,32 @@ class TestEntityUpdate:
             'friends': [1, 2],
         }
         update_entity(dbsession, id_or_slug=1, schema_id=1, data=data)
-        e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
-        assert e.slug == 'test'
-        assert e.get('age', dbsession).value == 10
-        assert e.get('born', dbsession).value == time
-        assert [i.value for i in e.get('friends', dbsession)] == [1, 2]
-        assert e.get('nickname', dbsession) == None
-        nicknames = dbsession.execute(
-            select(ValueStr)
-            .where(Attribute.name == 'nickname')
-            .join(Attribute)
-        ).scalars().all()
-        assert len(nicknames) == 1, "nickname for entity 1 wasn't deleted from database"
 
         data = {
             'slug': 'test2',
             'nickname': 'test'
         }
         update_entity(dbsession, id_or_slug='Jane', schema_id=1, data=data)
-        e = dbsession.execute(select(Entity).where(Entity.id == 2)).scalar()
-        assert e.slug == 'test2'
-        assert e.get('nickname', dbsession).value == 'test'
-        nicknames = dbsession.execute(
-            select(ValueStr)
-            .where(Attribute.name == 'nickname')
-            .join(Attribute)
-        ).scalars().all()
-        assert len(nicknames) == 1, "nickname for entity 2 wasn't deleted from database"
+        asserts_after_entities_update(dbsession, born_time=time)
+
+    def test_no_raise_with_empty_optional_single_fk_field(self, dbsession):
+        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
+        attr_def = AttributeDefinition(
+            schema_id=1,
+            attribute=attr,
+            required=False,
+            key=False,
+            unique=False,
+            list=False
+        )
+        dbsession.add(attr_def)
+        dbsession.commit()
+        data = {
+            'name': 'Mike',
+            'slug': 'Mike',
+            'address': None,
+        }
+        update_entity(dbsession, id_or_slug=1, schema_id=1, data=data)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession):
         with pytest.raises(MissingEntityException):
@@ -511,15 +562,17 @@ class TestEntityUpdate:
         assert e.get('nickname', dbsession).value == 'jane'
 
 
+def asserts_after_entity_delete(db: Session):
+    entities = db.execute(select(Entity)).scalars().all()
+    assert len(entities) == 2
+    e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
+    assert e.deleted
+
 class TestEntityDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'Jack'])
     def test_delete(self, dbsession, id_or_slug):
         delete_entity(dbsession, id_or_slug=id_or_slug, schema_id=1)
-        
-        entities = dbsession.execute(select(Entity)).scalars().all()
-        assert len(entities) == 2
-        e = dbsession.execute(select(Entity).where(Entity.id == 1)).scalar()
-        assert e.deleted
+        asserts_after_entity_delete(db=dbsession)
 
     @pytest.mark.parametrize('id_or_slug', [1234567, 'qwertyu'])
     def test_raise_on_entity_doesnt_exist(self, dbsession, id_or_slug):

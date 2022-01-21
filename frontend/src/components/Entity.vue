@@ -46,8 +46,7 @@ export default {
           name: "History",
           component: shallowRef(Changes),
           icon: "history",
-          tooltip: 'Change history of entity (not implemented yet)',
-          disabled: true
+          tooltip: 'Change history of entity'
         }
       ]
     };
