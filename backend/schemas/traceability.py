@@ -1,11 +1,11 @@
 from datetime import datetime
-from enum import Enum
 from typing import Dict, List, Optional, Union, Any
 
 from pydantic import BaseModel, Field, validator
 
-from ..models import ChangeObject, ChangeStatus, ChangeType, User
+from ..auth.models import User
 from .schema import AttrDefSchema, AttrDefUpdateSchema, SchemaBaseSchema
+from ..traceability.enum import EditableObjectType, ChangeStatus, ChangeType, ReviewResult
 
 
 class ChangeRequestSchema(BaseModel):
@@ -16,7 +16,7 @@ class ChangeRequestSchema(BaseModel):
     reviewed_by: Optional[str]
     status: ChangeStatus
     comment: Optional[str]
-    object_type: ChangeObject
+    object_type: EditableObjectType
     change_type: ChangeType
 
     class Config:
@@ -31,11 +31,6 @@ class ChangeRequestSchema(BaseModel):
 class SchemaChangeRequestSchema(BaseModel):
     schema_changes: List[ChangeRequestSchema]
     pending_entity_requests: List[ChangeRequestSchema]
-
-
-class ReviewResult(Enum):
-    APPROVE = 'APPROVE'
-    DECLINE = 'DECLINE'
 
 
 class ChangeReviewSchema(BaseModel):

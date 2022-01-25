@@ -89,7 +89,7 @@ class TestSchemaCreate:
         }
 
     def test_create(self, dbsession):
-        data = self.data_for_test(dbsession)
+        data = self.data_for_test()
         car = SchemaCreateSchema(name='Car', slug='car', attributes=list(data['attr_defs'].values()))
         create_schema(dbsession, data=car)
         asserts_after_schema_create(dbsession)
@@ -151,7 +151,7 @@ class TestSchemaCreate:
             create_schema(dbsession, data=sch)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
-        data = self.data_for_test(dbsession)
+        data = self.data_for_test()
 
         test = SchemaCreateSchema(
             name='Test',
@@ -678,10 +678,13 @@ class TestSchemaUpdate:
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
    
 
-def asserts_after_schema_delete(db: Session):
+def asserts_after_schema_delete(db: Session, deleted_schema_id: int):
     schemas = db.execute(select(Schema)).scalars().all()
     assert len(schemas) == 2
-    assert schemas[0].deleted
+
+    deleted_schema = [schema for schema in schemas if schema.id == deleted_schema_id]
+    assert deleted_schema
+    assert deleted_schema[0].deleted
 
     entities = db.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
     assert len(entities) == 2
@@ -690,8 +693,8 @@ def asserts_after_schema_delete(db: Session):
 class TestSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_delete(self, dbsession, id_or_slug):
-        delete_schema(dbsession, id_or_slug=id_or_slug)
-        asserts_after_schema_delete(db=dbsession)
+        s = delete_schema(dbsession, id_or_slug=id_or_slug)
+        asserts_after_schema_delete(db=dbsession, deleted_schema_id=s.id)
     
     def test_raise_on_already_deleted(self, dbsession):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))

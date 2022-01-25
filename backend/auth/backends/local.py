@@ -3,7 +3,7 @@ from typing import Optional
 from .abstract import AbstractBackend
 from ..context import pwd_context
 from ..crud import get_user
-from ...models import User
+from ..models import User
 
 
 class Backend(AbstractBackend):

@@ -11,10 +11,12 @@ from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from ..config import settings as s
 from .context import pwd_context
 from ..database import get_db
-from ..models import User, Group, Schema, Entity
+from ..models import Schema, Entity
 from ..schemas.auth import RequirePermission
 from .backends import get
 from .crud import get_user, has_permission
+from .enum import PermissionType
+from .models import User, Group
 
 
 _enabled_backends = get()

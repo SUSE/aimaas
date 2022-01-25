@@ -7,6 +7,7 @@ import pytest
 
 from ..models import *
 from ..schemas import *
+from ..traceability.models import ChangeRequest, Change
 from .test_crud_schema import (
     asserts_after_schema_create,
     asserts_after_schema_update,
@@ -75,19 +76,19 @@ class TestRouteSchemasGet:
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas?all=True')
-        assert response.status_code == 200
-        assert response.json() == [
+        expected = [
             {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
             {'id': 2, 'name': 'UnPerson', 'slug': 'unperson', 'deleted': False},
             {'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}
         ]
 
+        response = client.get('/schemas?all=True')
+        assert response.status_code == 200
+        assert response.json() == expected
+
         response = client.get('/schemas?all=True&deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'},
-                                   {'id': 2, 'name': 'UnPerson', 'slug': 'unperson'},
-                                   {'id': 3, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == expected
 
     def test_get_deleted_only(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
@@ -580,7 +581,7 @@ class TestRouteSchemaUpdate:
             ]
         } 
         response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 class TestRouteSchemaDelete:
@@ -591,7 +592,7 @@ class TestRouteSchemaDelete:
         assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True, 'reviewable': False}
 
         asserts_after_applying_schema_delete_request(db=dbsession, comment='Autosubmit')
-        asserts_after_schema_delete(db=dbsession)
+        asserts_after_schema_delete(db=dbsession, deleted_schema_id=1)
 
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
@@ -870,7 +871,7 @@ class TestRouteGetSchemaChanges:
 
 
 class TestTraceabilityRoutes:
-    def test_review_changes(self, dbsession: Session, client: TestClient):
+    def test_review_changes(self, dbsession: Session, authorized_client: TestClient):
         change_request = make_change_for_review(dbsession)
 
         # APPROVE
@@ -879,7 +880,8 @@ class TestTraceabilityRoutes:
             'comment': 'test'
         }
 
-        response = client.post(f'/changes/review/{change_request.id}', json=review)
+        response = authorized_client.post(f'/changes/review/{change_request.id}', json=review)
+        assert response.status_code == 200
         assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack', 'deleted': False}
 
         dbsession.commit()
@@ -889,17 +891,17 @@ class TestTraceabilityRoutes:
         # DECLINE
         review['result'] = 'DECLINE'
         review['comment'] = 'test2'
-        response = client.post(f'/changes/review/{change_request.id}', json=review)
+        response = authorized_client.post(f'/changes/review/{change_request.id}', json=review)
         json = response.json()
         assert json['status'] == 'DECLINED'
         assert json['comment'] == 'test2'
 
-    def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
+    def test_raise_on_change_doesnt_exist(self, dbsession: Session, authorized_client: TestClient):
         review = {
             'result': 'APPROVE',
             'comment': 'test'
         }
-        response = client.post(f'/changes/review/23456', json=review)
+        response = authorized_client.post('/changes/review/23456', json=review)
         assert response.status_code == 404
 
     def test_get_pending_change_requests(self, dbsession: Session, client: TestClient):

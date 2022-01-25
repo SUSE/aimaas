@@ -1,11 +1,10 @@
-from datetime import datetime
-from typing import Dict
-
-from ..models import *
+from .models import ChangeRequest, Change, ChangeValueInt, ChangeAttrType, ChangeValueBool, \
+    ChangeValueStr
 from ..schemas import *
-from ..exceptions import *
 from ..crud import *
 from .. import crud
+
+from .enum import EditableObjectType, ContentType
 
 
 def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> List[ChangeRequest]:
@@ -13,7 +12,7 @@ def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -
         select(ChangeRequest)
         .where(ChangeRequest.status == ChangeStatus.PENDING)
         .where(ChangeRequest.change_type == ChangeType.CREATE)
-        .where(ChangeRequest.object_type == ChangeObject.ENTITY)
+        .where(ChangeRequest.object_type == EditableObjectType.ENTITY)
         .join(Change)
         .where(Change.field_name == 'schema_id')
         .join(ChangeValueInt, Change.value_id == ChangeValueInt.id)
@@ -132,7 +131,7 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.SCHEMA,
+        object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.CREATE
     )
     db.add(change_request)
@@ -277,7 +276,7 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.SCHEMA,
+        object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.UPDATE
     )
     db.add(change_request)
@@ -483,7 +482,7 @@ def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], creat
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.SCHEMA,
+        object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.DELETE
     )
     db.add(change_request)

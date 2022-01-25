@@ -10,9 +10,15 @@ from pydantic.main import BaseModel, ModelMetaclass
 
 from .auth import authorized_user
 from .auth.enum import PermissionType
+from .auth.models import User
 from .config import settings
-from .models import AttrType, Schema, AttributeDefinition, User, Entity
-from . import crud, exceptions, schemas, traceability
+from .database import get_db
+from .models import AttrType, Schema, AttributeDefinition, Entity
+from . import crud, exceptions, schemas
+
+from .traceability.entity import create_entity_create_request, create_entity_update_request, \
+    create_entity_delete_request, apply_entity_create_request, apply_entity_update_request, \
+    apply_entity_delete_request
 
 
 def _make_type(attr_def: AttributeDefinition, optional: bool = False) -> tuple:
@@ -93,7 +99,7 @@ def _meta_for_get_entity(schema: Schema) -> dict:
     return meta
 
 
-def route_get_entity(router: APIRouter, schema: Schema, get_db: Callable):
+def route_get_entity(router: APIRouter, schema: Schema):
     entity_get_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}Get") 
     description = _description_for_get_entity(schema=schema)
     metadata = _meta_for_get_entity(schema=schema)
@@ -198,7 +204,7 @@ def _meta_for_get_entities(schema: Schema) -> dict:
         meta['filter_fields']['fields'][attr_def.attribute.name]['type'] = type_.__name__
     return meta
 
-def route_get_entities(router: APIRouter, schema: Schema, get_db: Callable):
+def route_get_entities(router: APIRouter, schema: Schema):
     entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
     description = _description_for_get_entities(schema=schema)
     filter_model = _filters_request_model(schema=schema)
@@ -290,7 +296,7 @@ def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
     return model
 
 
-def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
+def route_create_entity(router: APIRouter, schema: Schema):
     entity_create_schema = _create_entity_request_model(schema=schema)
     @router.post(
         f'/{schema.slug}',
@@ -325,7 +331,7 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
     def create_entity(data: entity_create_schema, db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.CREATE_ENTITY, target=Schema())))):
         try:
-            change = traceability.create_entity_create_request(
+            change = create_entity_create_request(
                 db=db,
                 schema_id=schema.id,
                 data=data.dict(),
@@ -333,7 +339,7 @@ def route_create_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_create_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
+                return apply_entity_create_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
             db.commit()
             return change
         except exceptions.MissingSchemaException as e:
@@ -382,7 +388,7 @@ def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
     return model
 
 
-def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
+def route_update_entity(router: APIRouter, schema: Schema):
     entity_update_schema = _update_entity_request_model(schema=schema)
     @router.put(
         f'/{schema.slug}/{{id_or_slug}}',
@@ -421,7 +427,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
                       db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.UPDATE_ENTITY, target=Entity())))):
         try:
-            change = traceability.create_entity_update_request(
+            change = create_entity_update_request(
                 db=db,
                 id_or_slug=id_or_slug,
                 schema_id=schema.id,
@@ -430,7 +436,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_update_request(
+                return apply_entity_update_request(
                     db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit'
                 )
             db.commit()
@@ -449,7 +455,7 @@ def route_update_entity(router: APIRouter, schema: Schema, get_db: Callable):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) 
 
 
-def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
+def route_delete_entity(router: APIRouter, schema: Schema):
     @router.delete(
         f'/{schema.slug}/{{id_or_slug}}',
         response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
@@ -464,7 +470,7 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
     def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.DELETE_ENTITY, target=Entity())))):
         try:
-            change = traceability.create_entity_delete_request(
+            change = create_entity_delete_request(
                 db=db,
                 id_or_slug=id_or_slug,
                 schema_id=schema.id,
@@ -472,7 +478,7 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
                 commit=False
             )
             if not schema.reviewable:
-                return traceability.apply_entity_delete_request(
+                return apply_entity_delete_request(
                     db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit'
                 )
             db.commit()
@@ -481,14 +487,14 @@ def route_delete_entity(router: APIRouter, schema: Schema, get_db: Callable):
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         
 
-def create_dynamic_router(schema: Schema, app: FastAPI, get_db: Callable, old_slug: str = None):
+def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
     router = APIRouter()
     
-    route_get_entities(router=router, schema=schema, get_db=get_db)
-    route_get_entity(router=router, schema=schema, get_db=get_db)
-    route_create_entity(router=router, schema=schema, get_db=get_db)
-    route_update_entity(router=router, schema=schema, get_db=get_db)
-    route_delete_entity(router=router, schema=schema, get_db=get_db)
+    route_get_entities(router=router, schema=schema)
+    route_get_entity(router=router, schema=schema)
+    route_create_entity(router=router, schema=schema)
+    route_update_entity(router=router, schema=schema)
+    route_delete_entity(router=router, schema=schema)
 
     router_routes = [(r.path, r.methods) for r in router.routes]
     routes_to_remove = []

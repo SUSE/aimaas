@@ -50,6 +50,11 @@ class MissingAttributeException(MissingObjectException):
 class MissingChangeException(MissingObjectException):
     obj_type = 'Change'
 
+
+class MissingChangeRequestException(MissingObjectException):
+    obj_type = "ChangeRequest"
+
+
 class MissingEntityUpdateRequestException(MissingObjectException):
     def __str__(self) -> str:
         return f'There is no entity update request with id {self.obj_id}'

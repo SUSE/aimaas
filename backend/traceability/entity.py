@@ -1,14 +1,13 @@
 from copy import deepcopy
-from datetime import datetime
-from typing import Dict
-from collections import defaultdict
 
-from ..models import *
+from .models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, ChangeValueBool, \
+    ChangeValueStr
 from ..schemas import *
-from ..exceptions import *
 from ..crud import *
 from .. import crud
 from .. import dynamic_routes
+
+from .enum import EditableObjectType, ContentType
 
 def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> List[ChangeRequest]:
     return db.execute(
@@ -148,7 +147,7 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.CREATE
     )
     
@@ -332,7 +331,7 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.UPDATE
     )
     db.add(change_request)
@@ -491,7 +490,7 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.utcnow(),
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.DELETE
     )
     db.add(change_request)

@@ -1,8 +1,16 @@
-from datetime import timedelta
-import pytest
+from datetime import timedelta, datetime
 
-from ..traceability import *
-from ..models import *
+import pytest
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
+from ..auth.models import User
+from ..schemas.traceability import ChangeReviewSchema
+from ..traceability.crud import decline_change_request, review_changes, get_pending_change_requests
+from ..traceability.enum import ChangeType, ContentType, EditableObjectType, ChangeStatus, \
+    ReviewResult
+from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueStr
+
 from .test_traceability_entity import make_entity_change_objects
 from .test_traceability_schema import make_schema_change_objects
 
@@ -19,7 +27,7 @@ def test_decline_change_request(dbsession: Session, content_type, change_type):
     change_request = ChangeRequest(
         created_at=datetime.utcnow(), 
         created_by=user,
-        object_type=ChangeObject[content_type.name],
+        object_type=EditableObjectType[content_type.name],
         change_type=change_type
     )
     v = ChangeValueStr()
@@ -39,7 +47,7 @@ def test_decline_change_request(dbsession: Session, content_type, change_type):
     decline_change_request(
         db=dbsession, 
         change_request_id=change_request.id,
-        change_object=ChangeObject[content_type.name],
+        change_object=EditableObjectType[content_type.name],
         change_type=change_type,
         reviewed_by=user,
         comment='test'
@@ -56,7 +64,7 @@ def make_change_for_review(db: Session) -> ChangeRequest:
     change_request = ChangeRequest(
         created_at=datetime.utcnow(), 
         created_by=user,
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.UPDATE
     )
     v = ChangeValueStr(new_value='test')

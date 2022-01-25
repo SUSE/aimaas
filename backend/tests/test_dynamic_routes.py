@@ -2,10 +2,14 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 from sqlalchemy import select, update
+from sqlalchemy.exc import PendingRollbackError
 
+from ..crud import create_schema
 from ..models import *
 from ..dynamic_routes import *
 from .. import load_schemas
+from ..schemas.schema import SchemaCreateSchema
+from ..traceability.models import ChangeRequest, Change
 from .test_crud_entity import (
     asserts_after_entities_create,
     asserts_after_entities_update,
@@ -43,10 +47,16 @@ class TestRouteBasics:
         ]
         assert all([i in [route.path for route in client.app.routes] for i in routes])
 
+
 class TestRouteCreateEntity:
     def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(ChangeRequest)).scalar() is None
-        assert db.execute(select(Change)).scalar() is None
+        try:
+            assert db.execute(select(ChangeRequest)).scalar() is None
+            assert db.execute(select(Change)).scalar() is None
+        except PendingRollbackError:
+            db.rollback()
+            db.begin()
+            self.assert_no_change_requests_appeared(db=db)
 
     def test_create_without_review(self, dbsession, authorized_client):
         p1 = {
@@ -110,12 +120,8 @@ class TestRouteCreateEntity:
         self.assert_no_change_requests_appeared(dbsession)
 
     def test_no_raise_on_same_slug_in_different_schemas(self, dbsession, authorized_client):
-        s = Schema(name='Test', slug='test')
-        dbsession.add(s)
-        dbsession.commit()
-
         data = {'slug': 'Jack', 'name': 'name'}
-        response = authorized_client.post(f'/dynamic/test', json=data)
+        response = authorized_client.post(f'/dynamic/unperson', json=data)
         assert response.status_code == 200
 
         changes = dbsession.execute(select(ChangeRequest)).scalars().all()
@@ -412,197 +418,6 @@ class TestRouteGetEntities:
         assert response.json()['entities'] == [jack, jane]
 
 
-# TODO: Check, why this should be deleted?!?
-class TestRouteCreateEntity:
-    def test_create(self, dbsession, authorized_client):
-        p1 = {
-            'name': 'mike',
-            'slug': 'Mike',
-            'nickname': 'mike',
-            'age': 10,
-            'friends': [],
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.json() == {'id': 3, 'slug': 'Mike', 'name': 'mike', 'deleted': False}
-
-        mike = dbsession.execute(select(Entity).where(Entity.id == 3)).scalar()
-        assert mike.get('nickname', dbsession).value == 'mike'
-        assert mike.get('age', dbsession).value == 10
-        assert mike.get('friends', dbsession) == []
-
-        p2 = {
-            'name': 'john',
-            'slug': 'John',
-            'nickname': 'john',
-            'age': 10,
-            'friends': [3, 1],
-            'born': '2021-10-20T13:52:17',
-        }
-        response = authorized_client.post(f'/person', json=p2)
-        assert response.json() == {'id': 4, 'slug': 'John', 'name': 'john', 'deleted': False}
-
-        john = dbsession.execute(select(Entity).where(Entity.id == 4)).scalar()
-        assert john.get('nickname', dbsession).value == 'john'
-        assert john.get('age', dbsession).value == 10
-        assert [i.value for i in john.get('friends', dbsession)] == [3, 1]
-        assert john.get('born', dbsession).value == datetime(2021, 10, 20, 13, 52, 17, tzinfo=timezone.utc)
-
-    def test_raise_on_non_unique_slug(self, dbsession, authorized_client):
-        p1 = {
-            'name': 'name',
-            'slug': 'Jack',
-            'nickname': 'test',
-            'age': 10,
-            'friends': []
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 409
-        assert 'already exists in this schema' in response.json()['detail']
-
-    def test_no_raise_on_same_slug_in_different_schemas(self, authorized_client):
-        data = {'slug': 'Jack', 'name': 'name'}
-        response = authorized_client.post(f'/unperson', json=data)
-        assert response.status_code == 200
-
-    def test_raise_on_invalid_slug(self, dbsession, authorized_client):
-        p1 = {
-            'slug': '-Jake-',
-            'nickname': 'jackie',
-            'age': 10,
-            'friends': []
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 422
-        assert 'is invalid value for slug field' in response.json()['detail'][0]['msg']
-
-    def test_raise_on_non_unique_field(self, dbsession, authorized_client):
-        p1 = {
-            'name': 'name',
-            'slug': 'Jake',
-            'nickname': 'jack',  # <-- already exists in db
-            'age': 10,
-            'friends': []
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 409
-        assert 'Got non-unique value for field' in response.json()['detail']
-
-    def test_no_raise_on_non_unique_value_if_it_is_deleted(self, dbsession, authorized_client):
-        jacks = dbsession.execute(select(ValueStr).where(ValueStr.value == 'jack')).scalars().all()
-        assert len(jacks) == 1
-
-        dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
-        dbsession.commit()
-        p1 = {
-            'name': 'name',
-            'slug': 'Jackie',
-            'nickname': 'jack', # <-- already exists in db, but for deleted entity
-            'age': 10,
-            'friends': []
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 200
-
-    def test_raise_on_attr_doesnt_exist(self, dbsession, authorized_client):
-        p = {
-            'name': 'name',
-            'slug': 'SomeName',
-            'nickname': 'somename',
-            'age': 10,
-            'friends': [1],
-            'nonexistent': True
-        }
-        response = authorized_client.post(f'/person', json=p)
-        assert response.status_code == 422
-        assert 'extra fields not permitted' in response.json()['detail'][0]['msg']
-
-    def test_raise_on_value_cast(self, dbsession, authorized_client):
-        p = {
-            'name': 'name',
-            'slug': 'SomeName',
-            'nickname': 'somename',
-            'age': 'INVALID VALUE',
-            'friends': [1],
-        }
-        response = authorized_client.post(f'/person', json=p)
-        assert response.status_code == 422
-        assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
-
-    def test_raise_on_passed_list_for_single_value_attr(self, dbsession, authorized_client):
-        p = {
-            'name': 'name',
-            'slug': 'Some name',
-            'nickname': 'somename',
-            'age': [1, 2, 3],
-            'friends': [1],
-        }
-        response = authorized_client.post(f'/person', json=p)
-        assert response.status_code == 422
-        assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
-
-    def test_raise_on_fk_entity_doesnt_exist(self, dbsession, authorized_client):
-        p1 = {
-            'name': 'name',
-            'slug': 'Mike',
-            'nickname': 'mike',
-            'age': 10,
-            'friends': [99999999]
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
-
-    def test_raise_on_fk_entity_is_deleted(self, dbsession, authorized_client):
-        dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
-        dbsession.commit()
-        p1 = {
-            'name': 'name',
-            'slug': 'Mike',
-            'nickname': 'mike',
-            'age': 10,
-            'friends': [1]
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
-
-    def test_raise_on_fk_entity_from_wrong_schema(self, dbsession, authorized_client):
-        schema = Schema(name='Test', slug='test')
-        entity = Entity(schema=schema, slug='test', name='test')
-        dbsession.add_all([schema, entity])
-        dbsession.commit()
-
-        p1 = {
-            'name': 'name',
-            'slug': 'Mike',
-            'nickname': 'mike',
-            'age': 10,
-            'friends': [entity.id]
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 422
-        assert 'got instead entity' in response.json()['detail']
-
-    def test_raise_on_slug_not_provided(self, dbsession, authorized_client):
-        p1 = {
-            'nickname': 'mike',
-            'age': 10,
-            'friends': [1]
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 422
-        assert 'field required' in response.json()['detail'][0]['msg']
-
-    def test_raise_on_required_field_not_provided(self, dbsession, authorized_client):
-        p1 = {
-            'slug': 'Mike',
-            'friends': [1]
-        }
-        response = authorized_client.post(f'/person', json=p1)
-        assert response.status_code == 422
-        assert 'field required' in response.json()['detail'][0]['msg']
-
-
 class TestRouteUpdateEntity:
     def assert_no_change_requests_appeared(self, db: Session):
         assert db.execute(select(ChangeRequest)).scalar() is None
@@ -616,7 +431,7 @@ class TestRouteUpdateEntity:
             'born': '2021-10-20T13:52:17+03',
             'friends': [1, 2],
         }
-        response = authorized_client.put('person/1', json=data)
+        response = authorized_client.put('dynamic/person/1', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test', 'deleted': False}
         asserts_after_applying_entity_update_request(dbsession, change_request_id=1)
@@ -634,7 +449,7 @@ class TestRouteUpdateEntity:
         asserts_after_entities_update(dbsession, born_time=born_utc)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client):
-        response = authorized_client.put('person/99999999999', json={})
+        response = authorized_client.put('/dynamic/person/99999999999', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
         self.assert_no_change_requests_appeared(dbsession)
@@ -677,19 +492,19 @@ class TestRouteUpdateEntity:
         p1 = {
             'slug': '-Jake-',
         }
-        response = authorized_client.put(f'/person/1', json=p1)
+        response = authorized_client.put('/dynamic/person/1', json=p1)
         assert response.status_code == 422
         assert 'is invalid value for slug field' in response.json()['detail'][0]['msg']
 
     def test_raise_on_deleting_required_value(self, dbsession, authorized_client):
         data = {'age': None}
-        response = authorized_client.put('person/1', json=data)
+        response = authorized_client.put('dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'Missing required field' in response.json()['detail']
 
     def test_raise_on_passing_list_for_not_listed_attr(self, dbsession, authorized_client):
         data = {'age': [1, 2, 3, 4, 5]}
-        response = authorized_client.put('person/1', json=data)
+        response = authorized_client.put('dynamic/person/1', json=data)
         assert response.status_code == 422
         assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
 

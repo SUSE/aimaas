@@ -1,6 +1,7 @@
+from datetime import timezone, timedelta, datetime
+
 import pytest
 
-from ..config import *
 from ..crud import *
 from ..models import *
 from ..exceptions import *
@@ -18,7 +19,7 @@ def asserts_after_entities_create(db: Session):
     assert persons[-2].get('born', db).value == born
     assert isinstance(persons[-2].get('age', db), ValueInt)
     assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
-    assert persons[-1].get('born', db).value == tz_born
+    assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(timezone.utc)
 
 class TestEntityCreate:
     def test_create(self, dbsession):
@@ -428,7 +429,7 @@ def asserts_after_entities_update(db: Session, born_time: datetime):
     e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
     assert e.slug == 'test'
     assert e.get('age', db).value == 10
-    assert e.get('born', db).value.replace(tzinfo=timezone.utc) == born_time
+    assert e.get('born', db).value.astimezone(timezone.utc) == born_time.astimezone(timezone.utc)
     assert [i.value for i in e.get('friends', db)] == [1, 2]
     assert e.get('nickname', db) is None
     nicknames = db.execute(

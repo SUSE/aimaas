@@ -1,37 +1,17 @@
 import enum
-from datetime import datetime
-from typing import List, Union, Optional, NamedTuple
+from typing import List, Union, Optional
 
 from sqlalchemy import (
     select, Enum, DateTime, Date,
     Boolean, Column, ForeignKey,
     Integer, String, Float)
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
-from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
+from sqlalchemy.sql.schema import UniqueConstraint
 
-from .auth.enum import PermissionType, PermissionTargetType, RecipientType
-from .config import settings
+from .base_models import Value, Mapping
 from .database import Base
-
-
-class Value(Base):
-    __abstract__ = True
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    @declared_attr
-    def entity_id(cls):
-        return Column(Integer, ForeignKey('entities.id'))
-
-    @declared_attr
-    def attribute_id(cls):
-        return Column(Integer, ForeignKey('attributes.id'))
-
-    @declared_attr
-    def entity(cls):
-        return relationship('Entity')
+from .utils import make_aware_datetime
 
 
 class ValueBool(Value):
@@ -66,16 +46,6 @@ class ValueDatetime(Value):
 class ValueDate(Value):
     __tablename__ = 'values_date'
     value = Column(Date)
-
-class Mapping(NamedTuple):
-    model: Value
-    converter: type
-
-
-def make_aware_datetime(dt: datetime) -> datetime:
-    if dt and dt.tzinfo is None:
-        return dt.replace(tzinfo=settings.timezone)
-    return dt
 
 
 class AttrType(enum.Enum):
@@ -187,205 +157,4 @@ class AttributeDefinition(Base):
 
     __table_args__ = (
         UniqueConstraint('schema_id', 'attribute_id'),
-    )
-
-
-class Group(Base):
-    __tablename__ = 'groups'
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String(128), unique=True, nullable=False)
-    parent_id = Column(Integer, ForeignKey('groups.id'))
-    parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
-
-    def __str__(self):
-        return self.name
-
-
-class User(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
-    username = Column(String(128), unique=True, nullable=False)
-    email = Column(String(128), unique=True, nullable=False)
-    password = Column(String, nullable=True)
-    firstname = Column(String(128), nullable=True)
-    lastname = Column(String(128), nullable=True)
-    is_active = Column(Boolean, default=True)
-
-    def __str__(self):
-        return self.username
-
-
-class Permission(Base):
-    __tablename__ = 'permissions'
-    id = Column(Integer, primary_key=True)
-    recipient_type = Column(Enum(RecipientType), nullable=False)
-    recipient_id = Column(Integer, nullable=False)
-    obj_type = Column(Enum(PermissionTargetType), nullable=True)
-    obj_id = Column(Integer, nullable=True)
-    permission = Column(Enum(PermissionType), nullable=False)
-
-    user = relationship('User',
-                        primaryjoin="and_(User.id == foreign(Permission.recipient_id), "
-                                    "Permission.recipient_type == 'USER')",
-                        overlaps="group")
-    group = relationship('Group',
-                         primaryjoin="and_(Group.id == foreign(Permission.recipient_id), "
-                                     "Permission.recipient_type == 'GROUP')",
-                         overlaps="user")
-    schema = relationship('Schema',
-                          primaryjoin="and_(Schema.id == foreign(Permission.obj_id), "
-                                      "Permission.obj_type == 'SCHEMA')",
-                          overlaps="entity, managed_group"
-                          )
-    entity = relationship('Entity',
-                          primaryjoin="and_(Entity.id == foreign(Permission.obj_id), "
-                                      "Permission.obj_type == 'ENTITY')",
-                          overlaps="schema, managed_group"
-                          )
-    managed_group = relationship('Group',
-                                 primaryjoin="and_(Group.id == foreign(Permission.obj_id), "
-                                             "Permission.obj_type == 'GROUP')",
-                                 overlaps="schema, entity"
-                                 )
-
-    __table_args__ = (
-        UniqueConstraint('recipient_type', 'recipient_id', 'obj_type', 'obj_id', 'permission'),
-    )
-
-    @property
-    def recipient_name(self):
-        return self.user.username if self.recipient_type == RecipientType.USER else self.group.name
-
-
-class UserGroup(Base):
-    __tablename__ = 'user_groups'
-    id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-
-    group = relationship('Group')
-    user = relationship('User')
-
-    __table_args__ = (
-        UniqueConstraint('user_id', 'group_id'),
-    )
-
-#################### TRACEABILITY #########################
-class ChangeObject(enum.Enum):
-    SCHEMA = 'SCHEMA'
-    ENTITY = 'ENTITY'
-
-
-class ChangeValue(Base):
-    __abstract__ = True
-
-    id = Column(Integer, primary_key=True, index=True)
-
-class ChangeValueBool(ChangeValue):
-    __tablename__ = 'change_values_bool'
-    old_value = Column(Boolean, nullable=True)
-    new_value = Column(Boolean, nullable=True)
-
-
-class ChangeValueInt(ChangeValue):
-    __tablename__ = 'change_values_int'
-    old_value = Column(Integer, nullable=True)
-    new_value = Column(Integer, nullable=True)
-
-
-class ChangeValueFloat(ChangeValue):
-    __tablename__ = 'change_values_float'
-    old_value = Column(Float, nullable=True)
-    new_value = Column(Float, nullable=True)
-
-
-class ChangeValueForeignKey(ChangeValue):
-    __tablename__ = 'change_values_fk'
-    old_value = Column(Integer, nullable=True)
-    new_value = Column(Integer, nullable=True)
-
-
-class ChangeValueStr(ChangeValue):
-    __tablename__ = 'change_values_str'
-    old_value = Column(String, nullable=True)
-    new_value = Column(String, nullable=True)
-
-
-class ChangeValueDatetime(ChangeValue):
-    __tablename__ = 'change_values_datetime'
-    old_value = Column(DateTime(timezone=True), nullable=True)
-    new_value = Column(DateTime(timezone=True), nullable=True)
-
-
-class ChangeValueDate(ChangeValue):
-    __tablename__ = 'change_values_date'
-    old_value = Column(Date, nullable=True)
-    new_value = Column(Date, nullable=True)
-
-
-class ChangeAttrType(enum.Enum):
-    STR = Mapping(ChangeValueStr, str)
-    BOOL = Mapping(ChangeValueBool, bool)
-    INT = Mapping(ChangeValueInt, int)
-    FLOAT = Mapping(ChangeValueFloat, float)
-    FK = Mapping(ChangeValueForeignKey, int)
-    DT = Mapping(ChangeValueDatetime, make_aware_datetime)
-    DATE = Mapping(ChangeValueDate, lambda x: x)
-
-
-class ChangeStatus(enum.Enum):
-    PENDING = 'PENDING'
-    DECLINED = 'DECLINED'
-    APPROVED = 'APPROVED'
-
-
-class ChangeType(enum.Enum):
-    CREATE = 'CREATE'
-    UPDATE = 'UPDATE'
-    DELETE = 'DELETE'
-
-
-class ChangeRequest(Base):
-    __tablename__ = 'change_requests'
-    id = Column(Integer, primary_key=True)
-    created_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    reviewed_by_user_id = Column(Integer, ForeignKey('users.id'))
-
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    reviewed_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(Enum(ChangeStatus), default=ChangeStatus.PENDING, nullable=False)
-    comment = Column(String(1024), nullable=True)
-    object_type = Column(Enum(ChangeObject), nullable=False)
-    change_type = Column(Enum(ChangeType), nullable=False)
-
-    created_by = relationship('User', foreign_keys=[created_by_user_id])
-    reviewed_by = relationship('User', foreign_keys=[reviewed_by_user_id])
-
-
-class ContentType(enum.Enum):
-    ATTRIBUTE = 'ATTRIBUTE'
-    ATTRIBUTE_DEFINITION = 'ATTRIBUTE_DEFINITION'
-    ENTITY = 'ENTITY'
-    SCHEMA = 'SCHEMA'
-
-
-class Change(Base):
-    __tablename__ = 'changes'
-    id = Column(Integer, primary_key=True)
-    change_request_id = Column(Integer, ForeignKey('change_requests.id'), nullable=False)
-    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=True)
-
-    object_id = Column(Integer, nullable=True)
-    value_id = Column(Integer, nullable=False)
-    content_type = Column(Enum(ContentType), nullable=False)
-    change_type = Column(Enum(ChangeType), nullable=False)
-    field_name = Column(String, nullable=True)
-    data_type = Column(Enum(ChangeAttrType), nullable=False)
-
-    change_request = relationship('ChangeRequest')
-    attribute = relationship('Attribute')
-
-    __table_args__ = (
-        CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL)'),
     )

@@ -1,10 +1,21 @@
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, datetime
 from itertools import groupby
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from ..traceability import *
-from ..models import *
+from ..auth.models import User
+from ..models import Schema, Attribute, AttrType, AttributeDefinition
+from ..schemas.schema import AttrDefSchema, SchemaCreateSchema, AttrDefUpdateSchema, \
+    SchemaUpdateSchema
+from ..traceability.enum import ChangeType, ContentType, EditableObjectType, ChangeStatus
+from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueStr, \
+    ChangeValueBool, ChangeValueInt
+from ..traceability.schema import get_recent_schema_changes, schema_change_details, \
+    create_schema_create_request, apply_schema_create_request, get_value_for_change, \
+    create_schema_update_request, apply_schema_update_request, create_schema_delete_request, \
+    apply_schema_delete_request
 
 from .test_traceability_entity import make_entity_change_objects
 
@@ -14,7 +25,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
             created_by=user,
-            object_type=ChangeObject.SCHEMA,
+            object_type=EditableObjectType.SCHEMA,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
@@ -42,7 +53,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
             created_at=time+timedelta(hours=9),
             created_by=user,
-            object_type=ChangeObject.SCHEMA,
+            object_type=EditableObjectType.SCHEMA,
             change_type=ChangeType.CREATE
     )
     change_1 = Change(
@@ -70,17 +81,17 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
 
 
 def test_get_recent_schema_changes(dbsession: Session):
-    time = datetime.utcnow()
+    time = datetime.now(timezone.utc)
     user = dbsession.execute(select(User)).scalar()
     make_schema_change_objects(db=dbsession, user=user, time=time)
-    entities =  make_entity_change_objects(db=dbsession, user=user, time=time)
+    entities = make_entity_change_objects(db=dbsession, user=user, time=time)
     changes, entity_requests = get_recent_schema_changes(db=dbsession, schema_id=1, count=1)
-    assert changes[0].created_at == (time + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+    assert changes[0].created_at.astimezone(timezone.utc) == (time + timedelta(hours=9))
     assert len(entity_requests) == 1 and entity_requests[0] == entities[-1]
 
     changes, entity_requests = get_recent_schema_changes(db=dbsession, schema_id=1, count=5)
     for change, i in zip(changes, reversed(range(5, 10))):
-        assert change.created_at == (time + timedelta(hours=i)).replace(tzinfo=timezone.utc)
+        assert change.created_at.astimezone(timezone.utc) == (time + timedelta(hours=i))
     assert len(entity_requests) == 1 and entity_requests[0] == entities[-1]
 
 
@@ -92,7 +103,7 @@ def make_schema_create_request(db: Session, user: User, time: datetime):
         created_by=user, 
         created_at=time, 
         status=ChangeStatus.APPROVED,
-        object_type=ChangeObject.SCHEMA,
+        object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.CREATE
     )
     slug_val = ChangeValueStr(new_value='test')
@@ -318,7 +329,7 @@ def make_schema_update_request(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
         created_by=user, 
         created_at=time,
-        object_type=ChangeObject.SCHEMA,
+        object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.UPDATE
     )
     slug_val = ChangeValueStr(old_value='person', new_value='test')

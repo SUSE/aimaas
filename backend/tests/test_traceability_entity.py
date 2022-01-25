@@ -1,8 +1,19 @@
-from ..traceability import *
-from ..models import *
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..auth.models import User
+from ..exceptions import MissingEntityUpdateRequestException, AttributeNotDefinedException, \
+    MissingEntityCreateRequestException
+from ..models import AttributeDefinition, Attribute, AttrType, Entity
+from ..traceability.entity import get_recent_entity_changes, entity_change_details, \
+    create_entity_update_request, apply_entity_update_request, create_entity_delete_request, \
+    apply_entity_delete_request, create_entity_create_request, apply_entity_create_request
+from ..traceability.enum import EditableObjectType, ChangeType, ContentType, ChangeStatus
+from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, \
+    ChangeValueStr, ChangeValueForeignKey, ChangeValueDatetime, ChangeValueBool
 
 
 # TODO test_old_value_is_changed_after_applying_entity_update_request(dbsession: Session, client):
@@ -14,7 +25,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
             created_by=user,
-            object_type=ChangeObject.ENTITY,
+            object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
@@ -42,7 +53,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
             created_at=time+timedelta(hours=9),
             created_by=user,
-            object_type=ChangeObject.ENTITY,
+            object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.CREATE
     )
     change_1 = Change(
@@ -81,12 +92,12 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
     return requests
 
 def test_get_recent_entity_changes(dbsession: Session):
-    time = datetime.utcnow()
+    time = datetime.now(timezone.utc)
     user = dbsession.execute(select(User)).scalar()
     make_entity_change_objects(db=dbsession, user=user, time=time)
 
     changes = get_recent_entity_changes(db=dbsession, entity_id=1, count=1)
-    assert changes[0].created_at == (time + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+    assert changes[0].created_at.astimezone(timezone.utc) == (time + timedelta(hours=9))
 
     changes = get_recent_entity_changes(db=dbsession, entity_id=1, count=5)
     for change, i in zip(changes, reversed(range(5, 10))):
@@ -100,7 +111,7 @@ def make_entity_update_request(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
         created_by=user, 
         created_at=time,
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.DELETE
     )
     name_val = ChangeValueStr(old_value='Jack', new_value='Jackson')
@@ -248,7 +259,7 @@ class TestUpdateEntityTraceability:
         schema_change = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
-            object_type=ChangeObject.SCHEMA,
+            object_type=EditableObjectType.SCHEMA,
             change_type=ChangeType.UPDATE
         )
         dbsession.add(schema_change)
@@ -266,7 +277,7 @@ class TestUpdateEntityTraceability:
         r = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
-            object_type=ChangeObject.ENTITY,
+            object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.UPDATE
         )
         name_val = ChangeValueStr(new_value='test')
@@ -319,7 +330,7 @@ def make_entity_delete_request(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
         created_by=user, 
         created_at=time,
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.DELETE
     )
     del_val = ChangeValueBool(old_value=False, new_value=True)
@@ -401,7 +412,7 @@ class TestDeleteEntityTraceability:
         schema_change = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
-            object_type=ChangeObject.SCHEMA,
+            object_type=EditableObjectType.SCHEMA,
             change_type=ChangeType.DELETE
         )
         dbsession.add(schema_change)
@@ -521,7 +532,7 @@ class TestCreateEntityTraceability:
         schema_change = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
-            object_type=ChangeObject.SCHEMA,
+            object_type=EditableObjectType.SCHEMA,
             change_type=ChangeType.CREATE
         )
         dbsession.add(schema_change)
@@ -539,7 +550,7 @@ class TestCreateEntityTraceability:
         r = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
-            object_type=ChangeObject.ENTITY,
+            object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.CREATE
         )
         name_val = ChangeValueStr(new_value='test')
@@ -590,7 +601,7 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
     change_request = ChangeRequest(
         created_by=user, 
         created_at=time,
-        object_type=ChangeObject.ENTITY,
+        object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.CREATE
     )
     change_request.status = ChangeStatus.APPROVED
