@@ -26,6 +26,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
             created_at=time+timedelta(hours=i),
             created_by=user,
             object_type=EditableObjectType.SCHEMA,
+            object_id=1,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
@@ -54,6 +55,7 @@ def make_schema_change_objects(db: Session, user: User, time: datetime):
             created_at=time+timedelta(hours=9),
             created_by=user,
             object_type=EditableObjectType.SCHEMA,
+            object_id=1,
             change_type=ChangeType.CREATE
     )
     change_1 = Change(
@@ -104,6 +106,7 @@ def make_schema_create_request(db: Session, user: User, time: datetime):
         created_at=time, 
         status=ChangeStatus.APPROVED,
         object_type=EditableObjectType.SCHEMA,
+        object_id=schema.id,
         change_type=ChangeType.CREATE
     )
     slug_val = ChangeValueStr(new_value='test')
@@ -318,10 +321,10 @@ class TestCreateSchemaTraceability:
         data = self.data_for_test(dbsession)
         car = SchemaCreateSchema(name='Car', slug='car', attributes=list(data['attr_defs'].values()))
 
-        create_schema_create_request(db=dbsession, data=car, created_by=user)
+        cr = create_schema_create_request(db=dbsession, data=car, created_by=user)
         asserts_after_submitting_schema_create_request(db=dbsession)
         
-        apply_schema_create_request(db=dbsession, change_request_id=1, reviewed_by=user, comment='test')
+        apply_schema_create_request(db=dbsession, change_request=cr, reviewed_by=user, comment='test')
         asserts_after_applying_schema_create_request(db=dbsession, change_request_id=1, comment='test')
 
 
@@ -330,6 +333,7 @@ def make_schema_update_request(db: Session, user: User, time: datetime):
         created_by=user, 
         created_at=time,
         object_type=EditableObjectType.SCHEMA,
+        object_id=1,
         change_type=ChangeType.UPDATE
     )
     slug_val = ChangeValueStr(old_value='person', new_value='test')
@@ -612,10 +616,10 @@ class TestUpdateSchemaTraceability:
             ],
             delete_attributes=['born']
         )
-        create_schema_update_request(dbsession, 1, data, user)
+        cr = create_schema_update_request(dbsession, 1, data, user)
         asserts_after_submitting_schema_update_request(db=dbsession, data=data)
 
-        apply_schema_update_request(db=dbsession, change_request_id=1, reviewed_by=user, comment='test')
+        apply_schema_update_request(db=dbsession, change_request=cr, reviewed_by=user, comment='test')
         asserts_after_applying_schema_update_request(db=dbsession, comment='test')
 
 
@@ -653,10 +657,10 @@ class TestDeleteSchemaTraceability:
     def test_delete_and_apply(self, mocker, dbsession: Session, user: User):
         mocker.patch('backend.crud.delete_schema', return_value=True)
 
-        create_schema_delete_request(db=dbsession, id_or_slug=1, created_by=user)
+        cr = create_schema_delete_request(db=dbsession, id_or_slug=1, created_by=user)
         asserts_after_submitting_schema_delete_request(db=dbsession)
 
-        apply_schema_delete_request(db=dbsession, change_request_id=1, reviewed_by=user, comment='test')
+        apply_schema_delete_request(db=dbsession, change_request=cr, reviewed_by=user, comment='test')
         asserts_after_applying_schema_delete_request(db=dbsession, comment='test')
 
 

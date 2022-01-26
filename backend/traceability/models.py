@@ -80,10 +80,23 @@ class ChangeRequest(Base):
     status = Column(Enum(ChangeStatus), default=ChangeStatus.PENDING, nullable=False)
     comment = Column(String(1024), nullable=True)
     object_type = Column(Enum(EditableObjectType), nullable=False)
+    object_id = Column(Integer, nullable=True)
     change_type = Column(Enum(ChangeType), nullable=False)
 
     created_by = relationship('User', foreign_keys=[created_by_user_id])
     reviewed_by = relationship('User', foreign_keys=[reviewed_by_user_id])
+    entity = relationship('Entity',
+                          primaryjoin="and_(Entity.id == foreign(ChangeRequest.object_id), "
+                                      "ChangeRequest.object_type == 'ENTITY')",
+                          overlaps="schema")
+    schema = relationship('Schema',
+                          primaryjoin="and_(Schema.id == foreign(ChangeRequest.object_id), "
+                                      "ChangeRequest.object_type == 'SCHEMA')",
+                          overlaps="entity")
+
+    __table_args__ = (
+        CheckConstraint("object_id IS NOT NULL OR (change_type = 'CREATE' AND status <> 'APPROVED')"),
+    )
 
 
 class Change(Base):
@@ -103,5 +116,6 @@ class Change(Base):
     attribute = relationship('Attribute')
 
     __table_args__ = (
-        CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL)'),
+        CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL)'
+                        ' AND NOT (attribute_id IS NOT NULL AND field_name IS NOT NULL)'),
     )

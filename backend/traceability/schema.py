@@ -1,3 +1,5 @@
+from itertools import groupby
+
 from .models import ChangeRequest, Change, ChangeValueInt, ChangeAttrType, ChangeValueBool, \
     ChangeValueStr
 from ..schemas import *
@@ -24,9 +26,8 @@ def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -
 def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> Tuple[List[ChangeRequest], List[ChangeRequest]]:
     schema_changes = db.execute(
         select(ChangeRequest)
-        .join(Change)
-        .where(Change.object_id == schema_id)
-        .where(Change.content_type == ContentType.SCHEMA)
+        .where(ChangeRequest.object_id == schema_id)
+        .where(ChangeRequest.object_type == EditableObjectType.SCHEMA)
         .order_by(ChangeRequest.created_at.desc()).limit(count)
         .distinct()
     ).scalars().all()
@@ -199,26 +200,18 @@ def get_value_for_change(change: Change, db: Session):
     ValueModel = change.data_type.value.model
     return db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
 
-from itertools import groupby
-def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Schema:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingSchemaCreateRequestException(obj_id=change_request_id)
 
+def apply_schema_create_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Tuple[bool, Schema]:
     schema_changes = db.execute(
         select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.field_name != None)
         .where(Change.object_id == None)
         .where(Change.content_type == ContentType.SCHEMA)
         .where(Change.change_type == ChangeType.CREATE)
     ).scalars().all()
     if not schema_changes:
-        raise MissingSchemaCreateRequestException(obj_id=change_request_id)
+        raise MissingSchemaCreateRequestException(obj_id=change_request.id)
     
     data = {'attributes': []}
     for change in schema_changes:
@@ -227,7 +220,7 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
     
     attr_changes = db.execute(
         select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.field_name != None)
         .where(Change.object_id != None)
         .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
@@ -239,11 +232,13 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
         data['attributes'].append({i.field_name: get_value_for_change(change=i, db=db).new_value for i in changes})
     data = SchemaCreateSchema(**data)
 
+    schema = create_schema(db=db, data=data, commit=False)
+    change_request.object_id = schema.id
     change_request.reviewed_at = datetime.utcnow()
     change_request.reviewed_by_user_id = reviewed_by.id
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
-    schema = create_schema(db=db, data=data, commit=False)
+
     for change in schema_changes:     # setting object_id is required
         change.object_id = schema.id  # to be able to show details
     for change in attr_changes:       # for this change request
@@ -265,7 +260,7 @@ def apply_schema_create_request(db: Session, change_request_id: int, reviewed_by
         db.commit()
     else:
         db.flush()
-    return schema
+    return True, schema
 
 
 def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, created_by: User, commit: bool = True) -> ChangeRequest:
@@ -277,6 +272,7 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
         created_by=created_by, 
         created_at=datetime.utcnow(),
         object_type=EditableObjectType.SCHEMA,
+        object_id=schema.id,
         change_type=ChangeType.UPDATE
     )
     db.add(change_request)
@@ -397,15 +393,7 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     return change_request
 
 
-def apply_schema_update_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str] = None) -> Schema:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingSchemaUpdateRequestException(obj_id=change_request_id)
-
+def apply_schema_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None) -> Tuple[bool, Schema]:
     schema_query = (
         select(Change)
         .where(Change.change_request_id == change_request.id)
@@ -443,7 +431,7 @@ def apply_schema_update_request(db: Session, change_request_id: int, reviewed_by
     ).scalars().all()
     
     if not schema_id or not any([schema_changes, attr_upd, attr_create, attr_delete]):
-        raise MissingSchemaUpdateRequestException(obj_id=change_request_id)
+        raise MissingSchemaUpdateRequestException(obj_id=change_request.id)
     schema_id = schema_id.object_id
 
     # group changes by attribute id to get set of properties for each attribute
@@ -473,7 +461,7 @@ def apply_schema_update_request(db: Session, change_request_id: int, reviewed_by
     change_request.comment = comment
     schema = update_schema(db=db, id_or_slug=schema_id, data=SchemaUpdateSchema(**data), commit=False)
     db.commit()
-    return schema
+    return True, schema
 
 def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], created_by: User, commit: bool = True) -> ChangeRequest:
     crud.delete_schema(db=db, id_or_slug=id_or_slug, commit=False)
@@ -483,6 +471,7 @@ def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], creat
         created_by=created_by, 
         created_at=datetime.utcnow(),
         object_type=EditableObjectType.SCHEMA,
+        object_id=schema.id,
         change_type=ChangeType.DELETE
     )
     db.add(change_request)
@@ -507,15 +496,7 @@ def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], creat
     return change_request
 
 
-def apply_schema_delete_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str]) -> Schema:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingSchemaDeleteRequestException(obj_id=change_request_id)
-    
+def apply_schema_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str]) -> Tuple[bool, Schema]:
     change = db.execute(
         select(Change)
         .where(Change.change_request_id == change_request.id)
@@ -526,11 +507,11 @@ def apply_schema_delete_request(db: Session, change_request_id: int, reviewed_by
         .where(Change.change_type == ChangeType.DELETE)
     ).scalar()
     if change is None:
-        raise MissingSchemaDeleteRequestException(obj_id=change_request_id)
+        raise MissingSchemaDeleteRequestException(obj_id=change_request.id)
 
     v = get_value_for_change(change=change, db=db)
     if not v.new_value:
-        raise MissingSchemaDeleteRequestException(obj_id=change_request_id)
+        raise MissingSchemaDeleteRequestException(obj_id=change_request.id)
 
     schema = delete_schema(db=db, id_or_slug=change.object_id, commit=False)
     change_request.status = ChangeStatus.APPROVED
@@ -538,4 +519,4 @@ def apply_schema_delete_request(db: Session, change_request_id: int, reviewed_by
     change_request.reviewed_at = datetime.utcnow()
     change_request.comment = comment
     db.commit()
-    return schema
+    return True, schema

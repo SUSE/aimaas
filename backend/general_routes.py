@@ -83,11 +83,10 @@ def get_schemas(
 def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.CREATE_SCHEMA)))):
     try:
-        change = create_schema_create_request(
-            db=db, data=data, created_by=user, commit=False
-        )
-        schema = apply_schema_create_request(db=db, change_request_id=change.id, reviewed_by=user,
-                                             comment='Autosubmit')
+        change_request = create_schema_create_request(db=db, data=data, created_by=user,
+                                                      commit=False)
+        _, schema = apply_schema_create_request(db=db, change_request=change_request,
+                                                reviewed_by=user, comment='Autosubmit')
         db.commit()
         create_dynamic_router(schema=schema, app=request.app)
         return schema
@@ -129,11 +128,11 @@ def update_schema(
     ):
     try:
         old_slug = crud.get_schema(db=db, id_or_slug=id_or_slug).slug
-        change = create_schema_update_request(
+        change_request = create_schema_update_request(
             db=db, id_or_slug=id_or_slug, data=data, created_by=user, commit=False
         )
-        schema = apply_schema_update_request(
-            db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit'
+        _, schema = apply_schema_update_request(
+            db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
         )
         db.commit()
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app)
@@ -167,25 +166,27 @@ def update_schema(
 def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.DELETE_SCHEMA)))):
     try:
-        change = create_schema_delete_request(
+        change_request = create_schema_delete_request(
             db=db, id_or_slug=id_or_slug, created_by=user, commit=False
         )
-        schema = apply_schema_delete_request(db=db, change_request_id=change.id,
-                                                          reviewed_by=user, comment='Autosubmit')
+        _, schema = apply_schema_delete_request(db=db, change_request=change_request,
+                                                reviewed_by=user, comment='Autosubmit')
         db.commit()
         return schema
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
-@router.post('/changes/review/{id}', tags=["Reviews & Changes"], response_model=Union[
-    ChangeRequestSchema, SchemaBaseSchema, EntityBaseSchema
-])
-def reviewchanges(id: int, review: schemas.ChangeReviewSchema, db: Session = Depends(get_db),
-                   user: User = Depends(authenticated_user)):
+@router.post('/changes/review/{request_id}', tags=["Reviews & Changes"], response_model=ChangeRequestSchema)
+def reviewchanges(request_id: int, review: schemas.ChangeReviewSchema, response: Response,
+                  db: Session = Depends(get_db), user: User = Depends(authenticated_user)):
     try:
-        is_user_authorized_to_review(db=db, user=user, request_id=id)
-        return review_changes(db=db, change_request_id=id, review=review, reviewed_by=user)
+        is_user_authorized_to_review(db=db, user=user, request_id=request_id)
+        change_request, changed = review_changes(db=db, change_request_id=request_id, review=review,
+                                                 reviewed_by=user)
+        if not changed:
+            response.status_code = status.HTTP_208_ALREADY_REPORTED
+        return change_request
     except exceptions.MissingObjectException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 

@@ -1,20 +1,29 @@
+from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime, timezone
+from typing import List, Tuple, Optional, Dict, Any, Union
 
-from .models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, ChangeValueBool, \
-    ChangeValueStr
-from ..schemas import *
-from ..crud import *
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from .. import crud
 from .. import dynamic_routes
+from ..auth.models import User
+from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
+    AttributeNotDefinedException, MissingEntityUpdateRequestException, \
+    MissingEntityDeleteRequestException
+from ..models import Entity, AttributeDefinition, Schema, Attribute
+from ..schemas.traceability import EntityChangeDetailSchema
 
-from .enum import EditableObjectType, ContentType
+from .enum import EditableObjectType, ContentType, ChangeType, ChangeStatus
+from .models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, ChangeValueBool, \
+    ChangeValueStr
 
 def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> List[ChangeRequest]:
     return db.execute(
         select(ChangeRequest)
-        .join(Change)
-        .where(Change.object_id == entity_id)
-        .where(Change.content_type == ContentType.ENTITY)
+        .where(ChangeRequest.object_id == entity_id)
+        .where(ChangeRequest.object_type == EditableObjectType.ENTITY)
         .order_by(ChangeRequest.created_at.desc()).limit(count)
         .distinct()
     ).scalars().all()
@@ -92,7 +101,7 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
             .where(Change.data_type == ChangeAttrType.INT)
         ).scalar()
         schema_id = db.execute(select(ChangeValueInt).where(ChangeValueInt.id == schema_change.value_id)).scalar()
-        schema = get_schema(db=db, id_or_slug=schema_id.new_value)
+        schema = crud.get_schema(db=db, id_or_slug=schema_id.new_value)
         entity.schema = schema
         entity.schema_id = schema_id.new_value
     elif entity_changes:
@@ -146,7 +155,7 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.ENTITY,
         change_type=ChangeType.CREATE
     )
@@ -216,18 +225,11 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     return change_request
 
 
-def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str] = None) -> Entity:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingEntityCreateRequestException(obj_id=change_request_id)
-
+def apply_entity_create_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: Optional[str] = None) -> Tuple[bool, Entity]:
     entity_change = (
         select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ENTITY)
         .where(Change.change_type == ChangeType.CREATE)
     )
@@ -247,7 +249,7 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
         .where(Change.data_type == ChangeAttrType.INT)
     ).scalar() 
     if not all([name_change, slug_change, schema_change]):
-        raise MissingEntityCreateRequestException(obj_id=change_request_id)
+        raise MissingEntityCreateRequestException(obj_id=change_request.id)
     
     schema_id = db.execute(
         select(ChangeValueInt).where(ChangeValueInt.id == schema_change.value_id)
@@ -265,7 +267,7 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
 
     value_changes = db.execute(
         select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.attribute_id != None)
         .where(Change.content_type == ContentType.ENTITY)
         .where(Change.change_type == ChangeType.CREATE)
@@ -300,7 +302,8 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
         data[attr_name] = [i.new_value for i in values if i.new_value is not None]
 
     EntityCreateModel = dynamic_routes._create_entity_request_model(schema=schema)
-    e = create_entity(
+
+    e = crud.create_entity(
         db=db, 
         schema_id=schema.id, 
         data=EntityCreateModel(**data).dict(),
@@ -311,12 +314,13 @@ def apply_entity_create_request(db: Session, change_request_id: int, reviewed_by
     schema_change.object_id = e.id
     for change in value_changes:  # for this change request
         change.object_id = e.id
+    change_request.object_id = e.id
     change_request.status = ChangeStatus.APPROVED
     change_request.reviewed_by = reviewed_by
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.comment = comment
     db.commit()
-    return e
+    return True, e
 
 
 def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schema_id: int, data: dict, created_by: User, commit: bool = True) -> ChangeRequest:
@@ -332,7 +336,8 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
         created_by=created_by, 
         created_at=datetime.utcnow(),
         object_type=EditableObjectType.ENTITY,
-        change_type=ChangeType.UPDATE
+        object_id=entity.id,
+        change_type=ChangeType.UPDATE,
     )
     db.add(change_request)
     
@@ -401,17 +406,9 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     return change_request
 
 
-def apply_entity_update_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str] = None) -> Entity:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingEntityUpdateRequestException(obj_id=change_request_id)
-
+def apply_entity_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None) -> Tuple[bool, Entity]:
     changes_query = (select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ENTITY)
         .where(Change.change_type == ChangeType.UPDATE))
     entity_fields_changes = db.execute(
@@ -422,14 +419,13 @@ def apply_entity_update_request(db: Session, change_request_id: int, reviewed_by
     ).scalars().all()
 
     if not entity_fields_changes and not other_fields_changes:
-        raise MissingEntityUpdateRequestException(obj_id=change_request_id)
+        raise MissingEntityUpdateRequestException(obj_id=change_request.id)
 
     if entity_fields_changes:
         entity = crud.get_entity_by_id(db=db, entity_id=entity_fields_changes[0].object_id)
     else:
         entity = crud.get_entity_by_id(db=db, entity_id=other_fields_changes[0].object_id)
 
-    
     single_changes = []
     listed_changes = defaultdict(list)
     for change in other_fields_changes:
@@ -466,7 +462,7 @@ def apply_entity_update_request(db: Session, change_request_id: int, reviewed_by
         data[attr_name] = [i.new_value for i in values if i.new_value is not None]
     
     UpdateModel = dynamic_routes._update_entity_request_model(schema=entity.schema)
-    result = update_entity(
+    entity = crud.update_entity(
         db=db, 
         id_or_slug=entity.id, 
         schema_id=entity.schema_id, 
@@ -478,7 +474,7 @@ def apply_entity_update_request(db: Session, change_request_id: int, reviewed_by
     change_request.reviewed_by_user_id = reviewed_by.id
     change_request.comment = comment
     db.commit()
-    return result
+    return True, entity
 
 
 def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schema_id: int, created_by: User, commit: bool = True) -> ChangeRequest:
@@ -491,6 +487,7 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
         created_by=created_by, 
         created_at=datetime.utcnow(),
         object_type=EditableObjectType.ENTITY,
+        object_id=entity.id,
         change_type=ChangeType.DELETE
     )
     db.add(change_request)
@@ -514,18 +511,10 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
         db.flush()
     return change_request
 
-def apply_entity_delete_request(db: Session, change_request_id: int, reviewed_by: User, comment: Optional[str]) -> Entity:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingEntityDeleteRequestException(obj_id=change_request_id)
-    
+def apply_entity_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str]) -> Tuple[bool, Entity]:
     change = db.execute(
         select(Change)
-        .where(Change.change_request_id == change_request_id)
+        .where(Change.change_request_id == change_request.id)
         .where(Change.data_type == ChangeAttrType.BOOL)
         .where(Change.change_type == ChangeType.DELETE)
         .where(Change.content_type == ContentType.ENTITY)
@@ -534,7 +523,7 @@ def apply_entity_delete_request(db: Session, change_request_id: int, reviewed_by
     ).scalar()
     
     if change is None:
-        raise MissingEntityDeleteRequestException(obj_id=change_request_id)
+        raise MissingEntityDeleteRequestException(obj_id=change_request.id)
     entity = crud.get_entity_by_id(db=db, entity_id=change.object_id)
     v = db.execute(select(ChangeValueBool).where(ChangeValueBool.id == change.value_id)).scalar()
     v.old_value = entity.deleted
@@ -549,4 +538,4 @@ def apply_entity_delete_request(db: Session, change_request_id: int, reviewed_by
     change_request.reviewed_at = datetime.utcnow()
     change_request.comment = comment
     db.commit()
-    return entity
+    return True, entity

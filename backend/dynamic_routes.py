@@ -2,7 +2,7 @@ from typing import List, Callable, Optional, Union
 from dataclasses import make_dataclass
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.applications import FastAPI
 from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
@@ -190,7 +190,6 @@ def _filters_request_model(schema: Schema):
     return filter_model
 
 
-
 def _meta_for_get_entities(schema: Schema) -> dict:
     meta = {'filter_fields': {'fields': defaultdict(dict), 'operators': defaultdict(dict)}}
     for attr_def in schema.attr_defs:
@@ -304,6 +303,8 @@ def route_create_entity(router: APIRouter, schema: Schema):
         tags=[schema.name],
         summary=f'Create new {schema.name} entity',
         responses={
+            200: {"description": "Entity was created"},
+            202: {"description": "Request to create entity was stored"},
             404: {
                 'description': '''Can be returned when:
 
@@ -328,20 +329,17 @@ def route_create_entity(router: APIRouter, schema: Schema):
             }
         }
     )
-    def create_entity(data: entity_create_schema, db: Session = Depends(get_db),
+    def create_entity(data: entity_create_schema, response: Response, db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.CREATE_ENTITY, target=Schema())))):
         try:
-            change = create_entity_create_request(
-                db=db,
-                schema_id=schema.id,
-                data=data.dict(),
-                created_by=user,
-                commit=False
-            )
+            change_request = create_entity_create_request(
+                db=db, schema_id=schema.id, data=data.dict(), created_by=user, commit=False)
             if not schema.reviewable:
-                return apply_entity_create_request(db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit')
+                return apply_entity_create_request(db=db, change_request=change_request,
+                                                   reviewed_by=user, comment='Autosubmit')[1]
             db.commit()
-            return change
+            response.status_code = status.HTTP_202_ACCEPTED
+            return change_request
         except exceptions.MissingSchemaException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.EntityExistsException as e:
@@ -396,6 +394,8 @@ def route_update_entity(router: APIRouter, schema: Schema):
         tags=[schema.name],
         summary=f'Update {schema.name} entity',
         responses={
+            200: {"description": "Entity was updated"},
+            202: {"description": "Request to update entity was stored"},
             404: {
                 'description': '''Can be returned when:
 
@@ -423,24 +423,21 @@ def route_update_entity(router: APIRouter, schema: Schema):
             }
         }
     )
-    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema,
+    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema, response: Response,
                       db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.UPDATE_ENTITY, target=Entity())))):
         try:
-            change = create_entity_update_request(
-                db=db,
-                id_or_slug=id_or_slug,
-                schema_id=schema.id,
-                data=data.dict(exclude_unset=True),
-                created_by=user,
-                commit=False
+            change_request = create_entity_update_request(
+                db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user,
+                data=data.dict(exclude_unset=True), commit=False
             )
             if not schema.reviewable:
                 return apply_entity_update_request(
-                    db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit'
-                )
+                    db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
+                )[1]
             db.commit()
-            return change
+            response.status_code = status.HTTP_202_ACCEPTED
+            return change_request
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except exceptions.MissingSchemaException as e:
@@ -462,27 +459,27 @@ def route_delete_entity(router: APIRouter, schema: Schema):
         tags=[schema.name],
         summary=f'Delete {schema.name} entity',
         responses={
+            200: {"description": "Entity was deleted"},
+            202: {"description": "Request to delete entity was stored"},
             404: {
                 'description': "entity with provided id/slug doesn't exist on current schema"
             }
         }
     )
-    def delete_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db),
+    def delete_entity(id_or_slug: Union[int, str], response: Response,
+                      db: Session = Depends(get_db),
                       user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.DELETE_ENTITY, target=Entity())))):
         try:
-            change = create_entity_delete_request(
-                db=db,
-                id_or_slug=id_or_slug,
-                schema_id=schema.id,
-                created_by=user,
-                commit=False
+            change_request = create_entity_delete_request(
+                db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user, commit=False
             )
             if not schema.reviewable:
                 return apply_entity_delete_request(
-                    db=db, change_request_id=change.id, reviewed_by=user, comment='Autosubmit'
-                )
+                    db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
+                )[1]
             db.commit()
-            return change
+            response.status_code = status.HTTP_202_ACCEPTED
+            return change_request
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         

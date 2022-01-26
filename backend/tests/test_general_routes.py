@@ -882,7 +882,13 @@ class TestTraceabilityRoutes:
 
         response = authorized_client.post(f'/changes/review/{change_request.id}', json=review)
         assert response.status_code == 200
-        assert response.json() == {'id': 1, 'name': 'test', 'slug': 'Jack', 'deleted': False}
+        data = response.json()
+        expected = {
+            'created_by': 'tester', 'reviewed_by': 'tester', 'status': 'APPROVED',
+            'comment': 'test', 'object_type': 'ENTITY', 'change_type': 'UPDATE'
+        }
+        for key, value in expected.items():
+            assert data.get(key, None) == value
 
         dbsession.commit()
         change_request.status = ChangeStatus.PENDING

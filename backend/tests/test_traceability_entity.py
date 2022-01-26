@@ -26,6 +26,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
             created_at=time+timedelta(hours=i),
             created_by=user,
             object_type=EditableObjectType.ENTITY,
+            object_id=1,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
@@ -54,6 +55,7 @@ def make_entity_change_objects(db: Session, user: User, time: datetime):
             created_at=time+timedelta(hours=9),
             created_by=user,
             object_type=EditableObjectType.ENTITY,
+            object_id=1,
             change_type=ChangeType.CREATE
     )
     change_1 = Change(
@@ -112,6 +114,7 @@ def make_entity_update_request(db: Session, user: User, time: datetime):
         created_by=user, 
         created_at=time,
         object_type=EditableObjectType.ENTITY,
+        object_id=1,
         change_type=ChangeType.DELETE
     )
     name_val = ChangeValueStr(old_value='Jack', new_value='Jackson')
@@ -249,17 +252,18 @@ class TestUpdateEntityTraceability:
             'born': time,
             'friends': [1, 2],
         }
-        create_entity_update_request(dbsession, 1, 1, data, user)
+        cr = create_entity_update_request(dbsession, 1, 1, data, user)
         asserts_after_submitting_entity_update_request(dbsession, born_time=time)
         
-        apply_entity_update_request(dbsession, change_request_id=1, reviewed_by=user, comment='Autosubmit')
-        asserts_after_applying_entity_update_request(dbsession, change_request_id=1)
+        apply_entity_update_request(dbsession, change_request=cr, reviewed_by=user, comment='Autosubmit')
+        asserts_after_applying_entity_update_request(dbsession, change_request_id=cr.id)
 
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
         schema_change = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
             object_type=EditableObjectType.SCHEMA,
+            object_id=1,
             change_type=ChangeType.UPDATE
         )
         dbsession.add(schema_change)
@@ -267,17 +271,19 @@ class TestUpdateEntityTraceability:
 
         # raise on wrong change
         with pytest.raises(MissingEntityUpdateRequestException):
-            apply_entity_update_request(db=dbsession, change_request_id=schema_change.id, reviewed_by=user)
+            apply_entity_update_request(db=dbsession, change_request=schema_change, reviewed_by=user)
         dbsession.rollback()
         # raise on nonexistent change
         with pytest.raises(MissingEntityUpdateRequestException):
-            apply_entity_update_request(db=dbsession, change_request_id=42, reviewed_by=user)
+            fake = ChangeRequest(id=42)
+            apply_entity_update_request(db=dbsession, change_request=fake, reviewed_by=user)
 
     def test_raise_on_attribute_not_defined(self, dbsession: Session, user: User):
         r = ChangeRequest(
             created_by=user, 
             created_at=datetime.utcnow(),
             object_type=EditableObjectType.ENTITY,
+            object_id=1,
             change_type=ChangeType.UPDATE
         )
         name_val = ChangeValueStr(new_value='test')
@@ -322,7 +328,7 @@ class TestUpdateEntityTraceability:
         dbsession.flush()
 
         with pytest.raises(AttributeNotDefinedException):
-            apply_entity_update_request(db=dbsession, change_request_id=r.id, reviewed_by=user)
+            apply_entity_update_request(db=dbsession, change_request=r, reviewed_by=user)
       
 
 
@@ -331,6 +337,7 @@ def make_entity_delete_request(db: Session, user: User, time: datetime):
         created_by=user, 
         created_at=time,
         object_type=EditableObjectType.ENTITY,
+        object_id=1,
         change_type=ChangeType.DELETE
     )
     del_val = ChangeValueBool(old_value=False, new_value=True)
@@ -402,10 +409,10 @@ class TestDeleteEntityTraceability:
 
     def test_entity_delete_request_create_and_apply(self, mocker, dbsession: Session, user: User):
         mocker.patch('backend.crud.update_entity', return_value=True)
-        create_entity_delete_request(dbsession, id_or_slug=1, schema_id=1, created_by=user)
+        cr = create_entity_delete_request(dbsession, id_or_slug=1, schema_id=1, created_by=user)
         asserts_after_submitting_entity_delete_request(db=dbsession)
 
-        apply_entity_delete_request(dbsession, change_request_id=1, reviewed_by=user, comment='test')
+        apply_entity_delete_request(dbsession, change_request=cr, reviewed_by=user, comment='test')
         asserts_after_applying_entity_delete_request(dbsession, comment='test')
 
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
@@ -413,6 +420,7 @@ class TestDeleteEntityTraceability:
             created_by=user, 
             created_at=datetime.utcnow(),
             object_type=EditableObjectType.SCHEMA,
+            object_id=1,
             change_type=ChangeType.DELETE
         )
         dbsession.add(schema_change)
@@ -420,11 +428,12 @@ class TestDeleteEntityTraceability:
         
         # raise on wrong change
         with pytest.raises(MissingEntityUpdateRequestException):
-            apply_entity_update_request(db=dbsession, change_request_id=schema_change.id, reviewed_by=user, comment=None)
+            apply_entity_update_request(db=dbsession, change_request=schema_change, reviewed_by=user, comment=None)
         dbsession.rollback()
         # raise on nonexistent change
         with pytest.raises(MissingEntityUpdateRequestException):
-            apply_entity_update_request(db=dbsession, change_request_id=42, reviewed_by=user, comment=None)
+            fake = ChangeRequest(id=42)
+            apply_entity_update_request(db=dbsession, change_request=fake, reviewed_by=user, comment=None)
 
 def asserts_after_submitting_entity_create_request(db: Session):
     change_request = db.execute(select(ChangeRequest)).scalar()
@@ -509,8 +518,6 @@ class TestCreateEntityTraceability:
         return dbsession.execute(select(User).where(User.id == 1)).scalar()
 
     def test_entity_create_request_and_approve(self, mocker, dbsession: Session, user: User):
-        mocker.patch('backend.crud.create_entity', return_value=True)
-
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
         p = {
                 'name': 'John',
@@ -525,7 +532,7 @@ class TestCreateEntityTraceability:
         change_request = create_entity_create_request(db=dbsession, data=p, schema_id=1, created_by=user)
         asserts_after_submitting_entity_create_request(dbsession)
 
-        apply_entity_create_request(db=dbsession, change_request_id=change_request.id, reviewed_by=user, comment='Autosubmit')
+        apply_entity_create_request(db=dbsession, change_request=change_request, reviewed_by=user, comment='Autosubmit')
         asserts_after_applying_entity_create_request(dbsession, change_request_id=change_request.id)
     
     def test_raise_on_missing_change(self, dbsession: Session, user: User):
@@ -540,16 +547,17 @@ class TestCreateEntityTraceability:
         
         # raise on wrong change
         with pytest.raises(MissingEntityCreateRequestException):
-            apply_entity_create_request(db=dbsession, change_request_id=schema_change.id, reviewed_by=user)
+            apply_entity_create_request(db=dbsession, change_request=schema_change, reviewed_by=user)
         dbsession.rollback()
         # raise on nonexistent change
         with pytest.raises(MissingEntityCreateRequestException):
-            apply_entity_create_request(db=dbsession, change_request_id=42, reviewed_by=user)
+            fake = ChangeRequest(id=42)
+            apply_entity_create_request(db=dbsession, change_request=fake, reviewed_by=user)
 
     def test_raise_on_attribute_not_defined(self, dbsession: Session, user: User):
         r = ChangeRequest(
             created_by=user, 
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.CREATE
         )
@@ -591,7 +599,7 @@ class TestCreateEntityTraceability:
         dbsession.flush()
 
         with pytest.raises(AttributeNotDefinedException):
-            apply_entity_create_request(db=dbsession, change_request_id=r.id, reviewed_by=user)
+            apply_entity_create_request(db=dbsession, change_request=r, reviewed_by=user)
 
             
 def make_entity_create_request(db: Session, user: User, time: datetime):
@@ -602,6 +610,7 @@ def make_entity_create_request(db: Session, user: User, time: datetime):
         created_by=user, 
         created_at=time,
         object_type=EditableObjectType.ENTITY,
+        object_id=person.id,
         change_type=ChangeType.CREATE
     )
     change_request.status = ChangeStatus.APPROVED

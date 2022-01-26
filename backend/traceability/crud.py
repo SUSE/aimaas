@@ -1,4 +1,5 @@
-from datetime import datetime
+import typing
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi.exceptions import HTTPException
@@ -57,62 +58,54 @@ def get_change_request(db: Session, request_id: int) -> ChangeRequest:
         raise MissingChangeRequestException(obj_id=request_id)
 
 
-def decline_change_request(db: Session, change_request_id: int, change_object: EditableObjectType,
-                           change_type: ChangeType, reviewed_by: User,
+def decline_change_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
                            comment: Optional[str]) -> ChangeRequest:
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.change_type == change_type)
-        .where(ChangeRequest.object_type == change_object)
-    ).scalar()
-    if change_request is None:
-        raise MissingChangeException(obj_id=change_request_id)
-
     change_request.status = ChangeStatus.DECLINED
     change_request.comment = comment
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.reviewed_by = reviewed_by
     db.commit()
     return change_request
 
 
 def review_changes(db: Session, change_request_id: int, review: ChangeReviewSchema,
-                   reviewed_by=User):
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-        .where(ChangeRequest.status == ChangeStatus.PENDING)
-    ).scalar()
-    if change_request is None:
-        raise MissingChangeException(obj_id=change_request_id)
+                   reviewed_by: User) -> typing.Tuple[ChangeRequest, bool]:
+    try:
+        change_request = db.query(ChangeRequest).filter(ChangeRequest.id == change_request_id).one()
+    except NoResultFound:
+        raise MissingChangeRequestException(obj_id=change_request_id)
+    if change_request.status != ChangeStatus.PENDING:
+        return change_request, False
 
     if review.result == ReviewResult.DECLINE:
-        return decline_change_request(
+        decline_change_request(
             db=db,
-            change_request_id=change_request_id,
-            change_object=change_request.object_type,
-            change_type=change_request.change_type,
+            change_request=change_request,
             reviewed_by=reviewed_by,
             comment=review.comment
         )
-    kwargs = {'db': db, 'change_request_id': change_request_id, 'reviewed_by': reviewed_by,
+        return change_request, True
+    kwargs = {'db': db, 'change_request': change_request, 'reviewed_by': reviewed_by,
               'comment': review.comment}
+
+    changed = False
     if change_request.object_type == EditableObjectType.SCHEMA:
         if change_request.change_type == ChangeType.CREATE:
-            return apply_schema_create_request(**kwargs)
+            changed |= apply_schema_create_request(**kwargs)[0]
         elif change_request.change_type == ChangeType.UPDATE:
-            return apply_schema_update_request(**kwargs)
+            changed |= apply_schema_update_request(**kwargs)[0]
         elif change_request.change_type == ChangeType.DELETE:
-            return apply_schema_delete_request(**kwargs)
+            changed |= apply_schema_delete_request(**kwargs)[0]
 
     elif change_request.object_type == EditableObjectType.ENTITY:
         if change_request.change_type == ChangeType.CREATE:
-            return apply_entity_create_request(**kwargs)
+            changed |= apply_entity_create_request(**kwargs)[0]
         elif change_request.change_type == ChangeType.UPDATE:
-            return apply_entity_update_request(**kwargs)
+            changed |= apply_entity_update_request(**kwargs)[0]
         elif change_request.change_type == ChangeType.DELETE:
-            return apply_entity_delete_request(**kwargs)
+            changed |= apply_entity_delete_request(**kwargs)[0]
+
+    return change_request, changed
 
 
 def get_pending_change_requests(db: Session, obj_type: Optional[ContentType] = None,

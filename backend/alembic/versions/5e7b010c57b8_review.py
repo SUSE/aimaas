@@ -1,8 +1,8 @@
 """review
 
-Revision ID: 63c4cf462c86
+Revision ID: 5e7b010c57b8
 Revises: 5c72f33e6b82
-Create Date: 2022-01-25 09:13:12.543588
+Create Date: 2022-01-26 13:49:15.993571
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '63c4cf462c86'
+revision = '5e7b010c57b8'
 down_revision = '5c72f33e6b82'
 branch_labels = None
 depends_on = None
@@ -76,7 +76,9 @@ def upgrade():
     sa.Column('status', sa.Enum('PENDING', 'DECLINED', 'APPROVED', name='changestatus'), nullable=False),
     sa.Column('comment', sa.String(length=1024), nullable=True),
     sa.Column('object_type', sa.Enum('SCHEMA', 'ENTITY', name='editableobjecttype'), nullable=False),
+    sa.Column('object_id', sa.Integer(), nullable=True),
     sa.Column('change_type', sa.Enum('CREATE', 'UPDATE', 'DELETE', name='changetype'), nullable=False),
+    sa.CheckConstraint("object_id IS NOT NULL OR (change_type = 'CREATE' AND status <> 'APPROVED')"),
     sa.ForeignKeyConstraint(['created_by_user_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['reviewed_by_user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -91,7 +93,7 @@ def upgrade():
     sa.Column('change_type', sa.Enum('CREATE', 'UPDATE', 'DELETE', name='changetype'), nullable=False),
     sa.Column('field_name', sa.String(), nullable=True),
     sa.Column('data_type', sa.Enum('STR', 'BOOL', 'INT', 'FLOAT', 'FK', 'DT', 'DATE', name='changeattrtype'), nullable=False),
-    sa.CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL)'),
+    sa.CheckConstraint('NOT(attribute_id IS NULL AND field_name IS NULL) AND NOT (attribute_id IS NOT NULL AND field_name IS NOT NULL)'),
     sa.ForeignKeyConstraint(['attribute_id'], ['attributes.id'], ),
     sa.ForeignKeyConstraint(['change_request_id'], ['change_requests.id'], ),
     sa.PrimaryKeyConstraint('id')
