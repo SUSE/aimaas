@@ -11,29 +11,43 @@ from ..exceptions import MissingChangeException, MissingChangeRequestException
 from ..auth.crud import has_permission
 from ..auth.enum import PermissionType
 from ..auth.models import User
+from ..models import Schema, Entity
 from ..schemas.auth import RequirePermission
 from ..schemas.traceability import ChangeReviewSchema
 
 from .enum import EditableObjectType, ChangeType, ChangeStatus, ReviewResult, ContentType
 from .models import ChangeRequest, Change
-from .entity import apply_entity_create_request, apply_entity_update_request, apply_entity_delete_request
-from .schema import apply_schema_create_request, apply_schema_update_request, apply_schema_delete_request
+from .entity import apply_entity_create_request, apply_entity_update_request, \
+    apply_entity_delete_request
+from .schema import apply_schema_create_request, apply_schema_update_request, \
+    apply_schema_delete_request
+
+
+REQUIRED_PERMISSIONS = {
+    (EditableObjectType.SCHEMA, ChangeType.CREATE): (PermissionType.CREATE_SCHEMA, Schema),
+    (EditableObjectType.SCHEMA, ChangeType.UPDATE): (PermissionType.UPDATE_SCHEMA, Schema),
+    (EditableObjectType.SCHEMA, ChangeType.DELETE): (PermissionType.DELETE_SCHEMA, Schema),
+    (EditableObjectType.ENTITY, ChangeType.CREATE): (PermissionType.CREATE_ENTITY, Entity),
+    (EditableObjectType.ENTITY, ChangeType.UPDATE): (PermissionType.UPDATE_ENTITY, Entity),
+    (EditableObjectType.ENTITY, ChangeType.DELETE): (PermissionType.DELETE_ENTITY, Entity),
+}
 
 
 def is_user_authorized_to_review(db: Session, user: User, request_id: int) -> None:
     request = get_change_request(db=db, request_id=request_id)
-    hp = False
+    req_perm, Model = REQUIRED_PERMISSIONS.get((request.object_type, request.change_type))
+    req_perm = RequirePermission(permission=req_perm, target=Model())
     if request.object_type == EditableObjectType.ENTITY:
-        hp = has_permission(db=db, user=user,
-                            permission=RequirePermission(permission=PermissionType.UPDATE_ENTITY))
-    elif request.object_type == EditableObjectType.SCHEMA:
-        hp = has_permission(db=db, user=user,
-                            permission=RequirePermission(permission=PermissionType.UPDATE_SCHEMA))
-    if not hp:
-        raise HTTPException(
-                status_code=HTTP_403_FORBIDDEN,
-                detail="You are not authorized for this action"
-            )
+        # TODO: Inject entity_id and/or schema_id in req_perm
+        pass
+    elif request.object_type == EditableObjectType.SCHEMA \
+            and request.change_type == ChangeType.UPDATE:
+        # TODO: Inject schema_id in req_perm
+        pass
+
+    if not has_permission(db=db, user=user, permission=req_perm):
+        raise HTTPException(status_code=HTTP_403_FORBIDDEN,
+                            detail="You are not authorized for this action")
 
 
 def get_change_request(db: Session, request_id: int) -> ChangeRequest:
@@ -44,7 +58,8 @@ def get_change_request(db: Session, request_id: int) -> ChangeRequest:
 
 
 def decline_change_request(db: Session, change_request_id: int, change_object: EditableObjectType,
-                           change_type: ChangeType, reviewed_by: User, comment: Optional[str]) -> ChangeRequest:
+                           change_type: ChangeType, reviewed_by: User,
+                           comment: Optional[str]) -> ChangeRequest:
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
@@ -62,7 +77,8 @@ def decline_change_request(db: Session, change_request_id: int, change_object: E
     return change_request
 
 
-def review_changes(db: Session, change_request_id: int, review: ChangeReviewSchema, reviewed_by=User):
+def review_changes(db: Session, change_request_id: int, review: ChangeReviewSchema,
+                   reviewed_by=User):
     change_request = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.id == change_request_id)
@@ -80,7 +96,8 @@ def review_changes(db: Session, change_request_id: int, review: ChangeReviewSche
             reviewed_by=reviewed_by,
             comment=review.comment
         )
-    kwargs = {'db': db, 'change_request_id': change_request_id, 'reviewed_by': reviewed_by, 'comment': review.comment}
+    kwargs = {'db': db, 'change_request_id': change_request_id, 'reviewed_by': reviewed_by,
+              'comment': review.comment}
     if change_request.object_type == EditableObjectType.SCHEMA:
         if change_request.change_type == ChangeType.CREATE:
             return apply_schema_create_request(**kwargs)
