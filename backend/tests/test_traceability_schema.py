@@ -315,9 +315,7 @@ class TestCreateSchemaTraceability:
             }
         }
 
-    def test_schema_create_request_and_apply(self, mocker, dbsession: Session, user: User):
-        mocker.patch('backend.crud.create_schema', return_value=True)
-
+    def test_schema_create_request_and_apply(self, dbsession: Session, user: User):
         data = self.data_for_test(dbsession)
         car = SchemaCreateSchema(name='Car', slug='car', attributes=list(data['attr_defs'].values()))
 

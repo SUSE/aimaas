@@ -145,7 +145,7 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
 
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.SCHEMA,
         change_type=ChangeType.CREATE
     )
@@ -252,7 +252,7 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
 
     schema = crud.create_schema(db=db, data=data, commit=False)
     change_request.object_id = schema.id
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.reviewed_by_user_id = reviewed_by.id
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
@@ -290,7 +290,7 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
 
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.SCHEMA,
         object_id=schema.id,
         change_type=ChangeType.UPDATE
@@ -478,7 +478,7 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
     for change in attr_delete:
         data['delete_attributes'].append(change.attribute.name)
 
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.reviewed_by = reviewed_by
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
@@ -495,7 +495,7 @@ def create_schema_delete_request(db: Session, id_or_slug: typing.Union[int, str]
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.SCHEMA,
         object_id=schema.id,
         change_type=ChangeType.DELETE
