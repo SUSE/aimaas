@@ -1,23 +1,23 @@
 <template>
   <Spinner :loading="loading">
-    <div v-if="!loading" class="container">
-      <TextInput label="Name" v-model="entity.name" :args="{ id: 'name', maxlength: 128 }"
+    <div v-if="!loading && editEntity!== null" class="container">
+      <TextInput label="Name" v-model="editEntity.name" :args="{ id: 'name', maxlength: 128 }"
                  :required="true"/>
-      <TextInput label="Slug" v-model="entity.slug" :args="{ id: 'slug', maxlength: 128 }"
+      <TextInput label="Slug" v-model="editEntity.slug" :args="{ id: 'slug', maxlength: 128 }"
                  :required="true"/>
 
       <h3 class="mt-3">Attributes</h3>
       <template v-for="attr in schemaDetails.attributes" :key="attr.name">
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
-          <ReferencedEntitySelect v-model="entity[attr.name]" :label="attr.name"
+          <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
                                   :args="{id: attr.name}" :fk-schema-id="attr.bind_to_schema"
                                   :select-type="attr.list ? 'many': 'single'"
                                   :required="requiredAttrs.includes(attr.name)"/>
         </template>
         <!-- ATTRIBUTE IS SINGLE VALUED -->
         <template v-else-if="!attr.list">
-          <component :is="TYPE_INPUT_MAP[attr.type]" v-model="entity[attr.name]"
+          <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name]"
                      :label="attr.name" :args="{id: attr.name}"
                      :required="requiredAttrs.includes(attr.name)"/>
         </template>
@@ -29,10 +29,10 @@
             </div>
             <div class="col-lg-10">
               <ul class="list-group">
-                <li v-for="(val, idx) in (entity[attr.name] || [])" :key="`${attr.name}-${idx}`"
+                <li v-for="(val, idx) in (editEntity[attr.name] || [])" :key="`${attr.name}-${idx}`"
                     class="list-group-item d-flex">
                   <div class="flex-grow-1">
-                    <component :is="TYPE_INPUT_MAP[attr.type]" v-model="entity[attr.name][idx]"
+                    <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name][idx]"
                                :vertical="true" :args="{id: `${attr.name}-${idx}`}"
                                :required="requiredAttrs.includes(attr.name)"/>
                   </div>
@@ -87,21 +87,31 @@ export default {
     Spinner, TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput,
     ReferencedEntitySelect
   },
-  props: ["schema"],
+  props: ["schema", "entity"],
   inject: ["activeSchema", "updatePendingRequests"],
   emits: ["update"],
   created() {
     this.updateSchemaMeta();
   },
   watch: {
-    activeSchema() {
-      this.updateSchemaMeta();
+    async activeSchema() {
+      await this.updateSchemaMeta();
+    },
+    async entity() {
+      if (this.entity?.schema_id && this.entity?.schema_id !== this.activeSchema.id) {
+        await this.updateSchemaMeta();
+      }
+      if (this.entity && this.editEntity?.id !== this.entity?.id) {
+        this.editEntity = _cloneDeep(this.entity);
+      }
+      else if (!this.entity) {
+        this.prepEntity();
+      }
     }
   },
   data() {
     return {
-      entity: null,
-      origEntity: null,
+      editEntity: null,
       schemaDetails: null,
       loading: true,
       TYPE_INPUT_MAP
@@ -114,56 +124,38 @@ export default {
   },
   methods: {
     addListItem(attrName) {
-      if (this.entity[attrName] instanceof Array) {
-        this.entity[attrName].push('');
+      if (this.editEntity[attrName] instanceof Array) {
+        this.editEntity[attrName].push('');
       } else {
         console.error("Attribute", attrName, "is not a multi-value attribute!");
       }
     },
     prepEntity() {
       const listAttrs = this.schemaDetails.attributes.filter(x => x.list);
-      if (this.entity === null) {
-        this.entity = {name: null, slug: null};
+      if (!this.entity) {
+        this.editEntity = {name: null, slug: null};
         for (const attr of this.schemaDetails.attributes) {
-          this.entity[attr.name] = null;
+          this.editEntity[attr.name] = null;
         }
       }
       for (const attr of listAttrs) {
-        if (this.entity && !this.entity[attr.name]) {
-          this.entity[attr.name] = [];
+        if (this.editEntity && !this.editEntity[attr.name]) {
+          this.editEntity[attr.name] = [];
         }
       }
-      this.origEntity = _cloneDeep(this.entity);
-      this.$emit("update", this.entity);
     },
-    updateSchemaMeta() {
-      const promises = [];
-      let p;
+    async updateSchemaMeta() {
       this.loading = true;
-
-      p = this.$api.getSchema({slugOrId: this.$route.params.schemaSlug}).then(
-          details => this.schemaDetails = details
-      );
-      promises.push(p);
-      if (this.$route.params.entitySlug) {
-        p = this.$api.getEntity({
-          schemaSlug: this.$route.params.schemaSlug,
-          entityIdOrSlug: this.$route.params.entitySlug,
-        }).then(data => {
-          this.entity = data;
-        });
-        promises.push(p);
-      }
-
-      Promise.all(promises).then(() => {
+      this.schemaDetails = await this.$api.getSchema({slugOrId: this.$route.params.schemaSlug});
+       if (!this.entity) {
         this.prepEntity();
-        this.loading = false;
-      });
+      }
+      this.loading = false;
     },
     getChanges() {
       const result = {};
-      for (const [attr, value] of Object.entries(this.entity)) {
-        if (!_isEqual(value, this.origEntity[attr])) {
+      for (const [attr, value] of Object.entries(this.editEntity)) {
+        if (!_isEqual(value, this.entity[attr])) {
           result[attr] = value;
         }
       }
@@ -191,7 +183,7 @@ export default {
         // CREATE NEW ENTITY
         response = await this.$api.createEntity({
           schemaSlug: this.$route.params.schemaSlug,
-          body: this.entity
+          body: this.editEntity
         });
         this.loading = false;
       }

@@ -28,7 +28,7 @@ export default {
   emits: ["pending-reviews"],
   data() {
     return {
-      title: '',
+      entity: null,
       tabs: [
         {
           name: 'Show/Edit',
@@ -52,22 +52,49 @@ export default {
     };
   },
   computed: {
+    title() {
+      return this.entity?.name || this.$route.params.entitySlug || '-';
+    },
     currentProperties() {
       const currIndex = this.$refs.entitytabbing?.currentTab || 0;
       if (this.tabs[currIndex].component.name === "PermissionList") {
-        return {objectType: "Entity", objectId: this.activeSchema.id};
+        return {objectType: "Entity", objectId: this.entity?.id};
       }
       let props = {schema: this.activeSchema};
 
       if (this.tabs[currIndex].component.name === "Changes") {
         props.entitySlug = this.$route.params.entitySlug;
       }
+
+      if (this.tabs[currIndex].component.name === "EntityForm") {
+        props.entity = this.entity;
+      }
+
       return props;
     }
   },
   methods: {
-    onUpdate(d) {
-      this.title = d.name || 'New';
+    async updateEntity() {
+      if (this.$route.params.entitySlug) {
+        const params = {
+          schemaSlug: this.activeSchema.slug,
+          entityIdOrSlug: this.$route.params.entitySlug
+        };
+        this.entity = await this.$api.getEntity(params);
+      } else {
+        this.entity = null;
+      }
+    },
+    async onUpdate() {
+      await this.updateEntity();
+    }
+  },
+  watch: {
+    async "$route.params.entitySlug"() {
+      await this.updateEntity();
+    },
+    async activeSchema() {
+      await this.updateEntity();
     }
   }
 };
