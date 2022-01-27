@@ -334,7 +334,7 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.ENTITY,
         object_id=entity.id,
         change_type=ChangeType.UPDATE,
@@ -470,7 +470,7 @@ def apply_entity_update_request(db: Session, change_request: ChangeRequest, revi
         commit=False
     )
     change_request.status = ChangeStatus.APPROVED
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.reviewed_by_user_id = reviewed_by.id
     change_request.comment = comment
     db.commit()
@@ -485,7 +485,7 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
 
     change_request = ChangeRequest(
         created_by=created_by, 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         object_type=EditableObjectType.ENTITY,
         object_id=entity.id,
         change_type=ChangeType.DELETE
@@ -535,7 +535,7 @@ def apply_entity_delete_request(db: Session, change_request: ChangeRequest, revi
     ) 
     change_request.status = ChangeStatus.APPROVED
     change_request.reviewed_by = reviewed_by
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.comment = comment
     db.commit()
     return True, entity

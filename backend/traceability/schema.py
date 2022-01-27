@@ -1,15 +1,24 @@
+from datetime import datetime, timezone
 from itertools import groupby
+import typing
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..auth.models import User
+from ..models import Schema
+from ..schemas.schema import AttrDefSchema, AttrDefUpdateSchema, SchemaCreateSchema, \
+    AttributeCreateSchema, SchemaUpdateSchema, AttributeDefinition
+from ..schemas.traceability import SchemaChangeDetailSchema
+from .. import crud
+from .. import exceptions
+
+from .enum import EditableObjectType, ContentType, ChangeType, ChangeStatus
 from .models import ChangeRequest, Change, ChangeValueInt, ChangeAttrType, ChangeValueBool, \
     ChangeValueStr
-from ..schemas import *
-from ..crud import *
-from .. import crud
-
-from .enum import EditableObjectType, ContentType
 
 
-def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> List[ChangeRequest]:
+def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> typing.List[ChangeRequest]:
     q = (
         select(ChangeRequest)
         .where(ChangeRequest.status == ChangeStatus.PENDING)
@@ -23,7 +32,8 @@ def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -
     return db.execute(q).scalars().all()
 
 
-def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) -> Tuple[List[ChangeRequest], List[ChangeRequest]]:
+def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) \
+        -> typing.Tuple[typing.List[ChangeRequest], typing.List[ChangeRequest]]:
     schema_changes = db.execute(
         select(ChangeRequest)
         .where(ChangeRequest.object_id == schema_id)
@@ -39,7 +49,7 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     # TODO details for schema create?
     change_request = db.execute(select(ChangeRequest).where(ChangeRequest.id == change_request_id)).scalar()
     if change_request is None:
-        raise MissingChangeException(obj_id=change_request_id)
+        raise exceptions.MissingChangeException(obj_id=change_request_id)
     
     schema_query = (
         select(Change)
@@ -77,7 +87,7 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     ).scalars().all()
     
     if not schema_id or not any([schema_changes, attr_update, attr_create, attr_delete]):
-        raise MissingSchemaUpdateRequestException(obj_id=change_request_id)
+        raise exceptions.MissingSchemaUpdateRequestException(obj_id=change_request_id)
     
     schema = crud.get_schema(db=db, id_or_slug=schema_id.object_id)
     # group changes by attribute id to get set of properties for each attribute
@@ -93,20 +103,23 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     change_['comment'] = change_request.comment
     change_['created_by'] = change_request.created_by.username
     change_['reviewed_by'] = change_request.reviewed_by.username if change_request.reviewed_by else None
-    change_['schema'] = {'slug': schema.slug, 'name': schema.name, 'id': schema.id, 'deleted': schema.deleted}
+    change_['schema'] = {'slug': schema.slug, 'name': schema.name, 'id': schema.id,
+                         'deleted': schema.deleted}
 
     deleted = [i for i in schema_changes if i.field_name == 'deleted']
     if deleted:
         deleted = deleted[0]
         v = db.execute(select(ChangeValueBool).where(ChangeValueBool.id == deleted.value_id)).scalar()
-        change_['changes']['deleted'] = {'new': v.new_value, 'old': v.old_value, 'current': schema.deleted}
-        return EntityChangeDetailSchema(**change_)
+        change_['changes']['deleted'] = {'new': v.new_value, 'old': v.old_value,
+                                         'current': schema.deleted}
+        return exceptions.EntityChangeDetailSchema(**change_)
 
     for change in schema_changes:
         v = get_value_for_change(change, db)
         if v.new_value is None:
             continue
-        change_['changes'][change.field_name] = {'old': v.old_value, 'new': v.new_value, 'current': getattr(schema, change.field_name)}
+        change_['changes'][change.field_name] = {'old': v.old_value, 'new': v.new_value,
+                                                 'current': getattr(schema, change.field_name)}
 
     for attr_id, changes in attr_create.items():
         change_['changes']['add'].append(AttrDefSchema(
@@ -125,7 +138,8 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
     return SchemaChangeDetailSchema(**change_)
 
 
-def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_by: User, commit: bool = True) -> ChangeRequest:
+def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_by: User,
+                                 commit: bool = True) -> ChangeRequest:
     crud.create_schema(db=db, data=data, commit=False)
     db.rollback()
 
@@ -137,7 +151,8 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
     )
     db.add(change_request)
 
-    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
+    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR),
+                     ('reviewable', ChangeAttrType.BOOL)]
     for field, type_ in schema_fields:
         ValueModel = type_.value.model
         v = ValueModel(new_value=getattr(data, field))
@@ -163,7 +178,8 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
         # ('type', ChangeAttrType.STR)
     ]
     for attr in data.attributes:
-        attribute = crud.create_attribute(db=db, data=AttributeCreateSchema(name=attr.name, type=attr.type.name), commit=False)
+        a_data = AttributeCreateSchema(name=attr.name, type=attr.type.name)
+        attribute = crud.create_attribute(db=db, data=a_data, commit=False)
         for field, type_ in attr_fields:
             ValueModel = type_.value.model
             v = ValueModel(new_value=getattr(attr, field))
@@ -201,7 +217,9 @@ def get_value_for_change(change: Change, db: Session):
     return db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
 
 
-def apply_schema_create_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None, commit: bool = True) -> Tuple[bool, Schema]:
+def apply_schema_create_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: typing.Optional[str] = None, commit: bool = True) \
+        -> typing.Tuple[bool, Schema]:
     schema_changes = db.execute(
         select(Change)
         .where(Change.change_request_id == change_request.id)
@@ -211,7 +229,7 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
         .where(Change.change_type == ChangeType.CREATE)
     ).scalars().all()
     if not schema_changes:
-        raise MissingSchemaCreateRequestException(obj_id=change_request.id)
+        raise exceptions.MissingSchemaCreateRequestException(obj_id=change_request.id)
     
     data = {'attributes': []}
     for change in schema_changes:
@@ -232,7 +250,7 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
         data['attributes'].append({i.field_name: get_value_for_change(change=i, db=db).new_value for i in changes})
     data = SchemaCreateSchema(**data)
 
-    schema = create_schema(db=db, data=data, commit=False)
+    schema = crud.create_schema(db=db, data=data, commit=False)
     change_request.object_id = schema.id
     change_request.reviewed_at = datetime.utcnow()
     change_request.reviewed_by_user_id = reviewed_by.id
@@ -263,7 +281,9 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
     return True, schema
 
 
-def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, created_by: User, commit: bool = True) -> ChangeRequest:
+def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str],
+                                 data: SchemaUpdateSchema, created_by: User, commit: bool = True) \
+        -> ChangeRequest:
     crud.update_schema(db=db, id_or_slug=id_or_slug, data=data, commit=False)
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
@@ -277,7 +297,8 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     )
     db.add(change_request)
     
-    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR), ('reviewable', ChangeAttrType.BOOL)]
+    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR),
+                     ('reviewable', ChangeAttrType.BOOL)]
     for field, type_ in schema_fields:
         ValueModel = type_.value.model
         v = ValueModel(new_value=getattr(data, field))  # TODO old value
@@ -316,7 +337,7 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
         ('new_name', ChangeAttrType.STR),
         # ('type', ChangeAttrType.STR)
     ]
-    attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
+    attr_def_names: typing.Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
     for attr in data.update_attributes:
         attribute = attr_def_names[attr.name].attribute
         for field, type_ in attr_fields:
@@ -345,7 +366,8 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
         # ('type', ChangeAttrType.STR)
     ]
     for attr in data.add_attributes:
-        attribute = crud.create_attribute(db=db, data=AttributeCreateSchema(name=attr.name, type=attr.type.name), commit=False)
+        a_data = AttributeCreateSchema(name=attr.name, type=attr.type.name)
+        attribute = crud.create_attribute(db=db, data=a_data, commit=False)
         for field, type_ in attr_fields:
             ValueModel = type_.value.model
             v = ValueModel(new_value=getattr(attr, field))
@@ -393,7 +415,8 @@ def create_schema_update_request(db: Session, id_or_slug: Union[int, str], data:
     return change_request
 
 
-def apply_schema_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None) -> Tuple[bool, Schema]:
+def apply_schema_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: typing.Optional[str] = None) -> typing.Tuple[bool, Schema]:
     schema_query = (
         select(Change)
         .where(Change.change_request_id == change_request.id)
@@ -431,7 +454,7 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
     ).scalars().all()
     
     if not schema_id or not any([schema_changes, attr_upd, attr_create, attr_delete]):
-        raise MissingSchemaUpdateRequestException(obj_id=change_request.id)
+        raise exceptions.MissingSchemaUpdateRequestException(obj_id=change_request.id)
     schema_id = schema_id.object_id
 
     # group changes by attribute id to get set of properties for each attribute
@@ -459,11 +482,14 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
     change_request.reviewed_by = reviewed_by
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
-    schema = update_schema(db=db, id_or_slug=schema_id, data=SchemaUpdateSchema(**data), commit=False)
+    schema = crud.update_schema(db=db, id_or_slug=schema_id, data=SchemaUpdateSchema(**data),
+                                commit=False)
     db.commit()
     return True, schema
 
-def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], created_by: User, commit: bool = True) -> ChangeRequest:
+
+def create_schema_delete_request(db: Session, id_or_slug: typing.Union[int, str], created_by: User,
+                                 commit: bool = True) -> ChangeRequest:
     crud.delete_schema(db=db, id_or_slug=id_or_slug, commit=False)
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
@@ -496,7 +522,8 @@ def create_schema_delete_request(db: Session, id_or_slug: Union[int, str], creat
     return change_request
 
 
-def apply_schema_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str]) -> Tuple[bool, Schema]:
+def apply_schema_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: typing.Optional[str]) -> typing.Tuple[bool, Schema]:
     change = db.execute(
         select(Change)
         .where(Change.change_request_id == change_request.id)
@@ -507,16 +534,16 @@ def apply_schema_delete_request(db: Session, change_request: ChangeRequest, revi
         .where(Change.change_type == ChangeType.DELETE)
     ).scalar()
     if change is None:
-        raise MissingSchemaDeleteRequestException(obj_id=change_request.id)
+        raise exceptions.MissingSchemaDeleteRequestException(obj_id=change_request.id)
 
     v = get_value_for_change(change=change, db=db)
     if not v.new_value:
-        raise MissingSchemaDeleteRequestException(obj_id=change_request.id)
+        raise exceptions.MissingSchemaDeleteRequestException(obj_id=change_request.id)
 
-    schema = delete_schema(db=db, id_or_slug=change.object_id, commit=False)
+    schema = crud.delete_schema(db=db, id_or_slug=change.object_id, commit=False)
     change_request.status = ChangeStatus.APPROVED
     change_request.reviewed_by = reviewed_by
-    change_request.reviewed_at = datetime.utcnow()
+    change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.comment = comment
     db.commit()
     return True, schema
