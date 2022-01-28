@@ -17,7 +17,7 @@ from ..schemas.auth import RequirePermission
 from ..schemas.traceability import ChangeReviewSchema
 
 from .enum import EditableObjectType, ChangeType, ChangeStatus, ReviewResult, ContentType
-from .models import ChangeRequest, Change
+from .models import ChangeRequest, Change, ChangeValueInt
 from .entity import apply_entity_create_request, apply_entity_update_request, \
     apply_entity_delete_request
 from .schema import apply_schema_create_request, apply_schema_update_request, \
@@ -28,7 +28,7 @@ REQUIRED_PERMISSIONS = {
     (EditableObjectType.SCHEMA, ChangeType.CREATE): (PermissionType.CREATE_SCHEMA, Schema),
     (EditableObjectType.SCHEMA, ChangeType.UPDATE): (PermissionType.UPDATE_SCHEMA, Schema),
     (EditableObjectType.SCHEMA, ChangeType.DELETE): (PermissionType.DELETE_SCHEMA, Schema),
-    (EditableObjectType.ENTITY, ChangeType.CREATE): (PermissionType.CREATE_ENTITY, Entity),
+    (EditableObjectType.ENTITY, ChangeType.CREATE): (PermissionType.CREATE_ENTITY, Schema),
     (EditableObjectType.ENTITY, ChangeType.UPDATE): (PermissionType.UPDATE_ENTITY, Entity),
     (EditableObjectType.ENTITY, ChangeType.DELETE): (PermissionType.DELETE_ENTITY, Entity),
 }
@@ -37,14 +37,20 @@ REQUIRED_PERMISSIONS = {
 def is_user_authorized_to_review(db: Session, user: User, request_id: int) -> None:
     request = get_change_request(db=db, request_id=request_id)
     req_perm, Model = REQUIRED_PERMISSIONS.get((request.object_type, request.change_type))
-    req_perm = RequirePermission(permission=req_perm, target=Model())
-    if request.object_type == EditableObjectType.ENTITY:
-        # TODO: Inject entity_id and/or schema_id in req_perm
-        pass
-    elif request.object_type == EditableObjectType.SCHEMA \
-            and request.change_type == ChangeType.UPDATE:
-        # TODO: Inject schema_id in req_perm
-        pass
+    req_perm = RequirePermission(permission=req_perm)
+    if request.object_type == EditableObjectType.ENTITY \
+            and request.change_type == ChangeType.CREATE:
+        try:
+            schema_id = db\
+                .query(ChangeValueInt.new_value)\
+                .join(Change, ChangeValueInt.id == Change.value_id)\
+                .filter(Change.change_request_id == request.id)\
+                .one()
+        except NoResultFound:
+            schema_id = None
+        req_perm.target = Model(id=schema_id)
+    else:
+        req_perm.target = Model(id=request.object_id)
 
     if not has_permission(db=db, user=user, permission=req_perm):
         raise HTTPException(status_code=HTTP_403_FORBIDDEN,

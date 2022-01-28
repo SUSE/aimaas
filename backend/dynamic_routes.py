@@ -8,7 +8,7 @@ from sqlalchemy.orm.session import Session
 from pydantic import create_model, Field, validator
 from pydantic.main import BaseModel, ModelMetaclass
 
-from .auth import authorized_user
+from .auth import authorized_user, authenticated_user
 from .auth.enum import PermissionType
 from .auth.models import User
 from .config import settings
@@ -297,6 +297,13 @@ def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
 
 def route_create_entity(router: APIRouter, schema: Schema):
     entity_create_schema = _create_entity_request_model(schema=schema)
+    req_permission = authenticated_user
+    if schema.reviewable:
+        req_permission = authorized_user(schemas.RequirePermission(
+            permission=PermissionType.CREATE_ENTITY,
+            target=Schema()
+        ))
+
     @router.post(
         f'/{schema.slug}',
         response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
@@ -330,7 +337,7 @@ def route_create_entity(router: APIRouter, schema: Schema):
         }
     )
     def create_entity(data: entity_create_schema, response: Response, db: Session = Depends(get_db),
-                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.CREATE_ENTITY, target=Schema())))):
+                      user: User = Depends(req_permission)):
         try:
             change_request = create_entity_create_request(
                 db=db, schema_id=schema.id, data=data.dict(), created_by=user, commit=False)
@@ -388,6 +395,13 @@ def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
 
 def route_update_entity(router: APIRouter, schema: Schema):
     entity_update_schema = _update_entity_request_model(schema=schema)
+    req_permission = authenticated_user
+    if schema.reviewable:
+        req_permission = authorized_user(schemas.RequirePermission(
+            permission=PermissionType.UPDATE_ENTITY,
+            target=Entity()
+        ))
+
     @router.put(
         f'/{schema.slug}/{{id_or_slug}}',
         response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
@@ -424,8 +438,7 @@ def route_update_entity(router: APIRouter, schema: Schema):
         }
     )
     def update_entity(id_or_slug: Union[int, str], data: entity_update_schema, response: Response,
-                      db: Session = Depends(get_db),
-                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.UPDATE_ENTITY, target=Entity())))):
+                      db: Session = Depends(get_db), user: User = Depends(req_permission)):
         try:
             change_request = create_entity_update_request(
                 db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user,
@@ -453,6 +466,13 @@ def route_update_entity(router: APIRouter, schema: Schema):
 
 
 def route_delete_entity(router: APIRouter, schema: Schema):
+    req_permission = authenticated_user
+    if schema.reviewable:
+        req_permission = authorized_user(schemas.RequirePermission(
+            permission=PermissionType.DELETE_ENTITY,
+            target=Entity()
+        ))
+
     @router.delete(
         f'/{schema.slug}/{{id_or_slug}}',
         response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
@@ -468,7 +488,7 @@ def route_delete_entity(router: APIRouter, schema: Schema):
     )
     def delete_entity(id_or_slug: Union[int, str], response: Response,
                       db: Session = Depends(get_db),
-                      user: User = Depends(authorized_user(schemas.RequirePermission(permission=PermissionType.DELETE_ENTITY, target=Entity())))):
+                      user: User = Depends(req_permission)):
         try:
             change_request = create_entity_delete_request(
                 db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user, commit=False
