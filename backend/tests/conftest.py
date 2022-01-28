@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from ..auth import get_password_hash, authenticated_user, authorized_user
 from ..auth.crud import get_or_create_user, get_user, grant_permission
 from ..auth.enum import RecipientType, PermissionType
+from ..auth.models import User
 from ..database import get_db
 from ..models import *
 from ..config import settings as s
@@ -189,6 +190,11 @@ def dbsession(engine, tables) -> Session:
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture
+def testuser(dbsession) -> User:
+    return get_user(db=dbsession, username=TEST_USER.username)
 
 
 @pytest.fixture

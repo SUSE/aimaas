@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import List, Tuple, Optional, Dict, Any, Union
 
 from sqlalchemy import select
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from .. import crud
@@ -11,7 +12,7 @@ from .. import dynamic_routes
 from ..auth.models import User
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
     AttributeNotDefinedException, MissingEntityUpdateRequestException, \
-    MissingEntityDeleteRequestException
+    MissingEntityDeleteRequestException, MissingChangeRequestException
 from ..models import Entity, AttributeDefinition, Schema, Attribute
 from ..schemas.traceability import EntityChangeDetailSchema
 
@@ -44,7 +45,7 @@ def _fill_in_entity_change(change: dict, entity_change: Change, entity: Entity, 
     field = entity_change.field_name
     ValueModel = entity_change.data_type.value.model
     v = db.execute(select(ValueModel).where(ValueModel.id == entity_change.value_id)).scalar()
-    change['changes'][field] = {'new': v.new_value, 'old': v.old_value, 'current': getattr(entity, field)}
+    change['changes'][field] = {'new': v.new_value, 'old': v.old_value, 'current': getattr(entity, field, None)}
 
 def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, listed_changes: dict[int, List[Change]], checked_listed: List[int], db: Session):
     attr = entity_change.attribute
@@ -64,17 +65,16 @@ def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, l
     changes = listed_changes[attr.id]
     values = db.execute(select(ValueModel).where(ValueModel.id.in_([i.value_id for i in changes]))).scalars().all()
     values = [i.new_value for i in values if i.new_value is not None]
-    change['changes'][attr.name] = {'new': values, 'old': None, 'current': None}
+    change['changes'][attr.name] = {'new': values,
+                                    'old': [] if attr.id in listed_changes else None,
+                                    'current': [] if attr.id in listed_changes else None}
 
 
 def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDetailSchema:
-    # TODO details for entity create?
-    change_request = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.id == change_request_id)
-    ).scalar()
-    if change_request is None:
-        raise MissingChangeException(obj_id=change_request_id)
+    try:
+        change_request = db.query(ChangeRequest).filter(ChangeRequest.id == change_request_id).one()
+    except NoResultFound:
+        raise MissingChangeRequestException(obj_id=change_request_id)
 
     changes_query = (select(Change)
         .where(Change.change_request_id == change_request.id)
