@@ -2,14 +2,15 @@ from datetime import datetime, timezone
 from itertools import groupby
 import typing
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from ..auth.models import User
-from ..models import Schema
+from ..models import Schema, Attribute
 from ..schemas.schema import AttrDefSchema, AttrDefUpdateSchema, SchemaCreateSchema, \
-    AttributeCreateSchema, SchemaUpdateSchema, AttributeDefinition
-from ..schemas.traceability import SchemaChangeDetailSchema
+    AttributeCreateSchema, SchemaUpdateSchema, AttributeDefinition, SchemaBaseSchema
+from ..schemas.traceability import SchemaChangeDetailSchema, ChangeSchema
 from .. import crud
 from .. import exceptions
 
@@ -46,65 +47,56 @@ def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) \
 
 
 def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDetailSchema:
-    # TODO details for schema create?
-    change_request = db.execute(select(ChangeRequest).where(ChangeRequest.id == change_request_id)).scalar()
-    if change_request is None:
-        raise exceptions.MissingChangeException(obj_id=change_request_id)
-    
-    schema_query = (
-        select(Change)
-        .where(Change.change_request_id == change_request.id)
-        .where(Change.field_name != None)
-        .where(Change.object_id != None)
-        .where(Change.content_type == ContentType.SCHEMA)
-    )
+    try:
+        change_request = db\
+            .query(ChangeRequest)\
+            .filter(ChangeRequest.id == change_request_id,
+                    ChangeRequest.object_type == EditableObjectType.SCHEMA)\
+            .one()
+    except NoResultFound:
+        raise exceptions.MissingChangeRequestException(obj_id=change_request_id)
 
-    schema_id = db.execute(schema_query.where(Change.field_name == 'id')).scalar()
-    schema_changes = db.execute(schema_query.where(Change.field_name != 'id')).scalars().all()
+    schema_changes = db\
+        .query(Change)\
+        .filter(Change.change_request_id == change_request.id,
+                Change.field_name != None,
+                Change.field_name != 'id',
+                Change.content_type == ContentType.SCHEMA)
 
-    attr_change_query = (
+    attr_changes = db.execute(
         select(Change)
         .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
-    )
-    attr_update = db.execute(
-        attr_change_query
+        .order_by(Change.object_id)
         .where(Change.field_name != None)
         .where(Change.object_id != None)
-        .where(Change.change_type == ChangeType.UPDATE)
     ).scalars().all()
-    attr_create = db.execute(
-        attr_change_query
-        .where(Change.field_name != None)
-        .where(Change.object_id != None)
-        .where(Change.change_type == ChangeType.CREATE)
-    ).scalars().all()
-    attr_delete = db.execute(
-        attr_change_query
-        .where(Change.attribute_id != None)
-        .where(Change.data_type == ChangeAttrType.STR)
-        .where(Change.change_type == ChangeType.DELETE)
-    ).scalars().all()
-    
-    if not schema_id or not any([schema_changes, attr_update, attr_create, attr_delete]):
-        raise exceptions.MissingSchemaUpdateRequestException(obj_id=change_request_id)
-    
-    schema = crud.get_schema(db=db, id_or_slug=schema_id.object_id)
-    # group changes by attribute id to get set of properties for each attribute
-    attr_update = {k: [i for i in v] for k, v in groupby(attr_update, key=lambda x: x.object_id)}
-    attr_create = {k: [i for i in v] for k, v in groupby(attr_create, key=lambda x: x.object_id)}
 
-    change_ = {'changes': {'add': [], 'update': [], 'delete': []}}
-    change_['object_type'] = change_request.object_type.name
-    change_['change_type'] = change_request.change_type.name
-    change_['reviewed_at'] = change_request.reviewed_at
-    change_['created_at'] = change_request.created_at
-    change_['status'] = change_request.status
-    change_['comment'] = change_request.comment
-    change_['created_by'] = change_request.created_by.username
-    change_['reviewed_by'] = change_request.reviewed_by.username if change_request.reviewed_by else None
-    change_['schema'] = {'slug': schema.slug, 'name': schema.name, 'id': schema.id,
-                         'deleted': schema.deleted}
+    if (not change_request.object_id and change_request.change_type != ChangeType.CREATE) \
+            or not attr_changes:
+        raise exceptions.MissingChangeException(obj_id=change_request.id)
+
+    attributes = {a.id: a.name for a in db.query(Attribute)
+        .join(Change, Attribute.id == Change.object_id)
+        .filter(Change.content_type == ContentType.ATTRIBUTE_DEFINITION,
+                Change.change_request_id == change_request.id)
+        .all()}
+    schema = None
+    if change_request.object_id:
+        schema = crud.get_schema(db=db, id_or_slug=change_request.object_id)
+
+    change_ = {
+        'changes': {},
+        'object_type': change_request.object_type.name,
+        'change_type': change_request.change_type.name,
+        'reviewed_at': change_request.reviewed_at,
+        'created_at': change_request.created_at,
+        'status': change_request.status,
+        'comment': change_request.comment,
+        'created_by': change_request.created_by.username,
+        'reviewed_by': change_request.reviewed_by.username if change_request.reviewed_by else None,
+        'schema': SchemaBaseSchema.from_orm(schema) if schema else None
+    }
 
     deleted = [i for i in schema_changes if i.field_name == 'deleted']
     if deleted:
@@ -112,28 +104,23 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
         v = db.execute(select(ChangeValueBool).where(ChangeValueBool.id == deleted.value_id)).scalar()
         change_['changes']['deleted'] = {'new': v.new_value, 'old': v.old_value,
                                          'current': schema.deleted}
-        return exceptions.EntityChangeDetailSchema(**change_)
+        return SchemaChangeDetailSchema(**change_)
 
     for change in schema_changes:
         v = get_value_for_change(change, db)
         if v.new_value is None:
             continue
         change_['changes'][change.field_name] = {'old': v.old_value, 'new': v.new_value,
-                                                 'current': getattr(schema, change.field_name)}
+                                                 'current': getattr(schema, change.field_name, None)}
 
-    for attr_id, changes in attr_create.items():
-        change_['changes']['add'].append(AttrDefSchema(
-            **{i.field_name: get_value_for_change(i, db).new_value for i in changes}
-        ))
-
-    for attr_id, changes in attr_update.items():
-        attr = crud.get_attribute(db=db, attr_id=attr_id)
-        change_['changes']['update'].append(AttrDefUpdateSchema(
-           **{**{i.field_name: get_value_for_change(i, db).new_value for i in changes}, 'name': attr.name}
-        ))
-
-    for change in attr_delete:
-        change_['changes']['delete'].append(change.attribute.name)
+    for change in attr_changes:
+        attr = attributes.get(change.object_id, None)
+        v = get_value_for_change(change, db)
+        change_["changes"][f"{attr}.{change.field_name}"] = ChangeSchema(
+            old=v.old_value,
+            current="TODO" if schema else None,
+            new=v.new_value
+        )
 
     return SchemaChangeDetailSchema(**change_)
 

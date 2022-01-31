@@ -17,7 +17,6 @@ from ..traceability.schema import get_recent_schema_changes, schema_change_detai
     create_schema_update_request, apply_schema_update_request, create_schema_delete_request, \
     apply_schema_delete_request
 
-from .test_traceability_entity import make_entity_change_objects
 
 def make_schema_change_objects(db: Session, user: User, time: datetime):
     requests = []
@@ -211,9 +210,7 @@ def test_get_schema_create_details(dbsession: Session):
 
 def asserts_after_submitting_schema_create_request(db: Session):
     change_request = db.execute(select(ChangeRequest)).scalar()
-    assert change_request.created_by is not None
-    assert change_request.created_at is not None
-    assert change_request.status == ChangeStatus.PENDING
+
     def get_value_for_change(change):
         ValueModel = change.data_type.value.model
         return db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
@@ -265,65 +262,126 @@ def asserts_after_applying_schema_create_request(db: Session, change_request_id:
     assert change_request.status == ChangeStatus.APPROVED
     assert change_request.reviewed_at >= change_request.created_at
 
+
 class TestCreateSchemaTraceability:
-    @pytest.fixture
-    def user(self, dbsession):
-        return dbsession.execute(select(User).where(User.id == 1)).scalar()
-    
-    @staticmethod
-    def data_for_test(db: Session) -> dict:
-        color_ = AttrDefSchema(
-            name='color',
-            type='STR',
-            required=False,
-            unique=False,
-            list=False,
-            key=False,
-            description='Color of this car'
-        )
-        max_speed_ = AttrDefSchema(
-            name='max_speed',
-            type='INT',
-            required=True,
-            unique=False,
-            list=False,
-            key=False
-        )
-        release_year_ = AttrDefSchema(
-            name="release_year",
-            type='DT',
-            required=False,
-            unique=False,
-            list=False,
-            key=False
-        )
-        owner_ = AttrDefSchema(
-            name='owner',
-            type='FK',
-            required=True,
-            unique=False,
-            list=False,
-            key=False,
-            bind_to_schema=1
-        )
-        return {
-            'attr_defs': {
-                'color': color_,
-                'max_speed': max_speed_,
-                'release_year': release_year_,
-                'owner': owner_
-            }
+    default_data = {
+        "name": "Car",
+        "slug": "car",
+        "attributes": [
+            AttrDefSchema(
+                name='color',
+                type='STR',
+                required=False,
+                unique=False,
+                list=False,
+                key=False,
+                description='Color of this car'
+            ),
+            AttrDefSchema(
+                name='max_speed',
+                type='INT',
+                required=True,
+                unique=False,
+                list=False,
+                key=False
+            ),
+            AttrDefSchema(
+                name="release_year",
+                type='DT',
+                required=False,
+                unique=False,
+                list=False,
+                key=False
+            ),
+            AttrDefSchema(
+                name='owner',
+                type='FK',
+                required=True,
+                unique=False,
+                list=False,
+                key=False,
+                bind_to_schema=1
+            ),
+            AttrDefSchema(
+                name="extras",
+                type="STR",
+                required=False,
+                unique=False,
+                list=True,
+                key=False,
+                description='Special extras of car'
+            )
+        ]
+    }
+
+    def create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
+        return create_schema_create_request(dbsession, SchemaCreateSchema(**self.default_data),
+                                            testuser)
+
+    def test_create_request(self, dbsession: Session, testuser: User):
+        change_request = self.create_request(dbsession=dbsession, testuser=testuser)
+
+        assert change_request.id is not None
+        assert change_request.created_by == testuser
+        assert change_request.created_at is not None
+        assert change_request.status == ChangeStatus.PENDING
+        assert change_request.object_id is None
+
+        changes = schema_change_details(db=dbsession, change_request_id=change_request.id)
+        expected_schema_new = {
+            'name': 'Car',
+            'slug': 'car',
+            'reviewable': False,
+            'color.required': False,
+            'color.unique': False,
+            'color.list': False,
+            'color.key': False,
+            'color.description': 'Color of this car',
+            'color.bind_to_schema': None,
+            'color.name': 'color',
+            'color.type': 'STR',
+            'max_speed.required': True,
+            'max_speed.unique': False,
+            'max_speed.list': False,
+            'max_speed.key':  False,
+            'max_speed.description': None,
+            'max_speed.bind_to_schema': None,
+            'max_speed.name': 'max_speed',
+            'max_speed.type': 'INT',
+            'release_year.required': False,
+            'release_year.unique': False,
+            'release_year.list': False,
+            'release_year.key': False,
+            'release_year.description': None,
+            'release_year.bind_to_schema': None,
+            'release_year.name': 'release_year',
+            'release_year.type': 'DT',
+            'owner.required': True,
+            'owner.unique': False,
+            'owner.list': False,
+            'owner.key': False,
+            'owner.description': None,
+            'owner.bind_to_schema': 1,
+            'owner.name': 'owner',
+            'owner.type': 'FK',
+            'extras.required': False,
+            'extras.unique': False,
+            'extras.list': True,
+            'extras.key': False,
+            'extras.description': 'Special extras of car',
+            'extras.bind_to_schema': None,
+            'extras.name': 'extras',
+            'extras.type': 'STR',
         }
+        assert expected_schema_new == {key: value.new for key, value in changes.changes.items()}
+        assert all(v.old is None for v in changes.changes.values())
+        assert all(v.current is None for v in changes.changes.values())
 
-    def test_schema_create_request_and_apply(self, dbsession: Session, user: User):
-        data = self.data_for_test(dbsession)
-        car = SchemaCreateSchema(name='Car', slug='car', attributes=list(data['attr_defs'].values()))
-
-        cr = create_schema_create_request(db=dbsession, data=car, created_by=user)
-        asserts_after_submitting_schema_create_request(db=dbsession)
-        
-        apply_schema_create_request(db=dbsession, change_request=cr, reviewed_by=user, comment='test')
-        asserts_after_applying_schema_create_request(db=dbsession, change_request_id=1, comment='test')
+    def test_appy_request(self, dbsession: Session, testuser: User):
+        apply_schema_create_request(db=dbsession, change_request=cr, reviewed_by=user,
+                                    comment='test')
+        asserts_after_applying_schema_create_request(db=dbsession, change_request_id=1,
+                                                     comment='test')
 
 
 def make_schema_update_request(db: Session, user: User, time: datetime):

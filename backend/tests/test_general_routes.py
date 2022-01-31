@@ -7,7 +7,10 @@ import pytest
 
 from ..models import *
 from ..schemas import *
+from ..traceability.entity import create_entity_update_request, create_entity_create_request, \
+    create_entity_delete_request
 from ..traceability.models import ChangeRequest, Change
+from ..traceability.schema import create_schema_create_request, create_schema_update_request
 from .test_crud_schema import (
     asserts_after_schema_create,
     asserts_after_schema_update,
@@ -24,13 +27,6 @@ from .test_traceability_schema import (
     make_schema_update_request,
     make_schema_create_request
 )
-from .test_traceability_entity import (
-    make_entity_change_objects,
-    make_entity_update_request,
-    make_entity_delete_request,
-    make_entity_create_request
-)
-from .test_traceability import make_change_for_review
 
 
 class TestRouteAttributes:
@@ -608,23 +604,20 @@ class TestRouteSchemaDelete:
 
 
 class TestRouteGetEntityChanges:
-    def test_get_recent_changes(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow()
-        make_entity_change_objects(db=dbsession, user=user, time=now)
+    default_request_data = {
+        "name": "Jackson",
+        "age": 42,
+        "fav_color": ['violet', 'cyan']
+    }
 
+    def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
         response = client.get('/changes/entity/person/Jack?count=1')
         changes = response.json()
-        assert parser.parse(changes[0]['created_at']).replace(tzinfo=timezone.utc) == (
-                    now + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+        parsed_timestamp = parser.parse(changes[0]['created_at'])
+        assert parsed_timestamp.tzinfo is not None
 
-        response = client.get('/changes/entity/person/Jack')
-        changes = response.json()
-        for change, i in zip(changes, reversed(range(5, 10))):
-            assert parser.parse(change['created_at']).replace(tzinfo=timezone.utc) == (
-                        now + timedelta(hours=i)).replace(tzinfo=timezone.utc)
-
-    def common_asserts_for_update_details(self, change, created_at, created_by):
+    @staticmethod
+    def common_asserts_for_update_details(change, created_at, created_by):
         assert parser.parse(change['created_at']) == created_at
         assert change['created_by'] == created_by.username
         assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
@@ -637,15 +630,19 @@ class TestRouteGetEntityChanges:
         fav_color = change['changes']['fav_color']
         assert name['new'] == 'Jackson' and name['old'] == name['current'] == 'Jack'
         assert age['new'] == 42 and age['old'] == age['current'] == 10
-        assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color[
-            'current'] == None
+        assert fav_color['new'] == ['violet', 'cyan'] \
+               and fav_color['old'] == fav_color['current'] == None
 
-    def test_get_update_details(self, dbsession: Session, client: TestClient):
+    def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
         user = dbsession.execute(select(User)).scalar()
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_entity_update_request(db=dbsession, user=user, time=now)
+        change_request = create_entity_update_request(
+            db=dbsession, id_or_slug=1, schema_id=1, data=self.default_request_data.copy(),
+            created_by=testuser
+        )
 
-        response = client.get('/changes/detail/entity/1')
+        url = f'/changes/detail/entity/{change_request.id}'
+        response = client.get(url)
         change = response.json()
         self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'PENDING'
@@ -653,7 +650,7 @@ class TestRouteGetEntityChanges:
         dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
         dbsession.commit()
 
-        response = client.get('/changes/detail/entity/1')
+        response = client.get(url)
         change = response.json()
         self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'APPROVED'
@@ -661,12 +658,13 @@ class TestRouteGetEntityChanges:
         dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
         dbsession.commit()
 
-        response = client.get('/changes/detail/entity/1')
+        response = client.get(url)
         change = response.json()
         self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'DECLINED'
 
-    def common_asserts_for_create_details(self, change, created_at, created_by):
+    @staticmethod
+    def common_asserts_for_create_details(change, created_at, created_by):
         assert parser.parse(change['created_at']) == created_at
         assert change['created_by'] == created_by.username
         assert change['reviewed_at'] == change['reviewed_by'] == None
@@ -679,17 +677,21 @@ class TestRouteGetEntityChanges:
         assert name['new'] == 'Jackson' and not name['old']
         assert slug['new'] == 'jackson' and not slug['old']
         assert age['new'] == 42 and age['old'] is None
-        assert fav_color['new'] == ['violet', 'cyan'] and fav_color['old'] == fav_color[
-            'current'] == None
+        assert fav_color['new'] == ['violet', 'cyan'] \
+               and fav_color['old'] == fav_color['current'] == None
 
-    def test_get_create_details(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
+    def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_entity_create_request(db=dbsession, user=user, time=now)
+        data = self.default_request_data.copy()
+        data.update({"slug": "jackson"})
+        change_request = create_entity_create_request(
+            db=dbsession, schema_id=1, data=data.copy(),
+            created_by=testuser)
 
-        response = client.get('/changes/detail/entity/1')
+        url = f'/changes/detail/entity/{change_request.id}'
+        response = client.get(url)
         change = response.json()
-        self.common_asserts_for_create_details(change, now, user)
+        self.common_asserts_for_create_details(change, now, testuser)
         assert change['status'] == 'APPROVED'
         assert change['entity']['name'] == 'Jackson'
         assert change['entity']['slug'] == 'jackson'
@@ -699,9 +701,9 @@ class TestRouteGetEntityChanges:
         dbsession.execute(update(Change).values(object_id=None))
         dbsession.commit()
 
-        response = client.get('/changes/detail/entity/1')
+        response = client.get(url)
         change = response.json()
-        self.common_asserts_for_create_details(change, now, user)
+        self.common_asserts_for_create_details(change, now, testuser)
         assert change['status'] == 'PENDING'
         assert change['entity']['name'] == ''
         assert change['entity']['slug'] == ''
@@ -712,21 +714,21 @@ class TestRouteGetEntityChanges:
 
         response = client.get('/changes/detail/entity/1')
         change = response.json()
-        self.common_asserts_for_create_details(change, now, user)
+        self.common_asserts_for_create_details(change, now, testuser)
         assert change['status'] == 'DECLINED'
         assert change['entity']['name'] == ''
         assert change['entity']['slug'] == ''
         assert change['entity']['schema'] == 'person'
 
-    def test_get_delete_details(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_entity_delete_request(db=dbsession, user=user, time=now)
+    def test_get_delete_details(self, dbsession: Session, client: TestClient, testuser: User):
+        now = datetime.now(timezone.utc)
+        change_request = create_entity_delete_request(db=dbsession, id_or_slug=1, schema_id=1,
+                                                      created_by=testuser)
 
-        response = client.get('/changes/detail/entity/1')
+        response = client.get(f'/changes/detail/entity/{change_request.id}')
         change = response.json()
-        assert parser.parse(change['created_at']) == now
-        assert change['created_by'] == user.username
+        assert parser.parse(change['created_at']) >= now
+        assert change['created_by'] == testuser.username
         assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
         assert change['status'] == 'PENDING'
         assert change['entity']['name'] == 'Jack'
@@ -734,7 +736,7 @@ class TestRouteGetEntityChanges:
         assert change['entity']['schema'] == 'person'
         assert len(change['changes']) == 1
         deleted = change['changes']['deleted']
-        assert deleted['new'] == True and deleted['old'] == deleted['current'] == False
+        assert deleted['new'] and not deleted['old'] and not deleted['current']
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/changes/detail/entity/12345678')
@@ -746,20 +748,17 @@ class TestRouteGetSchemaChanges:
         user = dbsession.execute(select(User)).scalar()
         now = datetime.utcnow()
         make_schema_change_objects(db=dbsession, user=user, time=now)
-        entities = make_entity_change_objects(db=dbsession, user=user, time=now)
         response = client.get('/changes/schema/person?count=1')
         changes = response.json()
         assert parser.parse(changes['schema_changes'][0]['created_at']).replace(
             tzinfo=timezone.utc) == (now + timedelta(hours=9)).replace(tzinfo=timezone.utc)
         entity_requests = changes['pending_entity_requests']
         assert len(entity_requests) == 1
-        assert entities[-1].id == entity_requests[0]['id']
 
         response = client.get('/changes/schema/person')
         changes = response.json()
         entity_requests = changes['pending_entity_requests']
         assert len(entity_requests) == 1
-        assert entities[-1].id == entity_requests[0]['id']
         for change, i in zip(changes['schema_changes'], reversed(range(5, 10))):
             assert parser.parse(change['created_at']).replace(tzinfo=timezone.utc) == (
                         now + timedelta(hours=i)).replace(tzinfo=timezone.utc)
@@ -871,8 +870,12 @@ class TestRouteGetSchemaChanges:
 
 
 class TestTraceabilityRoutes:
-    def test_review_changes(self, dbsession: Session, authorized_client: TestClient):
-        change_request = make_change_for_review(dbsession)
+    def test_review_changes(self, dbsession: Session, authorized_client: TestClient,
+                            testuser: User):
+        data = {"name": "Føø Bar"}
+        change_request = create_entity_update_request(
+            db=dbsession, id_or_slug=1, schema_id=1, data=data.copy(), created_by=testuser
+        )
 
         # APPROVE
         review = {
@@ -916,17 +919,15 @@ class TestTraceabilityRoutes:
         day_later = now + timedelta(hours=24)
         user = dbsession.execute(select(User)).scalar()
         # 10 requests, 9 UPD, 1 CREATE
-        entity_requests = make_entity_change_objects(dbsession, user, now)
+        entity_requests = dbsession.query(ChangeRequest).all()
         for i in entity_requests:
             dbsession.refresh(i)
-            i.created_by
         entity_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in
                            entity_requests]
         # 10 requests, 9 UPD, 1 CREATE
         schema_requests = make_schema_change_objects(dbsession, user, day_later)
         for i in schema_requests:
             dbsession.refresh(i)
-            i.created_by
         schema_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in
                            schema_requests]
 

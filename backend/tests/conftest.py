@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,6 +12,8 @@ from ..database import get_db
 from ..models import *
 from ..config import settings as s
 from ..schemas.auth import UserCreateSchema, PermissionSchema
+from ..traceability.enum import EditableObjectType, ChangeType, ContentType
+from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt
 from .. import create_app
 
 
@@ -160,7 +163,75 @@ def populate_db(db: Session):
 
     unperson = Schema(name="UnPerson", slug="unperson")
     db.add(unperson)
+
+    time = datetime.now(timezone.utc)
+    for i in range(-12, -3):
+        change_request = ChangeRequest(
+            created_at=time+timedelta(hours=i),
+            created_by=user,
+            object_type=EditableObjectType.ENTITY,
+            object_id=1,
+            change_type=ChangeType.UPDATE
+        )
+        change_1 = Change(
+            change_request=change_request,
+            object_id=1,
+            change_type=ChangeType.UPDATE,
+            content_type=ContentType.ENTITY,
+            field_name='name',
+            data_type=ChangeAttrType.STR,
+            value_id=998
+        )
+        change_2 = Change(
+            change_request=change_request,
+            object_id=1,
+            change_type=ChangeType.UPDATE,
+            content_type=ContentType.ENTITY,
+            field_name='slug',
+            data_type=ChangeAttrType.STR,
+            value_id=999
+        )
+        db.add_all([change_request, change_1, change_2])
+
+    change_request = ChangeRequest(
+            created_at=time+timedelta(hours=-9),
+            created_by=user,
+            object_type=EditableObjectType.ENTITY,
+            object_id=1,
+            change_type=ChangeType.CREATE
+    )
+    change_1 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.ENTITY,
+        field_name='deleted',
+        data_type=ChangeAttrType.STR,
+        value_id=998
+    )
+    change_2 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.ENTITY,
+        field_name='deleted',
+        data_type=ChangeAttrType.STR,
+        value_id=999
+    )
+    schema_value = ChangeValueInt(new_value=1)
+    db.add(schema_value)
     db.flush()
+    change_3 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.ENTITY,
+        field_name='schema_id',
+        data_type=ChangeAttrType.INT,
+        value_id=schema_value.id
+    )
+    db.add_all([change_request, change_1, change_2, change_3])
+
     db.commit()
 
 

@@ -28,6 +28,7 @@ class ChangeRequestSchema(BaseModel):
             return v.username
         return v
 
+
 class SchemaChangeRequestSchema(BaseModel):
     schema_changes: List[ChangeRequestSchema]
     pending_entity_requests: List[ChangeRequestSchema]
@@ -44,27 +45,27 @@ class ChangedEntitySchema(BaseModel):
     schema_slug: str = Field(alias='schema')
 
 
-class EntityChangeSchema(BaseModel):
+class ChangeSchema(BaseModel):
     new: Optional[Union[Any, list[Any]]]
-    old: Optional[Any]
-    current: Optional[Any]
+    old: Optional[Union[Any, list[Any]]]
+    current: Optional[Union[Any, list[Any]]]
 
 
 class EntityChangeDetailSchema(ChangeRequestSchema):
     entity: ChangedEntitySchema
-    changes: dict[str, EntityChangeSchema]
+    changes: dict[str, ChangeSchema]
 
 
-class SchemaChangesSchema(BaseModel):
-    name: Optional[Dict[str, Optional[str]]]
-    slug: Optional[Dict[str, Optional[str]]]
-    reviewable: Optional[Dict[str, Optional[bool]]]
-    deleted: Optional[Dict[str, bool]]
-    add: Optional[List[AttrDefSchema]]
-    update: Optional[List[AttrDefUpdateSchema]]
-    delete: Optional[List[str]]
+# class SchemaChangesSchema(BaseModel):
+#     name: Optional[Dict[str, Optional[str]]]
+#     slug: Optional[Dict[str, Optional[str]]]
+#     reviewable: Optional[Dict[str, Optional[bool]]]
+#     deleted: Optional[Dict[str, bool]]
+#     add: Optional[List[AttrDefSchema]]
+#     update: Optional[List[AttrDefUpdateSchema]]
+#     delete: Optional[List[str]]
 
 
 class SchemaChangeDetailSchema(ChangeRequestSchema):
-    schema_: SchemaBaseSchema = Field(alias='schema')
-    changes: SchemaChangesSchema
+    schema_: Optional[SchemaBaseSchema] = Field(alias='schema')
+    changes: dict[str, ChangeSchema]

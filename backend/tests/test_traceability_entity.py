@@ -18,163 +18,6 @@ from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeV
     ChangeValueStr
 
 
-def make_entity_change_objects(db: Session, user: User, time: datetime):
-    requests = []
-    for i in range(9):
-        change_request = ChangeRequest(
-            created_at=time+timedelta(hours=i),
-            created_by=user,
-            object_type=EditableObjectType.ENTITY,
-            object_id=1,
-            change_type=ChangeType.UPDATE
-        )
-        change_1 = Change(
-            change_request=change_request,
-            object_id=1,
-            change_type=ChangeType.UPDATE,
-            content_type=ContentType.ENTITY,
-            field_name='name',
-            data_type=ChangeAttrType.STR,
-            value_id=998
-        )
-        change_2 = Change(
-            change_request=change_request,
-            object_id=1,
-            change_type=ChangeType.UPDATE,
-            content_type=ContentType.ENTITY,
-            field_name='slug',
-            data_type=ChangeAttrType.STR,
-            value_id=999
-        )
-        db.add_all([change_request, change_1, change_2])
-        requests.append(change_request)
-
-
-    change_request = ChangeRequest(
-            created_at=time+timedelta(hours=9),
-            created_by=user,
-            object_type=EditableObjectType.ENTITY,
-            object_id=1,
-            change_type=ChangeType.CREATE
-    )
-    change_1 = Change(
-        change_request=change_request,
-        object_id=1,
-        change_type=ChangeType.CREATE,
-        content_type=ContentType.ENTITY,
-        field_name='deleted',
-        data_type=ChangeAttrType.STR,
-        value_id=998
-    )
-    change_2 = Change(
-        change_request=change_request,
-        object_id=1,
-        change_type=ChangeType.CREATE,
-        content_type=ContentType.ENTITY,
-        field_name='deleted',
-        data_type=ChangeAttrType.STR,
-        value_id=999
-    )
-    schema_value = ChangeValueInt(new_value=1)
-    db.add(schema_value)
-    db.flush()
-    change_3 = Change(
-        change_request=change_request,
-        object_id=1,
-        change_type=ChangeType.CREATE,
-        content_type=ContentType.ENTITY,
-        field_name='schema_id',
-        data_type=ChangeAttrType.INT,
-        value_id=schema_value.id
-    )
-    db.add_all([change_request, change_1, change_2, change_3])
-    requests.append(change_request)
-    db.commit()
-    return requests
-
-def test_get_recent_entity_changes(dbsession: Session):
-    time = datetime.now(timezone.utc)
-    user = dbsession.execute(select(User)).scalar()
-    make_entity_change_objects(db=dbsession, user=user, time=time)
-
-    changes = get_recent_entity_changes(db=dbsession, entity_id=1, count=1)
-    assert changes[0].created_at.astimezone(timezone.utc) == (time + timedelta(hours=9))
-
-    changes = get_recent_entity_changes(db=dbsession, entity_id=1, count=5)
-    for change, i in zip(changes, reversed(range(5, 10))):
-        assert change.created_at == (time + timedelta(hours=i)).replace(tzinfo=timezone.utc)
-
-
-def make_entity_update_request(db: Session, user: User, time: datetime):
-    # updating age from 10 to 42
-    # updating list of colors to violet and cyan
-    # updating name from Jack to Jackson
-    change_request = ChangeRequest(
-        created_by=user, 
-        created_at=time,
-        object_type=EditableObjectType.ENTITY,
-        object_id=1,
-        change_type=ChangeType.DELETE
-    )
-    name_val = ChangeValueStr(old_value='Jack', new_value='Jackson')
-    age_val = ChangeValueInt(old_value=10, new_value=42)
-    color_val_1 = ChangeValueStr(new_value='violet')
-    color_val_2 = ChangeValueStr(new_value='cyan')
-    db.add_all([change_request, name_val, age_val, color_val_1, color_val_2])
-    db.flush()
-
-    age = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == 1)
-        .join(Attribute)
-        .where(Attribute.name == 'age')
-    ).scalar().attribute
-
-    fav_color = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == 1)
-        .join(Attribute)
-        .where(Attribute.name == 'fav_color')
-    ).scalar().attribute
-
-    change_kwargs = {
-        'change_request': change_request, 
-        'object_id': 1, 
-        'content_type': ContentType.ENTITY,
-        'change_type': ChangeType.UPDATE
-    }
-    name_change = Change(field_name='name', value_id=name_val.id, data_type=ChangeAttrType.STR, **change_kwargs)
-    age_change = Change(attribute_id=age.id, value_id=age_val.id, data_type=ChangeAttrType.INT, **change_kwargs)
-    color_change_1 = Change(attribute_id=fav_color.id, value_id=color_val_1.id, data_type=ChangeAttrType.STR, **change_kwargs)
-    color_change_2 = Change(attribute_id=fav_color.id, value_id=color_val_2.id, data_type=ChangeAttrType.STR, **change_kwargs)
-    db.add_all([name_change, age_change, color_change_1, color_change_2])
-    db.commit()
-
-
-def test_get_entity_update_details(dbsession: Session):
-    user = dbsession.execute(select(User).where(User.id == 1)).scalar()
-    now = datetime.utcnow().replace(tzinfo=timezone.utc)
-    make_entity_update_request(db=dbsession, user=user, time=now)
-
-    change = entity_change_details(db=dbsession, change_request_id=1)
-    assert change.created_at == now
-    assert change.created_by == user.username
-    assert change.reviewed_at is None
-    assert change.reviewed_by is None
-    assert change.comment is None
-    assert change.status == ChangeStatus.PENDING
-    assert change.entity.name == 'Jack'
-    assert change.entity.slug == 'Jack'
-    assert change.entity.schema_slug == 'person'
-    assert len(change.changes) == 3
-    name = change.changes['name']
-    age = change.changes['age']
-    fav_color = change.changes['fav_color']
-    assert name.new == 'Jackson' and name.old == name.current == 'Jack'
-    assert age.new == 42 and age.old == age.current == 10
-    assert fav_color.new == ['violet', 'cyan'] and fav_color.old == fav_color.current == None
-
-
 class TestUpdateEntityTraceability:
     default_data = {
             'slug': 'test',
@@ -484,15 +327,20 @@ class TestCreateEntityTraceability:
             "age": 42,
             "friends": [1]
         }
-        self._create_request(dbsession=dbsession, user=testuser, data=data)
+        change_request = self._create_request(dbsession=dbsession, user=testuser, data=data)
 
-        change = entity_change_details(db=dbsession, change_request_id=1)
-        assert all(value.old is None for value in change.changes.values())
+        change = entity_change_details(db=dbsession, change_request_id=change_request.id)
+        assert all(value.old is None
+                   for key, value in change.changes.items()
+                   if key != "schema_id" and not isinstance(data[key], list))
+        assert all(value.old == []
+                   for key, value in change.changes.items()
+                   if key != "schema_id" and isinstance(data[key], list))
         assert all(value.current is None
                    for key, value in change.changes.items()
-                   if key not in ["name", "slug", "schema_id"])
-        assert all(value.current == ""
+                   if key not in ["name", "slug", "schema_id"] and not isinstance(data[key], list))
+        assert all(value.current == []
                    for key, value in change.changes.items()
-                   if key in ["name", "slug"])
+                   if isinstance(data.get(key, None), list))
         new_values = {key: value.new for key, value in change.changes.items() if key != "schema_id"}
         assert new_values == data

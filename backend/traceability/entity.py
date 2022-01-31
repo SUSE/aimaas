@@ -45,7 +45,9 @@ def _fill_in_entity_change(change: dict, entity_change: Change, entity: Entity, 
     field = entity_change.field_name
     ValueModel = entity_change.data_type.value.model
     v = db.execute(select(ValueModel).where(ValueModel.id == entity_change.value_id)).scalar()
-    change['changes'][field] = {'new': v.new_value, 'old': v.old_value, 'current': getattr(entity, field, None)}
+    change['changes'][field] = {'new': v.new_value,
+                                'old': v.old_value,
+                                'current': getattr(entity, field, None) if entity.id else None}
 
 def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, listed_changes: dict[int, List[Change]], checked_listed: List[int], db: Session):
     attr = entity_change.attribute
