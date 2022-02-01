@@ -59,10 +59,8 @@
               </ConfirmWithComment>
             </div>
           </div>
-          <SchemaChangeDetails v-if="change.object_type === 'SCHEMA'" :changeId="change.id"
-                               :schema="schema"/>
-          <EntityChangeDetails v-else-if="change.object_type === 'ENTITY'" :changeId="change.id"
-                               :schema="schema" :entitySlug="entitySlug" :is-bound="isBound"/>
+          <ChangeDetails :changeId="change.id" :schema="schema" :entitySlug="entitySlug"
+                         :is-bound="isBound" :object-type="change.object_type"/>
         </li>
         <li v-if="changes.length < 1" class="list-group-item">
           <div class="alert alert-info m-0">No changes to display.</div>
@@ -78,13 +76,11 @@ import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
 import BaseLayout from "@/components/layout/BaseLayout";
 import ConfirmWithComment from "@/components/inputs/ConfirmWithComment";
 import Placeholder from "@/components/layout/Placeholder";
-import EntityChangeDetails from "@/components/change_review/EntityChangeDetails";
-import SchemaChangeDetails from "@/components/change_review/SchemaChangeDetails";
+import ChangeDetails from "@/components/change_review/ChangeDetails";
 
 export default {
   name: "Changes",
-  components: {SchemaChangeDetails, Placeholder, EntityChangeDetails, ConfirmWithComment,
-               BaseLayout},
+  components: {Placeholder, ChangeDetails, ConfirmWithComment, BaseLayout},
   inject: ["pendingRequests", "updatePendingRequests"],
   props: {
     schema: {

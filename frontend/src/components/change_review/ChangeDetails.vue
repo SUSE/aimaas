@@ -53,12 +53,19 @@ import {loadChangeDetails} from "@/composables/changes";
 import Placeholder from "@/components/layout/Placeholder";
 
 export default {
-  name: "EntityChangeDetails",
+  name: "ChangeDetails",
   components: {Placeholder},
   props: {
     changeId: {
       required: true,
       type: Number
+    },
+    objectType: {
+      type: String,
+      required: true,
+      validator(value) {
+        return ["SCHEMA", "ENTITY"].includes(value);
+      }
     },
     schema: {
       required: true,
@@ -84,7 +91,7 @@ export default {
   methods: {
     async loadDetails() {
       this.loading = true;
-      await loadChangeDetails(this.$api, "entity", this.changeId,
+      await loadChangeDetails(this.$api, this.objectType.toLowerCase(), this.changeId,
           this.changeDetails, null);
       this.loading = false;
     }
