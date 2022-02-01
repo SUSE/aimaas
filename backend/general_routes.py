@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, R
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from .config import settings
+from .config import settings, VERSION
 from . import crud, schemas, exceptions, auth
 from .database import get_db
 from .models import User, Schema, Group, Entity
@@ -20,9 +20,16 @@ from .schemas.auth import (
     BaseGroupSchema,
     Token
 )
+from .schemas.info import InfoModel
 
 
 router = APIRouter()
+
+
+@router.get("/info", response_model=InfoModel)
+def get_info():
+    return {"version": VERSION}
+
 
 @router.get(
     '/attributes', 
