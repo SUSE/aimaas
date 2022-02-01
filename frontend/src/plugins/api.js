@@ -118,6 +118,10 @@ class API {
         }
     }
 
+    async getInfo() {
+        return this._fetch({url: `${this.base}/info`});
+    }
+
     async getSchemas({all = false, deletedOnly = false} = {}) {
         const params = new URLSearchParams();
         params.set('all', all);

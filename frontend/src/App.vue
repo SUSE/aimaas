@@ -11,10 +11,11 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <ul class="navbar-nav mb-2 mb-lg-0">
           <SchemaList v-model="activeSchema" :as-dropdown="true" ref="schemalist"/>
           <ReviewNav ref="pendingrequests"/>
           <AuthNav/>
+          <HelpNav/>
         </ul>
       </div>
     </div>
@@ -44,12 +45,13 @@ import "suse-bootstrap5-theme/dist/css/suse.css";
 
 import AuthNav from "@/components/auth/AuthNav";
 import AlertDisplay from "@/components/alerts/AlertDisplay";
+import HelpNav from "@/components/help/HelpNav";
 import SchemaList from "@/components/SchemaList";
 import ReviewNav from "@/components/change_review/ReviewNav";
 
 export default {
   name: 'App',
-  components: {SchemaList, AlertDisplay, AuthNav, ReviewNav},
+  components: {SchemaList, AlertDisplay, AuthNav, ReviewNav, HelpNav},
   data: function () {
     return {
       activeSchema: null
