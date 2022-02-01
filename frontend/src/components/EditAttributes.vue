@@ -1,10 +1,11 @@
 <template>
   <template v-for="(attr, rowIndex) in attributes" :key="rowIndex">
+    <input type="hidden" v-model="attributes[rowIndex].id">
     <TextInput label="Name" v-model="attributes[rowIndex].name"
                :args="{ id: `initialattrName${rowIndex}`, list: 'attributes' }"
                @change="onChange()"/>
     <SelectInput label="Type" v-model="attributes[rowIndex].type" @change="onChange()"
-                 :args="{ id: `initialattrType${rowIndex}`, disabled: !attr.isNew }"
+                 :args="{ id: `initialattrType${rowIndex}`, disabled: attr.id }"
                  :options="Object.keys(ATTR_TYPES_NAMES).map((type) => {
                    return { value: type, text: ATTR_TYPES_NAMES[type] };
                  })"/>
@@ -13,7 +14,7 @@
                  :options="schemasToBind.map((schema) => {
                    return { value: schema.id, text: schema.name };
                  })"
-                 :args="{ id: `initialboundFK${rowIndex}`, disabled: !attr.isNew }"/>
+                 :args="{ id: `initialboundFK${rowIndex}`, disabled: attr.id }"/>
     <Textarea label="Description" @change="onChange()"
               v-model="attributes[rowIndex].description"
               :args="{ id: `initialDescription${rowIndex}` }">
@@ -80,9 +81,6 @@ export default {
   data() {
     return {
       attributes: [],
-      attrsToDelete: [],
-      attrsToAdd: [],
-      initialAttrNames: [],
       ATTR_TYPES_NAMES,
     };
   },
@@ -91,44 +89,25 @@ export default {
   },
   methods: {
     onChange() {
-      console.debug("Hello, something changed!")
       this.$emit("change");
     },
     cloneAttrs() {
       this.attributes = _cloneDeep(this.schema.attributes);
-      this.attributes.map((x) => (x.initialName = x.name));
-    },
-    _remove_isNew(attr) {
-      if (attr.isNew) {
-            delete attr.isNew;
-          }
-          return attr;
     },
     getData() {
       return {
-        attributes: this.attributes.map(this._remove_isNew),
-        deleted: this.attrsToDelete.map(this._remove_isNew),
-        additions: this.attrsToAdd.map(this._remove_isNew)
+        attributes: this.attributes
       };
     },
     removeAttr(index) {
-      const attr = this.attributes[index];
       this.attributes.splice(index, 1);
-
-      const addIndex = this.attrsToAdd.indexOf(attr);
-      if (addIndex > -1) {
-        this.attrsToAdd.splice(addIndex, 1);
-      } else {
-        this.attrsToDelete.push(attr);
-      }
     },
     addAttr() {
       let attr = {
         name: '', type: 'STR', key: false, unique: false, required: false, list: false,
-        bind_to_schema: null, isNew: true
+        bind_to_schema: null, id: null
       };
       this.attributes.push(attr);
-      this.attrsToAdd.push(attr);
     }
   },
   computed: {

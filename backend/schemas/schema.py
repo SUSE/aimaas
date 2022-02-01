@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Union, Any
+from typing import List, Optional, Any
 
 from pydantic import BaseModel, validator, Field
 
@@ -41,6 +41,7 @@ class AttributeDefinitionBase(BaseModel):
     key: bool
     description: Optional[str]
     bind_to_schema: Optional[int]
+    id: Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -54,15 +55,8 @@ class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
             obj.type = obj.attribute.type.name
             obj.name = obj.attribute.name
             if obj.attribute.type == AttrType.FK:
-                obj.bind_to_schema = obj.bound_fk.schema_id
+                obj.bind_to_schema = obj.bind_to_schema.schema_id
         return super().from_orm(obj)
-
-
-class AttrDefUpdateSchema(AttributeDefinitionBase):
-    name: str
-    new_name: Optional[str]
-
-    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
 
 def validate_slug(cls, slug: str):
@@ -86,10 +80,7 @@ class SchemaUpdateSchema(BaseModel):
     name: Optional[str]
     slug: Optional[str]
     reviewable: Optional[bool]
-
-    update_attributes: List[AttrDefUpdateSchema] = []
-    add_attributes: List[AttrDefSchema] = []
-    delete_attributes: List[str] = []
+    attributes: List[AttrDefSchema] = []
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 

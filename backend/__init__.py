@@ -18,7 +18,7 @@ def load_schemas(db: Session) -> List[models.Schema]:
         select(Schema)
         .options(
             subqueryload(Schema.attr_defs)
-            .subqueryload(AttributeDefinition.bound_fk)
+            .subqueryload(AttributeDefinition.bind_to_schema)
             .subqueryload(BoundFK.schema)
         )
     ).scalars().all()

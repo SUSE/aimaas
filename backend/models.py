@@ -67,7 +67,7 @@ class BoundFK(Base):
 
     attr_def = relationship(
         'AttributeDefinition',
-        back_populates='bound_fk')
+        back_populates='bind_to_schema')
     schema = relationship(
         'Schema',
         doc='''Points to schema that is bound 
@@ -153,7 +153,7 @@ class AttributeDefinition(Base):
 
     schema = relationship('Schema', back_populates='attr_defs')
     attribute = relationship('Attribute', back_populates='attr_defs')
-    bound_fk = relationship('BoundFK', back_populates='attr_def', uselist=False)
+    bind_to_schema = relationship('BoundFK', back_populates='attr_def', uselist=False)
 
     __table_args__ = (
         UniqueConstraint('schema_id', 'attribute_id'),

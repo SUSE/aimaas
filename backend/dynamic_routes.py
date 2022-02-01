@@ -1,4 +1,4 @@
-from typing import List, Callable, Optional, Union
+from typing import List, Optional, Union
 from dataclasses import make_dataclass
 from collections import defaultdict
 
@@ -95,7 +95,7 @@ def _meta_for_get_entity(schema: Schema) -> dict:
         meta['fields'][attr.name]['type'] = attr.type.name
         meta['fields'][attr.name]['list'] = attr_def.list
         if attr.type == AttrType.FK:
-            meta['fields'][attr.name]['bind_to_schema'] = attr_def.bound_fk.schema.slug
+            meta['fields'][attr.name]['bind_to_schema'] = attr_def.bind_to_schema.schema.slug
     return meta
 
 

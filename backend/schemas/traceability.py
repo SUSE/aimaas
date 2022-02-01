@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Any
+from typing import List, Optional, Union, Any
 
 from pydantic import BaseModel, Field, validator
 
 from ..auth.models import User
-from .schema import AttrDefSchema, AttrDefUpdateSchema, SchemaBaseSchema
+from .schema import SchemaBaseSchema
 from ..traceability.enum import EditableObjectType, ChangeStatus, ChangeType, ReviewResult
 
 
@@ -54,16 +54,6 @@ class ChangeSchema(BaseModel):
 class EntityChangeDetailSchema(ChangeRequestSchema):
     entity: ChangedEntitySchema
     changes: dict[str, ChangeSchema]
-
-
-# class SchemaChangesSchema(BaseModel):
-#     name: Optional[Dict[str, Optional[str]]]
-#     slug: Optional[Dict[str, Optional[str]]]
-#     reviewable: Optional[Dict[str, Optional[bool]]]
-#     deleted: Optional[Dict[str, bool]]
-#     add: Optional[List[AttrDefSchema]]
-#     update: Optional[List[AttrDefUpdateSchema]]
-#     delete: Optional[List[str]]
 
 
 class SchemaChangeDetailSchema(ChangeRequestSchema):

@@ -13,20 +13,19 @@ from .models import (
     Attribute,
     AttributeDefinition,
     BoundFK,
-    Entity,
     Schema,
     Value
 )
 
 from .schemas import (
     AttrDefSchema,
-    AttrDefUpdateSchema,
     EntityListSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
 )
 from .exceptions import *
+from .utils import iterate_model_fields
 
 
 RESERVED_ATTR_NAMES = ['id', 'slug', 'deleted', 'name']
@@ -206,7 +205,7 @@ def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema:
     )
 
 
-def _update_attr_in_schema(db: Session, attr_upd: AttrDefUpdateSchema, attr_def: AttributeDefinition):
+def _update_attr_in_schema(db: Session, attr_upd: AttrDefSchema, attr_def: AttributeDefinition):
     if attr_def.list and not attr_upd.list:
         raise ListedToUnlistedException(attr_def_id=attr_def.id)
     if attr_upd.list:
@@ -217,10 +216,10 @@ def _update_attr_in_schema(db: Session, attr_upd: AttrDefUpdateSchema, attr_def:
     attr_def.key = attr_upd.key
     attr_def.description = attr_upd.description
 
-    if attr_upd.new_name:
+    if attr_upd.name != attr_def.attribute.name:
         attr_def.attribute = create_attribute(
             db=db,
-            data=AttributeCreateSchema(name=attr_upd.new_name, type=attr_def.attribute.type.name),
+            data=AttributeCreateSchema(name=attr_upd.name, type=attr_def.attribute.type.name),
             commit=False
         )
 
@@ -261,6 +260,25 @@ def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema)
         db.add(BoundFK(attr_def_id=attr_def.id, schema_id=bound_schema.id))
 
 
+def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])\
+        -> Tuple[List[AttrDefSchema], List[AttrDefSchema], List[AttributeDefinition]]:
+    existing_defs = schema.attr_defs
+    new, updated = [], []
+    fields = iterate_model_fields(AttributeDefinition)
+
+    for attr_def in definitions:
+        if not getattr(attr_def, "id", None):
+            new.append(attr_def)
+            continue
+        existing = next(e for e in existing_defs if e.id == attr_def.id)
+        if any(getattr(attr_def, field) != getattr(existing, field) for field in fields):
+            updated.append(attr_def)
+
+    submitted_ids = {a.id for a in definitions}
+    deleted = [a for a in existing_defs if a.id not in submitted_ids]
+    return new, updated, deleted
+
+
 def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
     schema = get_schema(db=db, id_or_slug=id_or_slug)
     if schema.deleted:
@@ -279,26 +297,21 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
-    _check_no_op_changes(schema=schema, data=data)
-    _check_attr_names_after_update(schema=schema, data=data)
+    added, updated, deleted = sort_attribute_definitions(schema=schema, definitions=data.attributes)
 
-    attr_def_names: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
+    attr_def_names: Dict[int, AttributeDefinition] = {i.id: i for i in schema.attr_defs}
 
-    for attr in data.delete_attributes:
-        attr_def = attr_def_names.get(attr)
-        if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr, schema_id=schema.id)
+    for attr_def in deleted:
         _delete_attr_from_schema(db=db, attr_def=attr_def, schema=schema)
 
-    for attr in data.update_attributes:
-        attr_def = attr_def_names.get(attr.name)
-        
+    for attr in updated:
+        attr_def = attr_def_names.get(attr.id)
         if attr_def is None:
-            raise AttributeNotDefinedException(attr_id=attr.name, schema_id=schema.id)
+            raise AttributeNotDefinedException(attr_id=attr.id, schema_id=schema.id)
         _update_attr_in_schema(db=db, attr_upd=attr, attr_def=attr_def)
     db.flush()
 
-    for attr in data.add_attributes:
+    for attr in added:
         _add_attr_to_schema(db=db, attr_schema=attr, schema=schema)
 
     try:
@@ -627,7 +640,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     q = select(Entity).where(Entity.schema_id == schema_id)
     q = q.where(Entity.id == id_or_slug) if isinstance(id_or_slug, int) else q.where(Entity.slug == id_or_slug)
     e = db.execute(q).scalar()
-    if e is None:
+    if e is None or e.deleted:
         raise MissingEntityException(obj_id=id_or_slug)
     if e.schema.deleted:
         raise MissingSchemaException(obj_id=e.schema.id)

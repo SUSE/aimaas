@@ -1,22 +1,23 @@
+import enum
 from datetime import datetime, timezone
-from itertools import groupby
+from itertools import groupby, chain
 import typing
 
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from ..auth.models import User
-from ..models import Schema, Attribute
-from ..schemas.schema import AttrDefSchema, AttrDefUpdateSchema, SchemaCreateSchema, \
-    AttributeCreateSchema, SchemaUpdateSchema, AttributeDefinition, SchemaBaseSchema
+from ..models import Schema
+from ..schemas.schema import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema, \
+    AttributeDefinition, SchemaBaseSchema
 from ..schemas.traceability import SchemaChangeDetailSchema, ChangeSchema
 from .. import crud
 from .. import exceptions
 
 from .enum import EditableObjectType, ContentType, ChangeType, ChangeStatus
 from .models import ChangeRequest, Change, ChangeValueInt, ChangeAttrType, ChangeValueBool, \
-    ChangeValueStr
+    ChangeValueStr, ChangeValue
 
 
 def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> typing.List[ChangeRequest]:
@@ -68,22 +69,16 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
         .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
         .order_by(Change.object_id)
-        .where(Change.field_name != None)
-        .where(Change.object_id != None)
     ).scalars().all()
 
     if (not change_request.object_id and change_request.change_type != ChangeType.CREATE) \
-            or not attr_changes:
+            or (change_request.change_type != ChangeType.DELETE and not attr_changes):
         raise exceptions.MissingChangeException(obj_id=change_request.id)
 
-    attributes = {a.id: a.name for a in db.query(Attribute)
-        .join(Change, Attribute.id == Change.object_id)
-        .filter(Change.content_type == ContentType.ATTRIBUTE_DEFINITION,
-                Change.change_request_id == change_request.id)
-        .all()}
-    schema = None
+    schema, attr_defs = None, None
     if change_request.object_id:
         schema = crud.get_schema(db=db, id_or_slug=change_request.object_id)
+        attr_defs = {d.attribute.name: d for d in schema.attr_defs}
 
     change_ = {
         'changes': {},
@@ -114,11 +109,23 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
                                                  'current': getattr(schema, change.field_name, None)}
 
     for change in attr_changes:
-        attr = attributes.get(change.object_id, None)
         v = get_value_for_change(change, db)
-        change_["changes"][f"{attr}.{change.field_name}"] = ChangeSchema(
+        if change.field_name:
+            attr_name, field_name = change.field_name.split(".", maxsplit=1)
+        else:
+            attr_name, field_name = change.attribute.name, None
+
+        if not attr_defs or attr_name not in attr_defs:
+            current_value = None
+        elif field_name in ["name", "type"]:
+            current_value = getattr(attr_defs.get(attr_name).attribute, field_name)
+        else:
+            current_value = getattr(attr_defs.get(attr_name), field_name, None)
+        if isinstance(current_value, enum.Enum):
+            current_value = current_value.name
+        change_["changes"][change.field_name or attr_name] = ChangeSchema(
             old=v.old_value,
-            current="TODO" if schema else None,
+            current=current_value,
             new=v.new_value
         )
 
@@ -162,44 +169,33 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
         ('description', ChangeAttrType.STR),
         ('bind_to_schema', ChangeAttrType.INT),
         ('name', ChangeAttrType.STR),
-        # ('type', ChangeAttrType.STR)
+        ('type', ChangeAttrType.STR)
     ]
     for attr in data.attributes:
-        a_data = AttributeCreateSchema(name=attr.name, type=attr.type.name)
-        attribute = crud.create_attribute(db=db, data=a_data, commit=False)
         for field, type_ in attr_fields:
             ValueModel = type_.value.model
-            v = ValueModel(new_value=getattr(attr, field))
+            new_value = getattr(attr, field)
+            if isinstance(new_value, enum.Enum):
+                new_value = new_value.value
+            v = ValueModel(new_value=new_value)
             db.add(v)
             db.flush()
             db.add(Change(
                 change_request=change_request,
-                field_name=field,
-                object_id=attribute.id,
+                field_name=f"{attr.name}.{field}",
                 value_id=v.id,
                 data_type=type_,
                 content_type=ContentType.ATTRIBUTE_DEFINITION,
                 change_type=ChangeType.CREATE
             ))
-        v = ChangeValueStr(new_value=attr.type.name)
-        db.add(v)
-        db.flush()
-        db.add(Change(
-                change_request=change_request,
-                field_name='type',
-                value_id=v.id,
-                object_id=attribute.id,
-                data_type=ChangeAttrType.STR,
-                content_type=ContentType.ATTRIBUTE_DEFINITION,
-                change_type=ChangeType.CREATE
-        ))
     if commit:
         db.commit()
     else:
         db.flush()
     return change_request
 
-def get_value_for_change(change: Change, db: Session):
+
+def get_value_for_change(change: Change, db: Session) -> ChangeValue:
     ValueModel = change.data_type.value.model
     return db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
 
@@ -227,14 +223,18 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
         select(Change)
         .where(Change.change_request_id == change_request.id)
         .where(Change.field_name != None)
-        .where(Change.object_id != None)
+        .where(Change.object_id == None)
         .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
         .where(Change.change_type == ChangeType.CREATE)
     ).scalars().all()
-    attr_changes = groupby(attr_changes, key=lambda x: x.object_id)
-    for attr_id, changes in attr_changes:
-        crud.get_attribute(db=db, attr_id=attr_id)
-        data['attributes'].append({i.field_name: get_value_for_change(change=i, db=db).new_value for i in changes})
+    grouped_attr_changes = groupby(attr_changes, key=lambda x: x.field_name.split(".", maxsplit=1)[0])
+    for attr_name, changes in grouped_attr_changes:
+        attr_data = {"name": attr_name}
+        for change in changes:
+            attr_name2, field_name = change.field_name.split(".", maxsplit=1)
+            assert attr_name2 == attr_name
+            attr_data[field_name] = get_value_for_change(change=change, db=db).new_value
+        data["attributes"].append(attr_data)
     data = SchemaCreateSchema(**data)
 
     schema = crud.create_schema(db=db, data=data, commit=False)
@@ -244,10 +244,12 @@ def apply_schema_create_request(db: Session, change_request: ChangeRequest, revi
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
 
+    attr_defs = {d.attribute.name: d.id for d in schema.attr_defs}
     for change in schema_changes:     # setting object_id is required
         change.object_id = schema.id  # to be able to show details
     for change in attr_changes:       # for this change request
-        change.object_id = schema.id
+        attr_name = change.field_name.split(".", maxsplit=1)[0]
+        change.object_id = attr_defs.get(attr_name)
 
     v = ChangeValueInt(new_value=schema.id)
     db.add(v)
@@ -287,8 +289,11 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
     schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR),
                      ('reviewable', ChangeAttrType.BOOL)]
     for field, type_ in schema_fields:
+        new_value, old_value = getattr(data, field), getattr(schema, field)
+        if new_value == old_value:
+            continue
         ValueModel = type_.value.model
-        v = ValueModel(new_value=getattr(data, field))  # TODO old value
+        v = ValueModel(new_value=new_value, old_value=old_value)
         db.add(v)
         db.flush()
         db.add(Change(
@@ -300,95 +305,96 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
             content_type=ContentType.SCHEMA,
             change_type=ChangeType.UPDATE
         ))
-    v = ChangeValueInt(new_value=schema.id)
-    db.add(v)
-    db.flush()
-    db.add(Change(
-        change_request=change_request,
-        field_name='id',
-        value_id=v.id,
-        object_id=schema.id,
-        data_type=ChangeAttrType.INT,
-        content_type=ContentType.SCHEMA,
-        change_type=ChangeType.UPDATE
-    ))
 
     attr_fields = [
-        ('required', ChangeAttrType.BOOL), 
-        ('unique', ChangeAttrType.BOOL), 
-        ('list', ChangeAttrType.BOOL), 
+        ('name', ChangeAttrType.STR),
+        ('type', ChangeAttrType.STR),
+    ]
+    attr_def_fields = [
+        ('required', ChangeAttrType.BOOL),
+        ('unique', ChangeAttrType.BOOL),
+        ('list', ChangeAttrType.BOOL),
         ('key', ChangeAttrType.BOOL),
         ('description', ChangeAttrType.STR),
         ('bind_to_schema', ChangeAttrType.INT),
-        ('name', ChangeAttrType.STR),
-        ('new_name', ChangeAttrType.STR),
-        # ('type', ChangeAttrType.STR)
     ]
-    attr_def_names: typing.Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
-    for attr in data.update_attributes:
-        attribute = attr_def_names[attr.name].attribute
+    attr_map: typing.Dict[int, AttributeDefinition] = {i.id: i for i in schema.attr_defs}
+
+    added, updated, deleted = crud.sort_attribute_definitions(schema=schema,
+                                                              definitions=data.attributes)
+    for attr in updated:
+        attr_def = attr_map.get(attr.id)
         for field, type_ in attr_fields:
             ValueModel = type_.value.model
-            v = ValueModel(new_value=getattr(attr, field))
+            new_value = getattr(attr, field)
+            old_value = getattr(attr_def.attribute, field)
+            if isinstance(new_value, enum.Enum):
+                new_value = new_value.name
+            if isinstance(old_value, enum.Enum):
+                old_value = old_value.name
+            if old_value == new_value:
+                continue
+            v = ValueModel(new_value=new_value, old_value=old_value)
             db.add(v)
             db.flush()
             db.add(Change(
                 change_request=change_request,
-                field_name=field,
-                object_id=attribute.id,
+                field_name=f"{attr.name}.{field}",
+                object_id=attr_def.id,
                 value_id=v.id,
                 data_type=type_,
                 content_type=ContentType.ATTRIBUTE_DEFINITION,
                 change_type=ChangeType.UPDATE
             ))
-    
-    attr_fields = [
-        ('required', ChangeAttrType.BOOL), 
-        ('unique', ChangeAttrType.BOOL), 
-        ('list', ChangeAttrType.BOOL), 
-        ('key', ChangeAttrType.BOOL),
-        ('description', ChangeAttrType.STR),
-        ('bind_to_schema', ChangeAttrType.INT),
-        ('name', ChangeAttrType.STR),
-        # ('type', ChangeAttrType.STR)
-    ]
-    for attr in data.add_attributes:
-        a_data = AttributeCreateSchema(name=attr.name, type=attr.type.name)
-        attribute = crud.create_attribute(db=db, data=a_data, commit=False)
-        for field, type_ in attr_fields:
+        for field, type_ in attr_def_fields:
             ValueModel = type_.value.model
-            v = ValueModel(new_value=getattr(attr, field))
+            new_value = getattr(attr, field)
+            old_value = getattr(attr_def, field)
+            if isinstance(new_value, enum.Enum):
+                new_value = new_value.name
+            if isinstance(old_value, enum.Enum):
+                old_value = old_value.name
+            if new_value == old_value:
+                continue
+            v = ValueModel(new_value=new_value, old_value=old_value)
             db.add(v)
             db.flush()
             db.add(Change(
                 change_request=change_request,
-                field_name=field,
-                object_id=attribute.id,
+                field_name=f"{attr.name}.{field}",
+                object_id=attr_def.id,
+                value_id=v.id,
+                data_type=type_,
+                content_type=ContentType.ATTRIBUTE_DEFINITION,
+                change_type=ChangeType.UPDATE
+            ))
+
+    for attr in added:
+        for field, type_ in chain(attr_fields, attr_def_fields):
+            ValueModel = type_.value.model
+            new_value = getattr(attr, field)
+            if isinstance(new_value, enum.Enum):
+                new_value = new_value.name
+            v = ValueModel(new_value=new_value)
+            db.add(v)
+            db.flush()
+            db.add(Change(
+                change_request=change_request,
+                field_name=f"{attr.name}.{field}",
                 value_id=v.id,
                 data_type=type_,
                 content_type=ContentType.ATTRIBUTE_DEFINITION,
                 change_type=ChangeType.CREATE
             ))
-        v = ChangeValueStr(new_value=attr.type.name)
+
+    for attr_def in deleted:
+        v = ChangeValueStr(old_value=attr_def.attribute.name)
         db.add(v)
         db.flush()
         db.add(Change(
-                change_request=change_request,
-                field_name='type',
-                value_id=v.id,
-                object_id=attribute.id,
-                data_type=ChangeAttrType.STR,
-                content_type=ContentType.ATTRIBUTE_DEFINITION,
-                change_type=ChangeType.CREATE
-        ))
-    for attr_name in data.delete_attributes:
-        attribute = attr_def_names[attr_name].attribute
-        v = ChangeValueStr(new_value=attr_name)  # this is not really needed in this case
-        db.add(v)                                # but models require value_id
-        db.flush()
-        db.add(Change(
             change_request=change_request,
-            attribute_id=attribute.id,
+            object_id=attr_def.id,
+            attribute_id=attr_def.attribute_id,
             value_id=v.id,
             data_type=ChangeAttrType.STR,
             content_type=ContentType.ATTRIBUTE_DEFINITION,
@@ -413,64 +419,55 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
         .where(Change.change_type == ChangeType.UPDATE)
     )
 
-    schema_id = db.execute(schema_query.where(Change.field_name == 'id')).scalar()
+    schema = change_request.schema
+    attr_defs = {d.id: d for d in schema.attr_defs}
     schema_changes = db.execute(schema_query.where(Change.field_name != 'id')).scalars().all()
 
-    attr_change_query = (
-        select(Change)
-        .where(Change.change_request_id == change_request.id)
-        .where(Change.content_type == ContentType.ATTRIBUTE_DEFINITION)
-    )
-    attr_upd = db.execute(
-        attr_change_query
-        .where(Change.field_name != None)
-        .where(Change.object_id != None)
-        .where(Change.change_type == ChangeType.UPDATE)
-    ).scalars().all()
-    attr_create = db.execute(
-        attr_change_query
-        .where(Change.field_name != None)
-        .where(Change.object_id != None)
-        .where(Change.change_type == ChangeType.CREATE)
-    ).scalars().all()
-    attr_delete = db.execute(
-        attr_change_query
-        .where(Change.attribute_id != None)
-        .where(Change.data_type == ChangeAttrType.STR)
-        .where(Change.change_type == ChangeType.DELETE)
-    ).scalars().all()
-    
-    if not schema_id or not any([schema_changes, attr_upd, attr_create, attr_delete]):
+    attr_changes = db.query(Change)\
+        .filter(Change.change_request_id == change_request.id,
+                Change.content_type == ContentType.ATTRIBUTE_DEFINITION)\
+        .all()
+
+    if not schema or not any([schema_changes, attr_changes]):
         raise exceptions.MissingSchemaUpdateRequestException(obj_id=change_request.id)
-    schema_id = schema_id.object_id
 
-    # group changes by attribute id to get set of properties for each attribute
-    attr_upd = {k: [i for i in v] for k, v in groupby(attr_upd, key=lambda x: x.object_id)}
-    attr_create = {k: [i for i in v] for k, v in groupby(attr_create, key=lambda x: x.object_id)}
+    attributes = []
+    for key, changes in groupby((a for a in attr_changes if a.change_type == ChangeType.UPDATE),
+                                key=lambda x: x.object_id):
+        attr_data = AttrDefSchema.from_orm(attr_defs.get(key))
+        for change in changes:
+            attr_name, field_name = change.field_name.split(".", maxsplit=1)
+            if attr_name not in attr_data:
+                setattr(attr_data, "name", attr_name)
+            setattr(attr_data, field_name, get_value_for_change(change=change, db=db).new_value)
+        attributes.append(attr_data)
+    for key, changes in groupby((a for a in attr_changes if a.change_type == ChangeType.CREATE),
+                                key=lambda x: x.field_name.split(".", maxsplit=1)[0]):
+        attr_data = {"name": key}
+        for change in changes:
+            attr_name, field_name = change.field_name.split(".", maxsplit=1)
+            assert key == attr_name
+            attr_data[field_name] = get_value_for_change(change=change, db=db).new_value
+        attributes.append(AttrDefSchema(**attr_data))
 
-    data = {'update_attributes': [], 'add_attributes': [], 'delete_attributes': []}
+    data = {"attributes": attributes}
     for change in schema_changes:
         data[change.field_name] = get_value_for_change(change=change, db=db).new_value
     
-    for attr_id, changes in attr_upd.items():
-        data['update_attributes'].append(
-            {i.field_name: get_value_for_change(i, db).new_value  for i in changes}
-        )
-
-    for attr_id, changes in attr_create.items():
-        data['add_attributes'].append(
-            {i.field_name: get_value_for_change(i, db).new_value  for i in changes}
-        )
-
-    for change in attr_delete:
-        data['delete_attributes'].append(change.attribute.name)
-
     change_request.reviewed_at = datetime.now(timezone.utc)
     change_request.reviewed_by = reviewed_by
     change_request.status = ChangeStatus.APPROVED
     change_request.comment = comment
-    schema = crud.update_schema(db=db, id_or_slug=schema_id, data=SchemaUpdateSchema(**data),
+    schema = crud.update_schema(db=db, id_or_slug=schema.id, data=SchemaUpdateSchema(**data),
                                 commit=False)
+    db.refresh(schema)
+    created_attr_defs = {d.attribute.name: d.id for d in schema.attr_defs}
+    for change in attr_changes:
+        if change.change_type == ChangeType.CREATE and not change.object_id:
+            attr_name = change.field_name.split(".", maxsplit=1)[0]
+            change.object_id = created_attr_defs.get(attr_name)
+            if change.object_id is None:
+                raise ValueError()
     db.commit()
     return True, schema
 
