@@ -46,9 +46,9 @@ class ChangedEntitySchema(BaseModel):
 
 
 class ChangeSchema(BaseModel):
-    new: Optional[Union[Any, list[Any]]]
-    old: Optional[Union[Any, list[Any]]]
-    current: Optional[Union[Any, list[Any]]]
+    new: Optional[Union[Any, List[Any]]]
+    old: Optional[Union[Any, List[Any]]]
+    current: Optional[Union[Any, List[Any]]]
 
 
 class EntityChangeDetailSchema(ChangeRequestSchema):
