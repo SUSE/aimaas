@@ -450,7 +450,11 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
             attr_data[field_name] = get_value_for_change(change=change, db=db).new_value
         attributes.append(AttrDefSchema(**attr_data))
 
-    data = {"attributes": attributes}
+    unchanged_attributes = [AttrDefSchema.from_orm(a)
+                            for a_id, a in attr_defs.items()
+                            if a_id not in [_a.id for _a in attributes]]
+
+    data = {"attributes": attributes + unchanged_attributes}
     for change in schema_changes:
         data[change.field_name] = get_value_for_change(change=change, db=db).new_value
     
