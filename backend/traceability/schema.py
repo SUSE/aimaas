@@ -20,6 +20,28 @@ from .models import ChangeRequest, Change, ChangeValueInt, ChangeAttrType, Chang
     ChangeValueStr, ChangeValue
 
 
+SCHEMA_FIELDS = [
+    ('name', ChangeAttrType.STR),
+    ('slug', ChangeAttrType.STR),
+    ('reviewable', ChangeAttrType.BOOL)
+]
+ATTRIBUTE_FIELDS = [
+    ('name', ChangeAttrType.STR),
+    ('type', ChangeAttrType.STR),
+]
+DEFINITION_FIELDS = [
+    ('required', ChangeAttrType.BOOL),
+    ('unique', ChangeAttrType.BOOL),
+    ('list', ChangeAttrType.BOOL),
+    ('key', ChangeAttrType.BOOL),
+    ('description', ChangeAttrType.STR),
+    ('bound_schema_id', ChangeAttrType.INT),
+]
+FIELD_MAP = {
+    'bound_schema_id': 'bound_schema_id'
+}
+
+
 def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -> typing.List[ChangeRequest]:
     q = (
         select(ChangeRequest)
@@ -119,6 +141,8 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
             current_value = None
         elif field_name in ["name", "type"]:
             current_value = getattr(attr_defs.get(attr_name).attribute, field_name)
+        elif field_name is None:
+            current_value = attr_name
         else:
             current_value = getattr(attr_defs.get(attr_name), field_name, None)
         if isinstance(current_value, enum.Enum):
@@ -145,9 +169,7 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
     )
     db.add(change_request)
 
-    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR),
-                     ('reviewable', ChangeAttrType.BOOL)]
-    for field, type_ in schema_fields:
+    for field, type_ in SCHEMA_FIELDS:
         ValueModel = type_.value.model
         v = ValueModel(new_value=getattr(data, field))
         db.add(v)
@@ -161,18 +183,8 @@ def create_schema_create_request(db: Session, data: SchemaCreateSchema, created_
             change_type=ChangeType.CREATE
         ))
 
-    attr_fields = [
-        ('required', ChangeAttrType.BOOL), 
-        ('unique', ChangeAttrType.BOOL), 
-        ('list', ChangeAttrType.BOOL), 
-        ('key', ChangeAttrType.BOOL),
-        ('description', ChangeAttrType.STR),
-        ('bind_to_schema', ChangeAttrType.INT),
-        ('name', ChangeAttrType.STR),
-        ('type', ChangeAttrType.STR)
-    ]
     for attr in data.attributes:
-        for field, type_ in attr_fields:
+        for field, type_ in chain(ATTRIBUTE_FIELDS, DEFINITION_FIELDS):
             ValueModel = type_.value.model
             new_value = getattr(attr, field)
             if isinstance(new_value, enum.Enum):
@@ -285,10 +297,8 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
         change_type=ChangeType.UPDATE
     )
     db.add(change_request)
-    
-    schema_fields = [('name', ChangeAttrType.STR), ('slug', ChangeAttrType.STR),
-                     ('reviewable', ChangeAttrType.BOOL)]
-    for field, type_ in schema_fields:
+
+    for field, type_ in SCHEMA_FIELDS:
         new_value, old_value = getattr(data, field), getattr(schema, field)
         if new_value == old_value:
             continue
@@ -306,28 +316,17 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
             change_type=ChangeType.UPDATE
         ))
 
-    attr_fields = [
-        ('name', ChangeAttrType.STR),
-        ('type', ChangeAttrType.STR),
-    ]
-    attr_def_fields = [
-        ('required', ChangeAttrType.BOOL),
-        ('unique', ChangeAttrType.BOOL),
-        ('list', ChangeAttrType.BOOL),
-        ('key', ChangeAttrType.BOOL),
-        ('description', ChangeAttrType.STR),
-        ('bind_to_schema', ChangeAttrType.INT),
-    ]
     attr_map: typing.Dict[int, AttributeDefinition] = {i.id: i for i in schema.attr_defs}
 
     added, updated, deleted = crud.sort_attribute_definitions(schema=schema,
                                                               definitions=data.attributes)
     for attr in updated:
         attr_def = attr_map.get(attr.id)
-        for field, type_ in attr_fields:
+        for field, type_ in ATTRIBUTE_FIELDS:
+            cfield = FIELD_MAP.get(field, field)
             ValueModel = type_.value.model
             new_value = getattr(attr, field)
-            old_value = getattr(attr_def.attribute, field)
+            old_value = getattr(attr_def.attribute, cfield)
             if isinstance(new_value, enum.Enum):
                 new_value = new_value.name
             if isinstance(old_value, enum.Enum):
@@ -346,10 +345,11 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
                 content_type=ContentType.ATTRIBUTE_DEFINITION,
                 change_type=ChangeType.UPDATE
             ))
-        for field, type_ in attr_def_fields:
+        for field, type_ in DEFINITION_FIELDS:
+            cfield = FIELD_MAP.get(field, field)
             ValueModel = type_.value.model
             new_value = getattr(attr, field)
-            old_value = getattr(attr_def, field)
+            old_value = getattr(attr_def, cfield)
             if isinstance(new_value, enum.Enum):
                 new_value = new_value.name
             if isinstance(old_value, enum.Enum):
@@ -370,7 +370,7 @@ def create_schema_update_request(db: Session, id_or_slug: typing.Union[int, str]
             ))
 
     for attr in added:
-        for field, type_ in chain(attr_fields, attr_def_fields):
+        for field, type_ in chain(ATTRIBUTE_FIELDS, DEFINITION_FIELDS):
             ValueModel = type_.value.model
             new_value = getattr(attr, field)
             if isinstance(new_value, enum.Enum):
@@ -452,7 +452,7 @@ def apply_schema_update_request(db: Session, change_request: ChangeRequest, revi
 
     unchanged_attributes = [AttrDefSchema.from_orm(a)
                             for a_id, a in attr_defs.items()
-                            if a_id not in [_a.id for _a in attributes]]
+                            if a_id not in [_a.object_id for _a in attr_changes if _a.object_id]]
 
     data = {"attributes": attributes + unchanged_attributes}
     for change in schema_changes:

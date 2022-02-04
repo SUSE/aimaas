@@ -1,10 +1,11 @@
 from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
+from itertools import chain
 
-import sqlalchemy
-from sqlalchemy import func, distinct, column, asc, desc
+from psycopg2.errors import ForeignKeyViolation
+from sqlalchemy import func, distinct, column, asc, desc, or_, select, update
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
 
@@ -12,7 +13,6 @@ from .models import (
     AttrType,
     Attribute,
     AttributeDefinition,
-    BoundFK,
     Schema,
     Value
 )
@@ -81,12 +81,19 @@ def get_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
     return schema
 
 
+def _check_bound_schema_id(db: Session, schema_id: int):
+    try:
+        db.query(Schema.id).filter(Schema.id == schema_id, Schema.deleted == False).one()
+    except NoResultFound:
+        raise MissingSchemaException(obj_id=schema_id)
+
+
 def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) -> Schema:
     try:
         sch = Schema(name=data.name, slug=data.slug, reviewable=data.reviewable)
         db.add(sch)
         db.flush()
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
@@ -100,6 +107,11 @@ def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) ->
                 raise MultipleAttributeOccurencesException(a.name)
             attr_names.add(a.name)
 
+            if a.type == AttrType.FK:
+                if attr.bound_schema_id == -1:
+                    attr.bound_schema_id = sch.id
+                _check_bound_schema_id(db=db, schema_id=attr.bound_schema_id)
+
             ad = AttributeDefinition(
                 attribute_id=a.id,
                 schema_id=sch.id,
@@ -107,31 +119,16 @@ def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) ->
                 list=attr.list,
                 unique=attr.unique,
                 key=attr.key,
-                description=attr.description
+                description=attr.description,
+                bound_schema_id=attr.bound_schema_id
             )
             db.add(ad)
             db.flush()
-            if a.type == AttrType.FK:
-                if attr.bind_to_schema is None:
-                    raise NoSchemaToBindException(attr_id=a.id)
-                if attr.bind_to_schema == -1:
-                    s = sch
-                else:
-                    s = db.execute(
-                        select(Schema)
-                        .where(Schema.id == attr.bind_to_schema)
-                        .where(Schema.deleted == False)
-                    ).scalar()
-                if s is None:
-                    raise MissingSchemaException(obj_id=attr.bind_to_schema)
-                bfk = BoundFK(attr_def_id=ad.id, schema_id=s.id)
-                db.add(bfk)
-
         if commit:
             db.commit()
         else:
             db.flush()
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
     except:
@@ -162,29 +159,12 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     return schema
 
 
-def _check_attr_names_after_update(schema: Schema, data: SchemaUpdateSchema):
-    attrs = [i.attribute.name for i in schema.attr_defs]
-    expected_count = len(attrs) - len(data.delete_attributes) + len(data.add_attributes)
-    attrs = [i for i in attrs if i not in data.delete_attributes]
-
-    for attr in data.update_attributes:
-        if attr.new_name:
-            attrs.remove(attr.name)
-            attrs.append(attr.new_name)
-    for attr in data.add_attributes:
-        attrs.append(attr.name)
-
-    repeating_attrs = [i for i, count in Counter(attrs).items() if count > 1]
-    if repeating_attrs:
-        raise MultipleAttributeOccurencesException(', '.join(repeating_attrs))
-
-    assert len(attrs) == expected_count
-
-
 def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
     attrs = {i.attribute.name: i.attribute.type.name for i in schema.attr_defs}
     deleted = [i for i in schema.attr_defs if i.attribute.name in data.delete_attributes]
-    deleted = {i.attribute.name: i.attribute.type.name for i in deleted}
+    deleted = {i.attribute.name: i.attribute.type.name
+               for i in schema.attr_defs
+               if i.attribute.name in data.delete_attributes}
     for attr in data.add_attributes:
         if attr.name in deleted and deleted[attr.name] == attr.type.name:
             raise NoOpChangeException('No-op change: made an attempt to add and delete the same attribute')
@@ -195,7 +175,6 @@ def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
 
 def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema: Schema):
     ValueModel = attr_def.attribute.type.value.model
-    db.execute(delete(BoundFK).where(BoundFK.attr_def_id == attr_def.id))
     db.execute(delete(AttributeDefinition).where(AttributeDefinition.id == attr_def.id))
     db.execute(delete(ValueModel)
         .where(ValueModel.attribute_id == attr_def.attribute_id)
@@ -208,10 +187,9 @@ def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema:
 def _update_attr_in_schema(db: Session, attr_upd: AttrDefSchema, attr_def: AttributeDefinition):
     if attr_def.list and not attr_upd.list:
         raise ListedToUnlistedException(attr_def_id=attr_def.id)
-    if attr_upd.list:
-        attr_upd.unique = False
+
     attr_def.required = attr_upd.required
-    attr_def.unique = attr_upd.unique
+    attr_def.unique = False if attr_upd.list else attr_upd.unique
     attr_def.list = attr_upd.list
     attr_def.key = attr_upd.key
     attr_def.description = attr_upd.description
@@ -227,6 +205,9 @@ def _update_attr_in_schema(db: Session, attr_upd: AttrDefSchema, attr_def: Attri
 def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema):
     attribute = create_attribute(db, attr_schema, commit=False)
     db.flush()
+    bound_schema_id = attr_schema.bound_schema_id if attr_schema.bound_schema_id != -1 else schema.id
+    if bound_schema_id is not None and bound_schema_id != schema.id:
+        _check_bound_schema_id(db=db, schema_id=bound_schema_id)
     try:
         attr_def = AttributeDefinition(
             attribute_id=attribute.id,
@@ -235,29 +216,16 @@ def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema)
             list=attr_schema.list,
             unique=attr_schema.unique if not attr_schema.list else False,
             key=attr_schema.key,
-            description=attr_schema.description
+            description=attr_schema.description,
+            bound_schema_id=bound_schema_id
         )
         db.add(attr_def)
         db.flush()
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError as error:
         db.rollback()
+        if isinstance(error.orig, ForeignKeyViolation):
+            raise MissingSchemaException(obj_id=attr_schema.bound_schema_id)
         raise AttributeAlreadyDefinedException(attr_id=attribute.id, schema_id=schema.id)
-
-    if attribute.type == AttrType.FK:
-        if attr_schema.bind_to_schema is None:
-            raise NoSchemaToBindException(attr_id=attribute.id)
-        if attr_schema.bind_to_schema == -1:
-            bound_schema = schema
-        else:
-            bound_schema = db.execute(
-                select(Schema)
-                .where(Schema.id == attr_schema.bind_to_schema)
-                .where(Schema.deleted == False)
-            ).scalar()
-
-        if bound_schema is None:
-            raise MissingSchemaException(obj_id=attr_schema.bind_to_schema)
-        db.add(BoundFK(attr_def_id=attr_def.id, schema_id=bound_schema.id))
 
 
 def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])\
@@ -265,14 +233,24 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
     existing_defs = schema.attr_defs
     new, updated = [], []
     fields = iterate_model_fields(AttributeDefinition)
+    skipped_fields = ["schema_id", "attribute_id", "name", "type", "bound_schema_id"]
 
     for attr_def in definitions:
         if not getattr(attr_def, "id", None):
             new.append(attr_def)
             continue
         existing = next(e for e in existing_defs if e.id == attr_def.id)
-        if any(getattr(attr_def, field) != getattr(existing, field) for field in fields):
+        if existing.attribute.name != attr_def.name:
             updated.append(attr_def)
+        bound_schema_id = attr_def.bound_schema_id if attr_def.bound_schema_id != -1 else existing.bound_schema_id
+        if bound_schema_id != existing.bound_schema_id:
+            updated.append(attr_def)
+            continue
+        if any(getattr(attr_def, field) != getattr(existing, field)
+               for field in fields
+               if field not in skipped_fields):
+            updated.append(attr_def)
+            continue
 
     submitted_ids = {a.id for a in definitions}
     deleted = [a for a in existing_defs if a.id not in submitted_ids]
@@ -283,21 +261,37 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
     schema = get_schema(db=db, id_or_slug=id_or_slug)
     if schema.deleted:
         raise MissingSchemaException(obj_id=id_or_slug)
-    
+
+    duplicate_attr_names = [name
+                            for name, count in Counter(a.name for a in data.attributes).items()
+                            if count > 1]
+    if duplicate_attr_names:
+        raise MultipleAttributeOccurencesException(attr_name=duplicate_attr_names[0])
+
     try:
-        db.execute(
+        result = db.execute(
             update(Schema)
-            .where(Schema.id == schema.id)
+            .where(Schema.id == schema.id,
+                   or_(Schema.name != data.name, Schema.slug != data.slug,
+                       Schema.reviewable != (data.reviewable or Schema.reviewable.default.arg)))
             .values(
                 name=data.name or schema.name,
                 slug=data.slug or schema.slug,
                 reviewable=data.reviewable if data.reviewable is not None else schema.reviewable)
         )
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
 
     added, updated, deleted = sort_attribute_definitions(schema=schema, definitions=data.attributes)
+
+    # Are there meaningful changes?
+    intersect_update_delete = {(d.name, d.type.name) for d in updated} & {(d.attribute.name, d.attribute.type.name) for d in deleted}
+    intersect_add_delete = {(d.name, d.type.name) for d in added} & {(d.attribute.name, d.attribute.type.name) for d in deleted}
+
+    if result.rowcount == 0 and intersect_update_delete | intersect_add_delete:
+        raise NoOpChangeException("Trivial change: Attempt to add/update and delete an attribute at"
+                                  " the same time")
 
     attr_def_names: Dict[int, AttributeDefinition] = {i.id: i for i in schema.attr_defs}
 
@@ -319,7 +313,7 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
             db.commit()
         else:
             db.flush()
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         db.rollback()
         raise SchemaExistsException(name=data.name, slug=data.slug)
     return schema
@@ -552,23 +546,17 @@ def _convert_values(attr_def: AttributeDefinition, value: Any, caster: Callable)
 
 
 def _check_fk_value(db: Session, attr_def: AttributeDefinition, entity_ids: List[int]):
-    bound_schema_id = db.execute(
-        select(BoundFK.schema_id)
-        .where(BoundFK.attr_def_id == attr_def.id)
-    ).scalar()
+    entities = {e.id: e for e in db.query(Entity.schema_id).filter(Entity.id.in_(entity_ids),
+                                                                   Entity.deleted == False)}
     for id_ in entity_ids:
-        entity = db.execute(
-            select(Entity)
-            .where(Entity.id == id_)
-            .where(Entity.deleted == False)
-        ).scalar()
+        entity = entities.get(id_, None)
         if entity is None:
             raise MissingEntityException(obj_id=id_)
-        if entity.schema_id != bound_schema_id:
+        if entity.schema_id != attr_def.bound_schema_id:
             raise WrongSchemaToBindException(
                 attr_name=attr_def.attribute.name, 
                 schema_id=attr_def.schema_id, 
-                bound_schema_id=bound_schema_id, 
+                bound_schema_id=attr_def.bound_schema_id,
                 passed_entity=entity
             )
 
@@ -611,7 +599,7 @@ def create_entity(db: Session, schema_id: int, data: dict, commit: bool = True) 
     db.add(e)
     try:
         db.flush()
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         raise EntityExistsException(slug=slug)
 
     for field, value in data.items():
@@ -649,7 +637,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     name = data.pop('name', e.name)
     try:
         db.execute(update(Entity).where(Entity.id == e.id).values(slug=slug, name=name))
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         db.rollback()
         raise EntityExistsException(slug=slug)
 

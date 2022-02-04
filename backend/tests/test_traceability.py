@@ -11,8 +11,6 @@ from ..traceability.enum import ChangeType, ContentType, EditableObjectType, Cha
     ReviewResult
 from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueStr
 
-from .test_traceability_entity import make_entity_change_objects
-from .test_traceability_schema import make_schema_change_objects
 
 @pytest.mark.parametrize(['content_type', 'change_type'], [
     (ContentType.ENTITY, ChangeType.CREATE),
@@ -126,13 +124,12 @@ def test_review_changes(dbsession: Session):
 
 
 def test_get_pending_change_requests(dbsession: Session):
-    now = datetime.utcnow()
-    day_later = now + timedelta(hours=24)
-    user = dbsession.execute(select(User)).scalar()
     # 10 requests, 9 UPD, 1 CREATE
-    entity_requests = make_entity_change_objects(dbsession, user, now)
     # 10 requests, 9 UPD, 1 CREATE
-    schema_requests = make_schema_change_objects(dbsession, user, day_later)
+    schema_requests = dbsession.query(ChangeRequest)\
+        .filter(ChangeRequest.object_type == EditableObjectType.SCHEMA)
+    entity_requests = dbsession.query(ChangeRequest)\
+        .filter(ChangeRequest.object_type == EditableObjectType.ENTITY)
 
     # limit 10 offset 0
     requests = get_pending_change_requests(dbsession)

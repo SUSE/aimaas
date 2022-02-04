@@ -9,7 +9,7 @@ from .config import settings
 from .crud import ALLOWED_FILTERS
 from .database import SessionLocal
 from .dynamic_routes import create_dynamic_router
-from .models import Schema, AttributeDefinition, BoundFK
+from .models import Schema, AttributeDefinition
 from .general_routes import router
 
 
@@ -18,8 +18,6 @@ def load_schemas(db: Session) -> List[models.Schema]:
         select(Schema)
         .options(
             subqueryload(Schema.attr_defs)
-            .subqueryload(AttributeDefinition.bind_to_schema)
-            .subqueryload(BoundFK.schema)
         )
     ).scalars().all()
     return schemas

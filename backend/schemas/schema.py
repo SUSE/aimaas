@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from typing import List, Optional, Any
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, root_validator
 
 from ..models import AttrType, AttributeDefinition
 
@@ -39,9 +39,17 @@ class AttributeDefinitionBase(BaseModel):
     unique: bool
     list: bool
     key: bool
-    description: Optional[str]
-    bind_to_schema: Optional[int]
+    description: Optional[str] = None
+    bound_schema_id: Optional[int] = None
     id: Optional[int] = None
+
+    @root_validator(pre=True)
+    def check_type_and_bound_id(cls, values):
+        if values.get("type", None) in (AttrTypeMapping.FK, 'FK') \
+                and values.get("bound_schema_id") is None:
+            raise ValueError("Attribute type FK must be bound to a specific schema")
+
+        return values
 
     class Config:
         orm_mode = True
@@ -54,8 +62,6 @@ class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
         if isinstance(obj, AttributeDefinition):
             obj.type = obj.attribute.type.name
             obj.name = obj.attribute.name
-            if obj.attribute.type == AttrType.FK:
-                obj.bind_to_schema = obj.bind_to_schema.schema_id
         return super().from_orm(obj)
 
 

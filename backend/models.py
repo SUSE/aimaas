@@ -7,7 +7,7 @@ from sqlalchemy import (
     Integer, String, Float)
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
-from sqlalchemy.sql.schema import UniqueConstraint
+from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
 
 from .base_models import Value, Mapping
 from .database import Base
@@ -58,25 +58,6 @@ class AttrType(enum.Enum):
     DATE = Mapping(ValueDate, lambda x: x)
 
 
-class BoundFK(Base):
-    __tablename__ = 'bound_foreign_keys'
-
-    id = Column(Integer, primary_key=True, index=True)
-    attr_def_id = Column(Integer, ForeignKey('attr_definitions.id'))
-    schema_id = Column(Integer, ForeignKey('schemas.id'))
-
-    attr_def = relationship(
-        'AttributeDefinition',
-        back_populates='bind_to_schema')
-    schema = relationship(
-        'Schema',
-        doc='''Points to schema that is bound 
-            to BoundFK.attr_def which is 
-            not necessarily the same as 
-            BoundFK.attr_def.schema'''
-    )
-
-
 class Schema(Base):
     __tablename__ = 'schemas'
 
@@ -87,7 +68,8 @@ class Schema(Base):
     reviewable = Column(Boolean, default=False)
 
     entities = relationship('Entity', back_populates='schema')
-    attr_defs = relationship('AttributeDefinition', back_populates='schema')
+    attr_defs = relationship('AttributeDefinition', back_populates='schema',
+                             foreign_keys="[AttributeDefinition.schema_id]")
 
 
 class Entity(Base):
@@ -150,10 +132,11 @@ class AttributeDefinition(Base):
     key = Column(Boolean)
     list = Column(Boolean, default=False)
     description = Column(String(128))
+    bound_schema_id = Column(Integer, ForeignKey('schemas.id'), nullable=True)
 
-    schema = relationship('Schema', back_populates='attr_defs')
+    schema = relationship('Schema', back_populates='attr_defs', foreign_keys=[schema_id])
+    bound_schema = relationship('Schema', foreign_keys=[bound_schema_id])
     attribute = relationship('Attribute', back_populates='attr_defs')
-    bind_to_schema = relationship('BoundFK', back_populates='attr_def', uselist=False)
 
     __table_args__ = (
         UniqueConstraint('schema_id', 'attribute_id'),

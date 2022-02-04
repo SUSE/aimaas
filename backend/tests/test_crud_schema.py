@@ -1,46 +1,14 @@
+from pydantic.error_wrappers import ValidationError
 import pytest
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
 
-from ..config import *
-from ..crud import *
-from ..models import *
-from ..schemas import *
-from ..exceptions import *
+from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema
+from ..exceptions import SchemaExistsException, NoSchemaToBindException, MissingSchemaException, \
+    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
+from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
+from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
 
-
-def asserts_after_schema_create(db: Session):
-    data = TestSchemaCreate.data_for_test()
-    car = db.execute(select(Schema).where(Schema.name == 'Car')).scalar()
-    assert car is not None and not car.reviewable
-
-    attr_defs = db.execute(select(AttributeDefinition).where(AttributeDefinition.schema_id == car.id)).scalars().all()
-    assert sorted([i.attribute.name for i in attr_defs]) == sorted(data['attr_defs'])
-
-    color = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == car.id)
-        .join(Attribute)
-        .where(Attribute.name == 'color')
-    ).scalar()
-    assert not any([color.required, color.unique, color.list, color.key])
-    assert color.description == 'Color of this car'
-
-    ry = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == car.id)
-        .join(Attribute)
-        .where(Attribute.name == 'release_year')
-    ).scalar()
-    assert not any([ry.required, ry.unique, ry.list, ry.key])
-    assert ry.description is None
-
-    owner = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == car.id)
-        .join(Attribute)
-        .where(Attribute.name == 'owner')
-    ).scalar()
-    bfk = db.execute(select(BoundFK).where(BoundFK.attr_def_id == owner.id)).scalars().all()
-    assert len(bfk) == 1 and bfk[0].schema.name == 'Person'
 
 class TestSchemaCreate:
     @staticmethod
@@ -77,7 +45,7 @@ class TestSchemaCreate:
             unique=False,
             list=False,
             key=False,
-            bind_to_schema=1
+            bound_schema_id=1
         )
         return {
             'attr_defs': {
@@ -90,9 +58,41 @@ class TestSchemaCreate:
 
     def test_create(self, dbsession):
         data = self.data_for_test()
-        car = SchemaCreateSchema(name='Car', slug='car', attributes=list(data['attr_defs'].values()))
-        create_schema(dbsession, data=car)
-        asserts_after_schema_create(dbsession)
+        car = create_schema(dbsession, data=SchemaCreateSchema(
+            name='Car', slug='car', attributes=list(data['attr_defs'].values())
+        ))
+
+        assert car is not None and not car.reviewable
+
+        attr_defs = dbsession.execute(select(AttributeDefinition).where(
+            AttributeDefinition.schema_id == car.id)).scalars().all()
+        assert sorted([i.attribute.name for i in attr_defs]) == sorted(data['attr_defs'])
+
+        color = dbsession.execute(
+            select(AttributeDefinition)
+                .where(AttributeDefinition.schema_id == car.id)
+                .join(Attribute)
+                .where(Attribute.name == 'color')
+        ).scalar()
+        assert not any([color.required, color.unique, color.list, color.key])
+        assert color.description == 'Color of this car'
+
+        ry = dbsession.execute(
+            select(AttributeDefinition)
+                .where(AttributeDefinition.schema_id == car.id)
+                .join(Attribute)
+                .where(Attribute.name == 'release_year')
+        ).scalar()
+        assert not any([ry.required, ry.unique, ry.list, ry.key])
+        assert ry.description is None
+
+        owner = dbsession.execute(
+            select(AttributeDefinition)
+                .where(AttributeDefinition.schema_id == car.id)
+                .join(Attribute)
+                .where(Attribute.name == 'owner')
+        ).scalar()
+        assert owner.bound_schema.name == 'Person'
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession):
         sch = SchemaCreateSchema(name='Person', slug='test', attributes=[])
@@ -106,18 +106,16 @@ class TestSchemaCreate:
         dbsession.rollback()
 
     def test_raise_on_empty_schema_when_binding(self, dbsession):
-        no_schema = AttrDefSchema(
-            name='friends',
-            type='FK',
-            required=True,
-            unique=True,
-            list=False,
-            key=True,
-            description='No schema passed for binding',
-        )
-        sch = SchemaCreateSchema(name='Test', slug='test', attributes=[no_schema])
-        with pytest.raises(NoSchemaToBindException):
-            create_schema(dbsession, data=sch)
+        with pytest.raises(ValidationError):
+            no_schema = AttrDefSchema(
+                name='friends',
+                type='FK',
+                required=True,
+                unique=True,
+                list=False,
+                key=True,
+                description='No schema passed for binding',
+            )
 
     def test_raise_on_nonexistent_schema_when_binding(self, dbsession):
         nonexistent = AttrDefSchema(
@@ -128,7 +126,7 @@ class TestSchemaCreate:
             list=False,
             key=True,
             description='Nonexistent schema to bind to',
-            bind_to_schema=9999999999
+            bound_schema_id=9999999999
         )
         sch = SchemaCreateSchema(name='Test', slug='test', attributes=[nonexistent])
         with pytest.raises(MissingSchemaException):
@@ -143,7 +141,7 @@ class TestSchemaCreate:
             unique=True,
             list=False,
             key=True,
-            bind_to_schema=1
+            bound_schema_id=1
         )
        
         sch = SchemaCreateSchema(name='Test', slug='test', attributes=[attr_def])
@@ -255,61 +253,69 @@ class TestSchemaRead:
         assert schemas[0] == test
 
 
-def asserts_after_schema_update(db: Session):
-    friends = db.execute(
-        select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'friends')
-            .where(AttributeDefinition.schema_id == 1)
-    ).scalar()
-    assert friends is None
-
-    age_def = db.execute(
-        select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-    ).scalar()
-    assert age_def is not None
-    assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
-
-    address_def = db.execute(
-        select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'address')
-            .where(AttributeDefinition.schema_id == 1)
-    ).scalar()
-    assert address_def is not None
-    assert all([address_def.list, address_def.key, address_def.required])
-    assert not address_def.unique
-
-    bfk = db.execute(
-        select(BoundFK)
-            .where(BoundFK.schema_id == 1)
-            .where(BoundFK.attr_def_id == address_def.id)
-    ).scalar()
-    assert bfk is not None
-
-    sch = db.execute(select(Schema).where(Schema.id == 1)).scalar()
-    assert sch.name == 'Person' and sch.slug == 'test' and sch.reviewable
-
-
 class TestSchemaUpdate:
+    default_attributes = [
+        AttrDefSchema(
+            id=1,
+            name='age',
+            type="INT",
+            required=True,
+            unique=False,
+            list=False,
+            key=True,
+            description='Age of this person'
+        ),
+        AttrDefSchema(
+            id=2,
+            name='born',
+            type='DT',
+            required=False,
+            unique=False,
+            list=False,
+            key=False
+        ),
+        AttrDefSchema(
+            id=3,
+            name='friends',
+            type='FK',
+            required=True,
+            unique=False,
+            list=True,
+            key=False,
+            bound_schema_id=-1
+        ),
+        AttrDefSchema(
+            id=4,
+            name='nickname',
+            type='STR',
+            required=False,
+            unique=True,
+            list=False,
+            key=False
+        ),
+        AttrDefSchema(
+            id=5,
+            name='fav_color',
+            type='STR',
+            required=False,
+            unique=False,
+            list=True,
+            key=False
+        )
+    ]
+
     def test_update(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            slug='test',
-            reviewable=True,
-            update_attributes=[
-                AttrDefUpdateSchema(
+        attributes = [a for a in self.default_attributes if a.name != "age"] + [
+                AttrDefSchema(
+                    id=1,
                     name='age',
+                    type='INT',
                     required=False,
                     unique=False,
                     list=False,
                     key=False,
                     description='Age of this person'
-                )
-            ], 
-            add_attributes=[
+                ),
                 AttrDefSchema(
                     name='address',
                     type='FK',
@@ -317,29 +323,50 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True,
-                    bind_to_schema=-1
+                    bound_schema_id=-1
                 )
-            ],
+            ]
+        upd_schema = SchemaUpdateSchema(
+            slug='test',
+            reviewable=True,
+            attributes=attributes,
             delete_attributes=['friends']
         )
         update_schema(dbsession, id_or_slug='person', data=upd_schema)
-        asserts_after_schema_update(db=dbsession)
+
+        schema = dbsession.query(Schema).filter(Schema.slug == "test").one()
+        assert schema.name == 'Person' and schema.slug == 'test'
+
+        attrs = {d.attribute.name: d.attribute.type for d in schema.attr_defs}
+        assert attrs.get("friends") == AttrType.FK
+        assert attrs.get("address") == AttrType.FK
+        assert attrs.get("age") == AttrType.INT
+
+        age = next(iter(d for d in schema.attr_defs if d.attribute.name == "age"))
+        assert not any([age.required, age.unique, age.list, age.key])
+
+        address = next(iter(d for d in schema.attr_defs if d.attribute.name == "address"))
+        assert all([address.list, address.key, address.required])
+        assert not address.unique
+        assert address.bound_schema_id == schema.id
 
     def test_update_with_renaming(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[
-                AttrDefUpdateSchema(
-                    name='nickname',
-                    new_name='nick',
+        attributes = [a for a in self.default_attributes if a.id != 4] + [
+                AttrDefSchema(
+                    id=4,
+                    name='nick',
+                    type='STR',
                     required=False,
                     unique=False,
                     list=False,
                     key=False,
                     description='updated'
                 )
-            ],
+            ]
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            attributes=attributes,
         )
         update_schema(dbsession, id_or_slug=1, data=upd_schema)
         nickname = dbsession.execute(select(Attribute).where(Attribute.name == 'nickname')).scalar()
@@ -362,21 +389,17 @@ class TestSchemaUpdate:
             .where(AttributeDefinition.schema_id == 1)
         ).scalar().id
 
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[
-                AttrDefUpdateSchema(
-                    name='nickname',
-                    new_name='nick',
+        attributes = [a for a in self.default_attributes if a.id != 4] + [
+                AttrDefSchema(
+                    id=4,
+                    name='nick',
+                    type='STR',
                     required=False,
                     unique=False,
                     list=False,
                     key=False,
                     description='updated'
-                )
-            ], 
-            add_attributes=[
+                ),
                 AttrDefSchema(
                     name='nickname',
                     type='DT',
@@ -386,6 +409,11 @@ class TestSchemaUpdate:
                     key=True
                 )
             ]
+
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            attributes=attributes
         )
         update_schema(dbsession, id_or_slug=1, data=upd_schema)
         dbsession.expire_all()
@@ -407,22 +435,22 @@ class TestSchemaUpdate:
         assert all([nickname.required, nickname.list, nickname.key])
 
     def test_raise_on_renaming_to_already_present_attr(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test',
-            slug='test',
-            update_attributes=[
-                AttrDefUpdateSchema(
-                    name='nickname',
-                    new_name='friends',
+        attributes = [a for a in self.default_attributes if a.id != 4] + [
+                AttrDefSchema(
+                    id=4,
+                    name='friends',
+                    type='INT',
                     required=False,
                     unique=False,
                     list=False,
                     key=False,
                     description='updated'
                 )
-            ],
-            add_attributes=[],
-            delete_attributes=[]
+            ]
+        upd_schema = SchemaUpdateSchema(
+            name='Test',
+            slug='test',
+            attributes=attributes
         )
         with pytest.raises(MultipleAttributeOccurencesException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
@@ -439,7 +467,7 @@ class TestSchemaUpdate:
         upd_schema = SchemaUpdateSchema(
             name='Test',
             slug='test',
-            delete_attributes=['age', 'born']
+            attributes=[a for a in self.default_attributes if a.name not in ['age', 'born']]
         )
         update_schema(dbsession, id_or_slug=1, data=upd_schema)
         attr_defs = dbsession.execute(
@@ -454,10 +482,7 @@ class TestSchemaUpdate:
         assert init_entities_count == new_entities_count
 
     def test_raise_on_deleting_and_creating_same_attr(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test',
-            slug='test',
-            add_attributes=[
+        attributes = [a for a in self.default_attributes if a.id != 1] + [
                 AttrDefSchema(
                     name='age',
                     type='INT',
@@ -465,56 +490,20 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True
-                )
-            ],
-            delete_attributes=['age']
+                )]
+        upd_schema = SchemaUpdateSchema(
+            name='Person',
+            slug='person',
+            attributes=attributes
         )
         with pytest.raises(NoOpChangeException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
-    def test_raise_on_deleting_and_updating_same_attr(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test',
-            slug='test',
-            update_attributes=[
-                AttrDefUpdateSchema(
-                    name='age',
-                    required=True,
-                    unique=True,
-                    list=True,
-                    key=True,
-                    description='upd'
-                )
-            ],
-            delete_attributes=['age']
-        )
-        with pytest.raises(NoOpChangeException):
-            update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
-    def test_no_raise_on_deleting_and_creating_attr_with_same_name_but_different_type(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test',
-            slug='test',
-            add_attributes=[
-                AttrDefSchema(
-                    name='age',
-                    type='FLOAT',
-                    required=True,
-                    unique=True,
-                    list=True,
-                    key=True
-                )
-            ],
-            delete_attributes=['age']
-        )
-        update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_schema_doesnt_exist(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[]
+            slug='test',
+            attributes=[]
         )
         with pytest.raises(MissingSchemaException):
             update_schema(dbsession, id_or_slug=99999999, data=upd_schema)
@@ -524,50 +513,53 @@ class TestSchemaUpdate:
         dbsession.add(new_sch)
         dbsession.flush()
         
-        upd_schema = SchemaUpdateSchema(name='Person', slug='test', update_attributes=[], add_attributes=[])
+        upd_schema = SchemaUpdateSchema(name='Person', slug='test', attributes=[])
         with pytest.raises(SchemaExistsException):
             update_schema(dbsession, id_or_slug=new_sch.id, data=upd_schema)
         dbsession.rollback()
         dbsession.add(new_sch)
         dbsession.flush()
 
-        upd_schema = SchemaUpdateSchema(name='Test', slug='person', update_attributes=[], add_attributes=[])
+        upd_schema = SchemaUpdateSchema(name='Test', slug='person', attributes=[])
         with pytest.raises(SchemaExistsException):
             update_schema(dbsession, id_or_slug=new_sch.id, data=upd_schema)
 
     def test_raise_on_convert_list_to_single(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[
-                AttrDefUpdateSchema(
+        attributes = [a for a in self.default_attributes if a.id != 3] + [
+                AttrDefSchema(
+                    id=3,
                     name='friends',
+                    type="FK",
                     required=True,
                     unique=True,
                     list=False,
                     key=True,
+                    bound_schema_id=-1
                 )
-            ], 
-            add_attributes=[]
+            ]
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test', 
+            attributes=attributes
         )
         with pytest.raises(ListedToUnlistedException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_attr_def_already_exists(self, dbsession):
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
+        attributes = self.default_attributes + [
                 AttrDefSchema(
                     name='born',
-                    type='DT',
+                    type='INT',
                     required=True,
                     unique=True,
                     list=True,
                     key=True
                 )
             ]
+        upd_schema = SchemaUpdateSchema(
+            name='Test', 
+            slug='test',
+            attributes=attributes
         )
         # TODO currently works the same way as raise_on_multiple_attrs_with_same_name
         # this one can be removed
@@ -578,9 +570,8 @@ class TestSchemaUpdate:
     def test_raise_on_nonexistent_schema_when_binding(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
+            slug='test',
+            attributes=self.default_attributes + [
                 AttrDefSchema(
                     name='address',
                     type='FK',
@@ -588,7 +579,7 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True,
-                    bind_to_schema=999999
+                    bound_schema_id=999999
                 )
             ]
         )
@@ -596,11 +587,27 @@ class TestSchemaUpdate:
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
 
     def test_raise_on_schema_not_passed_when_binding(self, dbsession):
+        with pytest.raises(ValidationError):
+            SchemaUpdateSchema(
+                name='Test',
+                slug='test',
+                attributes=[
+                    AttrDefSchema(
+                        name='address2',
+                        type='FK',
+                        required=True,
+                        unique=True,
+                        list=True,
+                        key=True,
+                    )
+                ]
+            )
+
+    def test_raise_on_duplicate_attrs(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
+            slug='test',
+            attributes=[
                 AttrDefSchema(
                     name='address',
                     type='FK',
@@ -608,31 +615,7 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True,
-                )
-            ]
-        )
-        with pytest.raises(NoSchemaToBindException):
-            update_schema(dbsession, id_or_slug=1, data=upd_schema)
-
-    def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
-        address = dbsession.execute(
-            select(Attribute)
-            .where(Attribute.name == 'address')
-        ).scalar()
-
-        upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
-                AttrDefSchema(
-                    name='address',
-                    type='FK',
-                    required=True,
-                    unique=True,
-                    list=True,
-                    key=True,
-                    bind_to_schema=-1
+                    bound_schema_id=-1
                 ),
                 AttrDefSchema(
                     name='address',
@@ -641,20 +624,18 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True,
-                    bind_to_schema=-1
+                    bound_schema_id=-1
                 )
             ]
         )
         with pytest.raises(MultipleAttributeOccurencesException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
-        dbsession.rollback()
 
-
+    def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
         upd_schema = SchemaUpdateSchema(
             name='Test', 
-            slug='test', 
-            update_attributes=[], 
-            add_attributes=[
+            slug='test',
+            attributes=[
                 AttrDefSchema(
                     name='address',
                     type='FK',
@@ -662,7 +643,7 @@ class TestSchemaUpdate:
                     unique=True,
                     list=True,
                     key=True,
-                    bind_to_schema=-1
+                    bound_schema_id=-1
                 ),
                 AttrDefSchema(
                     name='address',
@@ -678,23 +659,21 @@ class TestSchemaUpdate:
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
    
 
-def asserts_after_schema_delete(db: Session, deleted_schema_id: int):
-    schemas = db.execute(select(Schema)).scalars().all()
-    assert len(schemas) == 2
-
-    deleted_schema = [schema for schema in schemas if schema.id == deleted_schema_id]
-    assert deleted_schema
-    assert deleted_schema[0].deleted
-
-    entities = db.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
-    assert len(entities) == 2
-    assert all([i.deleted for i in entities])
-
 class TestSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_delete(self, dbsession, id_or_slug):
-        s = delete_schema(dbsession, id_or_slug=id_or_slug)
-        asserts_after_schema_delete(db=dbsession, deleted_schema_id=s.id)
+        schema = delete_schema(dbsession, id_or_slug=id_or_slug)
+        assert schema.deleted
+
+        schemas = dbsession.execute(select(Schema)).scalars().all()
+        deleted_schema = [s for s in schemas if schema.id == s.id]
+        assert len(schemas) == 2
+        assert deleted_schema
+        assert deleted_schema[0].deleted
+
+        entities = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
+        assert len(entities) == 2
+        assert all([i.deleted for i in entities])
     
     def test_raise_on_already_deleted(self, dbsession):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
@@ -704,7 +683,3 @@ class TestSchemaDelete:
     def test_raise_on_delete_nonexistent(self, dbsession):
         with pytest.raises(MissingSchemaException):
             delete_schema(dbsession, id_or_slug=999999999)
-
-    
-
-    

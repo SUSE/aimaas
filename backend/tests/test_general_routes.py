@@ -1,31 +1,22 @@
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, datetime
 
 from fastapi.testclient import TestClient
 from dateutil import parser
-from sqlalchemy import update
+from sqlalchemy import update, select
+from sqlalchemy.orm import Session
 import pytest
 
-from ..models import *
-from ..schemas import *
+from ..auth.models import User
+from ..models import Schema
+from ..schemas import AttrDefSchema, ChangeRequestSchema
 from ..traceability.entity import create_entity_update_request, create_entity_create_request, \
     create_entity_delete_request
+from ..traceability.enum import ChangeStatus
 from ..traceability.models import ChangeRequest, Change
-from ..traceability.schema import create_schema_create_request, create_schema_update_request
 from .test_crud_schema import (
     asserts_after_schema_create,
     asserts_after_schema_update,
     asserts_after_schema_delete
-)
-from .test_traceability_schema import (
-    asserts_after_applying_schema_create_request,
-    asserts_after_submitting_schema_create_request,
-    asserts_after_applying_schema_update_request,
-    asserts_after_submitting_schema_update_request,
-    asserts_after_applying_schema_delete_request,
-    asserts_after_submitting_schema_delete_request,
-    make_schema_change_objects,
-    make_schema_update_request,
-    make_schema_create_request
 )
 
 
@@ -98,7 +89,7 @@ class TestRouteSchemasGet:
     def test_get_schema(self, dbsession: Session, client: TestClient):
         attrs = [
             {
-                'bind_to_schema': None,
+                'bound_schema_id': None,
                 'description': 'Age of this person',
                 'key': True,
                 'list': False,
@@ -108,7 +99,7 @@ class TestRouteSchemasGet:
                 'unique': False
             },
             {
-                'bind_to_schema': None,
+                'bound_schema_id': None,
                 'description': None,
                 'key': False,
                 'list': False,
@@ -118,7 +109,7 @@ class TestRouteSchemasGet:
                 'unique': False
             },
             {
-                'bind_to_schema': 1,
+                'bound_schema_id': 1,
                 'description': None,
                 'key': False,
                 'list': True,
@@ -128,7 +119,7 @@ class TestRouteSchemasGet:
                 'unique': False
             },
             {
-                'bind_to_schema': None,
+                'bound_schema_id': None,
                 'description': None,
                 'key': False,
                 'list': False,
@@ -138,7 +129,7 @@ class TestRouteSchemasGet:
                 'unique': True
             },
             {
-                'bind_to_schema': None,
+                'bound_schema_id': None,
                 'description': None,
                 'key': False,
                 'list': True,
@@ -220,7 +211,7 @@ class TestRouteSchemaCreate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 1
+                    'bound_schema_id': 1
                 }
             ]
         }
@@ -288,7 +279,7 @@ class TestRouteSchemaCreate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 123456789
+                    'bound_schema_id': 123456789
                 }
             ]
         } 
@@ -311,7 +302,7 @@ class TestRouteSchemaCreate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 1
+                    'bound_schema_id': 1
                 }
             ]
         } 
@@ -376,7 +367,7 @@ class TestRouteSchemaUpdate:
                     'unique': True,
                     'list': True,
                     'key': True,
-                    'bind_to_schema': -1
+                    'bound_schema_id': -1
                 }
             ],
             'delete_attributes': ['friends']
@@ -481,7 +472,7 @@ class TestRouteSchemaUpdate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 123456789
+                    'bound_schema_id': 123456789
                 }
             ]
         } 
@@ -523,7 +514,7 @@ class TestRouteSchemaUpdate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': -1
+                    'bound_schema_id': -1
                 },
                 {
                     'name': 'address',
@@ -532,7 +523,7 @@ class TestRouteSchemaUpdate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': -1
+                    'bound_schema_id': -1
                 }
             ]
         } 
@@ -797,7 +788,7 @@ class TestRouteGetSchemaChanges:
             list=False,
             key=False,
         )
-        assert AttrDefUpdateSchema(**update[0]) == AttrDefUpdateSchema(
+        assert AttrDefSchema(**update[0]) == AttrDefSchema(
             name='age',
             new_name='AGE',
             required=True,

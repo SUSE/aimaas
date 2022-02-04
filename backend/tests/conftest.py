@@ -119,7 +119,8 @@ def populate_db(db: Session):
         required=True,
         unique=False,
         list=True,
-        key=False
+        key=False,
+        bound_schema_id=person.id
     )
     nickname_ = AttributeDefinition(
         schema_id=person.id,
@@ -139,8 +140,6 @@ def populate_db(db: Session):
     )
     db.add_all([age_, born_, friends_, nickname_, fav_color_])
     db.flush()
-    bfk = BoundFK(attr_def_id=friends_.id, schema_id=person.id)
-    db.add(bfk)
 
     p1 = Entity(schema_id=person.id, slug='Jack', name='Jack')
     db.add(p1)
@@ -165,6 +164,8 @@ def populate_db(db: Session):
     db.add(unperson)
 
     time = datetime.now(timezone.utc)
+
+    # Some change requests for entities
     for i in range(-12, -3):
         change_request = ChangeRequest(
             created_at=time+timedelta(hours=i),
@@ -232,6 +233,61 @@ def populate_db(db: Session):
     )
     db.add_all([change_request, change_1, change_2, change_3])
 
+    # And some change requests for schemas
+    for i in range(-12, -3):
+        change_request = ChangeRequest(
+            created_at=time+timedelta(hours=i),
+            created_by=user,
+            object_type=EditableObjectType.SCHEMA,
+            object_id=1,
+            change_type=ChangeType.UPDATE
+        )
+        change_1 = Change(
+            change_request=change_request,
+            object_id=1,
+            change_type=ChangeType.UPDATE,
+            content_type=ContentType.SCHEMA,
+            field_name='name',
+            data_type=ChangeAttrType.STR,
+            value_id=998
+        )
+        change_2 = Change(
+            change_request=change_request,
+            object_id=1,
+            change_type=ChangeType.UPDATE,
+            content_type=ContentType.SCHEMA,
+            field_name='slug',
+            data_type=ChangeAttrType.STR,
+            value_id=999
+        )
+        db.add_all([change_request, change_1, change_2])
+
+    change_request = ChangeRequest(
+            created_at=time+timedelta(hours=9),
+            created_by=user,
+            object_type=EditableObjectType.SCHEMA,
+            object_id=1,
+            change_type=ChangeType.CREATE
+    )
+    change_1 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.SCHEMA,
+        field_name='deleted',
+        data_type=ChangeAttrType.STR,
+        value_id=998
+    )
+    change_2 = Change(
+        change_request=change_request,
+        object_id=1,
+        change_type=ChangeType.CREATE,
+        content_type=ContentType.SCHEMA,
+        field_name='deleted',
+        data_type=ChangeAttrType.STR,
+        value_id=999
+    )
+    db.add_all([change_request, change_1, change_2])
     db.commit()
 
 

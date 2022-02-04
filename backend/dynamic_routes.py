@@ -95,7 +95,7 @@ def _meta_for_get_entity(schema: Schema) -> dict:
         meta['fields'][attr.name]['type'] = attr.type.name
         meta['fields'][attr.name]['list'] = attr_def.list
         if attr.type == AttrType.FK:
-            meta['fields'][attr.name]['bind_to_schema'] = attr_def.bind_to_schema.schema.slug
+            meta['fields'][attr.name]['bound_schema_id'] = attr_def.bound_schema_id.schema.slug
     return meta
 
 
