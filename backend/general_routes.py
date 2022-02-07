@@ -220,9 +220,7 @@ def get_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query
 def get_schema_change_details(change_id: int, db: Session = Depends(get_db)):
     try:
         return schema_change_details(db=db, change_request_id=change_id)
-    except exceptions.MissingChangeException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.MissingSchemaException as e:
+    except exceptions.MissingObjectException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
@@ -237,9 +235,7 @@ def get_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Un
         if entity is None:
             raise exceptions.MissingEntityException(obj_id=entity_id_or_slug)
         return get_recent_entity_changes(db=db, entity_id=entity.id, count=count)
-    except exceptions.MissingEntityException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.MissingSchemaException as e:
+    except exceptions.MissingObjectException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
@@ -250,11 +246,7 @@ def get_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Un
 def get_entity_change_details(change_id: int, db: Session = Depends(get_db)):
     try:
         return entity_change_details(db=db, change_request_id=change_id)
-    except exceptions.MissingChangeException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.MissingEntityException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.MissingSchemaException as e:
+    except exceptions.MissingObjectException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 

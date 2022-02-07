@@ -135,13 +135,11 @@ def test_get_pending_change_requests(dbsession: Session):
     requests = get_pending_change_requests(dbsession)
     assert len(requests) == 10
     assert {i.id for i in schema_requests} == {i.id for i in requests}
-    assert requests[0].created_at > requests[1].created_at, 'requests are supposed to be in descending order'
 
     # limit 10, offset 10
     requests = get_pending_change_requests(dbsession, offset=10)
     assert len(requests) == 10
     assert {i.id for i in entity_requests} == {i.id for i in requests}
-    assert requests[0].created_at > requests[1].created_at, 'requests are supposed to be in descending order'
 
     # limit 1, offset 0
     requests = get_pending_change_requests(dbsession, limit=1)

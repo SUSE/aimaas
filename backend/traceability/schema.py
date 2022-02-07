@@ -93,10 +93,6 @@ def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDe
         .order_by(Change.object_id)
     ).scalars().all()
 
-    if (not change_request.object_id and change_request.change_type != ChangeType.CREATE) \
-            or (change_request.change_type != ChangeType.DELETE and not attr_changes):
-        raise exceptions.MissingChangeException(obj_id=change_request.id)
-
     schema, attr_defs = None, None
     if change_request.object_id:
         schema = crud.get_schema(db=db, id_or_slug=change_request.object_id)

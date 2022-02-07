@@ -263,11 +263,11 @@ def populate_db(db: Session):
         db.add_all([change_request, change_1, change_2])
 
     change_request = ChangeRequest(
-            created_at=time+timedelta(hours=9),
-            created_by=user,
-            object_type=EditableObjectType.SCHEMA,
-            object_id=1,
-            change_type=ChangeType.CREATE
+        created_at=time+timedelta(hours=9),
+        created_by=user,
+        object_type=EditableObjectType.SCHEMA,
+        object_id=1,
+        change_type=ChangeType.CREATE,
     )
     change_1 = Change(
         change_request=change_request,

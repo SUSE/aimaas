@@ -15,14 +15,6 @@ from .test_crud_entity import (
     asserts_after_entities_update,
     asserts_after_entity_delete
 )
-from .test_traceability_entity import (
-    asserts_after_submitting_entity_create_request,
-    asserts_after_applying_entity_create_request,
-    asserts_after_submitting_entity_update_request,
-    asserts_after_applying_entity_update_request,
-    asserts_after_submitting_entity_delete_request,
-    asserts_after_applying_entity_delete_request
-)
 
 
 class TestRouteBasics:

@@ -148,9 +148,9 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     if schema is None:
         raise MissingSchemaException(obj_id=id_or_slug)
     
-    db.execute(
-        update(Entity).where(Entity.schema_id == schema.id).values(deleted=True)
-    )
+    db.execute(update(Entity)
+               .where(Entity.schema_id == schema.id, Entity.deleted == False)
+               .values(deleted=True))
     schema.deleted = True
     if commit:
         db.commit()
@@ -161,7 +161,6 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
 
 def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
     attrs = {i.attribute.name: i.attribute.type.name for i in schema.attr_defs}
-    deleted = [i for i in schema.attr_defs if i.attribute.name in data.delete_attributes]
     deleted = {i.attribute.name: i.attribute.type.name
                for i in schema.attr_defs
                if i.attribute.name in data.delete_attributes}
@@ -230,7 +229,7 @@ def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema)
 
 def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])\
         -> Tuple[List[AttrDefSchema], List[AttrDefSchema], List[AttributeDefinition]]:
-    existing_defs = schema.attr_defs
+    existing_defs = {x.id: x for x in schema.attr_defs}
     new, updated = [], []
     fields = iterate_model_fields(AttributeDefinition)
     skipped_fields = ["schema_id", "attribute_id", "name", "type", "bound_schema_id"]
@@ -239,7 +238,9 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
         if not getattr(attr_def, "id", None):
             new.append(attr_def)
             continue
-        existing = next(e for e in existing_defs if e.id == attr_def.id)
+        existing = existing_defs.get(attr_def.id, None)
+        if existing is None:
+            raise AttributeNotDefinedException(attr_id=attr_def.id, schema_id=schema.id)
         if existing.attribute.name != attr_def.name:
             updated.append(attr_def)
         bound_schema_id = attr_def.bound_schema_id if attr_def.bound_schema_id != -1 else existing.bound_schema_id
@@ -253,7 +254,7 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
             continue
 
     submitted_ids = {a.id for a in definitions}
-    deleted = [a for a in existing_defs if a.id not in submitted_ids]
+    deleted = [a for a in existing_defs.values() if a.id not in submitted_ids]
     return new, updated, deleted
 
 
@@ -301,6 +302,7 @@ def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSc
     for attr in updated:
         attr_def = attr_def_names.get(attr.id)
         if attr_def is None:
+            db.rollback()
             raise AttributeNotDefinedException(attr_id=attr.id, schema_id=schema.id)
         _update_attr_in_schema(db=db, attr_upd=attr, attr_def=attr_def)
     db.flush()
@@ -546,8 +548,9 @@ def _convert_values(attr_def: AttributeDefinition, value: Any, caster: Callable)
 
 
 def _check_fk_value(db: Session, attr_def: AttributeDefinition, entity_ids: List[int]):
-    entities = {e.id: e for e in db.query(Entity.schema_id).filter(Entity.id.in_(entity_ids),
-                                                                   Entity.deleted == False)}
+    entities = {e.id: e
+                for e in db.query(Entity).filter(Entity.id.in_(entity_ids),
+                                                 Entity.deleted == False)}
     for id_ in entity_ids:
         entity = entities.get(id_, None)
         if entity is None:

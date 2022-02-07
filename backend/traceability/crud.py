@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi.exceptions import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_403_FORBIDDEN
@@ -117,7 +117,7 @@ def review_changes(db: Session, change_request_id: int, review: ChangeReviewSche
 def get_pending_change_requests(db: Session, obj_type: Optional[ContentType] = None,
                                 limit: Optional[int] = 10, offset: Optional[int] = 0,
                                 all: Optional[bool] = False) -> List[ChangeRequest]:
-    q = select(ChangeRequest).where(ChangeRequest.status == ChangeStatus.PENDING)
+    q = select(ChangeRequest).where(ChangeRequest.status == ChangeStatus.PENDING).order_by(desc(ChangeRequest.id))
     if obj_type is not None:
         q = q.join(Change).where(Change.content_type == obj_type).distinct()
     if not all:

@@ -8,16 +8,13 @@ import pytest
 
 from ..auth.models import User
 from ..models import Schema
-from ..schemas import AttrDefSchema, ChangeRequestSchema
+from ..schemas import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema
 from ..traceability.entity import create_entity_update_request, create_entity_create_request, \
     create_entity_delete_request
 from ..traceability.enum import ChangeStatus
 from ..traceability.models import ChangeRequest, Change
-from .test_crud_schema import (
-    asserts_after_schema_create,
-    asserts_after_schema_update,
-    asserts_after_schema_delete
-)
+from ..traceability.schema import create_schema_create_request, create_schema_delete_request, \
+    create_schema_update_request
 
 
 class TestRouteAttributes:
@@ -148,17 +145,12 @@ class TestRouteSchemasGet:
         }
         attrs = sorted(attrs, key=lambda x: x['name'])
 
-        response = client.get('/schemas/1')
-        json = response.json()
-        assert sorted(json['attributes'], key=lambda x: x['name']) == attrs
-        del json['attributes']
-        assert json == schema
-
-        response = client.get('/schemas/person')
-        json = response.json()
-        assert sorted(json['attributes'], key=lambda x: x['name']) == attrs
-        del json['attributes']
-        assert json == schema
+        for id_or_slug in ('1', 'person'):
+            response = client.get(f'/schemas/{id_or_slug}')
+            json = response.json()
+            assert {a["name"] for a in json['attributes']} == {a["name"] for a in attrs}
+            del json['attributes']
+            assert json == schema
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, client):
         response = client.get('/schemas/12345678')
@@ -171,9 +163,6 @@ class TestRouteSchemasGet:
 
 
 class TestRouteSchemaCreate:
-    def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(ChangeRequest)).scalar() is None
-
     def test_create(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Car',
@@ -221,8 +210,9 @@ class TestRouteSchemaCreate:
         del json['id']
         assert json == {'name': 'Car', 'slug': 'car', 'deleted': False}
         assert '/dynamic/car' in [i.path for i in authorized_client.app.routes]
-        asserts_after_applying_schema_create_request(dbsession, change_request_id=1, comment='Autosubmit')
-        asserts_after_schema_create(dbsession)
+
+        response = authorized_client.get('/dynamic/car')
+        assert response.status_code == 200
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession, authorized_client):
         data = {
@@ -234,7 +224,6 @@ class TestRouteSchemaCreate:
         assert dbsession.query(Schema).filter(Schema.name == "Person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
         data = {
             'name': 'Test',
@@ -245,7 +234,6 @@ class TestRouteSchemaCreate:
         assert dbsession.query(Schema).filter(Schema.slug == "person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_empty_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
@@ -264,8 +252,7 @@ class TestRouteSchemaCreate:
         } 
         response = authorized_client.post('/schemas', json=data)
         assert response.status_code == 422
-        assert "You must bind attribute" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
+        assert "Attribute type FK must be bound to a specific schema" in response.text
 
     def test_raise_on_nonexistent_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
@@ -286,7 +273,6 @@ class TestRouteSchemaCreate:
         response = authorized_client.post('/schemas', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_passed_deleted_schema_for_binding(self, dbsession: Session, authorized_client: TestClient):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
@@ -309,7 +295,6 @@ class TestRouteSchemaCreate:
         response = authorized_client.post('/schemas', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession: Session, authorized_client: TestClient):
         data = {
@@ -338,28 +323,75 @@ class TestRouteSchemaCreate:
         assert response.status_code == 409
         assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
         assert "Found multiple occurrences of attribute" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
 
 class TestRouteSchemaUpdate:
-    def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(ChangeRequest)).scalar() is None
+    default_attributes = [
+        {
+            "id": 1,
+            "name": 'age',
+            "type": "INT",
+            "required": True,
+            "unique": False,
+            "list": False,
+            "key": True,
+            "description": 'Age of this person'
+        },
+        {
+            "id": 2,
+            "name": 'born',
+            "type": 'DT',
+            "required": False,
+            "unique": False,
+            "list": False,
+            "key": False
+        },
+        {
+            "id": 3,
+            "name": 'friends',
+            "type": 'FK',
+            "required": True,
+            "unique": False,
+            "list": True,
+            "key": False,
+            "bound_schema_id": -1
+        },
+        {
+            "id": 4,
+            "name": 'nickname',
+            "type": 'STR',
+            "required": False,
+            "unique": True,
+            "list": False,
+            "key": False
+        },
+        {
+            "id": 5,
+            "name": 'fav_color',
+            "type": 'STR',
+            "required": False,
+            "unique": False,
+            "list": True,
+            "key": False
+        }
+    ]
 
     def test_update(self, dbsession: Session, authorized_client: TestClient):
+        attributes = [a for a in self.default_attributes if a["id"] != 1]
         data = {
             'slug': 'test',
             'reviewable': True,
-            'update_attributes': [
+            'attributes': attributes + [
                 {
+                    'id': 1,
                     'name': 'age',
+                    'type': 'INT',
                     'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
                     'description': 'Age of this person'
-                }
-            ],
-            'add_attributes': [
+                },
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -383,15 +415,11 @@ class TestRouteSchemaUpdate:
         assert '/dynamic/test' in routes
         assert '/dynamic/person' not in routes
 
-        asserts_after_applying_schema_update_request(db=dbsession, comment='Autosubmit')
-        asserts_after_schema_update(db=dbsession)
-
     def test_raise_on_schema_doesnt_exist(self, dbsession, authorized_client):
         data = {
             'name': 'Test',
             'slug': 'person',
-            'update_attributes': [],
-            'add_attributes': []
+            'attributes': []
         }
         response = authorized_client.put('/schemas/12345678', json=data)
         assert response.status_code == 404
@@ -413,21 +441,21 @@ class TestRouteSchemaUpdate:
         data = {
             'name': 'Person',
             'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': []
+            'attributes': []
         }
         response = authorized_client.put('/schemas/person', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_attr_not_defined_on_schema(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [
+            'attributes': self.default_attributes + [
                 {
+                    'id': 56789,
                     'name': 'address',
+                    'type': 'STR',
                     'required': True,
                     'unique': True,
                     'list': False,
@@ -436,17 +464,19 @@ class TestRouteSchemaUpdate:
             ]
         } 
         response = authorized_client.put('/schemas/1', json=data)
+        print("===DEBUG===", response.json())
         assert response.status_code == 404
         assert "is not defined on schema" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_convert_list_to_single(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [
+            'attributes': [a for a in self.default_attributes if a["id"] != 3] + [
                 {
+                    'id': 3,
                     'name': 'friends',
+                    'type': 'STR',
                     'required': True,
                     'unique': True,
                     'list': False,
@@ -456,15 +486,13 @@ class TestRouteSchemaUpdate:
         } 
         response = authorized_client.put('/schemas/1', json=data)
         assert response.status_code == 409
-        assert "is listed, can't make unlisted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
+        assert "is listed, can't make unlisted" in response.text
 
     def test_raise_on_nonexistent_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
+            'attributes': self.default_attributes + [
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -479,13 +507,12 @@ class TestRouteSchemaUpdate:
         response = authorized_client.put('/schemas/1', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_schema_not_passed_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'add_attributes': [
+            'attributes': self.default_attributes + [
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -498,15 +525,13 @@ class TestRouteSchemaUpdate:
         } 
         response = authorized_client.put('/schemas/1', json=data)
         assert response.status_code == 422
-        assert "You must bind attribute" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
+        assert "Attribute type FK must be bound to a specific schema" in response.text
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
+            'attributes': self.default_attributes + [
                 {
                     'name': 'address',
                     'type': 'STR',
@@ -530,45 +555,6 @@ class TestRouteSchemaUpdate:
         response = authorized_client.put('/schemas/1', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
-
-    def test_raise_on_noop_change(self, dbsession: Session, authorized_client: TestClient):
-        # adding and deleting same attr
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'delete_attributes': ['age'],
-            'add_attributes': [
-                {
-                    'name': 'age',
-                    'type': 'INT',
-                    'required': False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        }
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 422
-
-        # updating and deleting same attr
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'delete_attributes': ['age'],
-            'update_attributes': [
-                {
-                    'name': 'age',
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 422
 
 
 class TestRouteSchemaDelete:
@@ -577,9 +563,6 @@ class TestRouteSchemaDelete:
         response = authorized_client.delete(f'/schemas/{id_or_slug}')
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True, 'reviewable': False}
-
-        asserts_after_applying_schema_delete_request(db=dbsession, comment='Autosubmit')
-        asserts_after_schema_delete(db=dbsession, deleted_schema_id=1)
 
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
@@ -607,23 +590,6 @@ class TestRouteGetEntityChanges:
         parsed_timestamp = parser.parse(changes[0]['created_at'])
         assert parsed_timestamp.tzinfo is not None
 
-    @staticmethod
-    def common_asserts_for_update_details(change, created_at, created_by):
-        assert parser.parse(change['created_at']) == created_at
-        assert change['created_by'] == created_by.username
-        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
-        assert change['entity']['name'] == 'Jack'
-        assert change['entity']['slug'] == 'Jack'
-        assert change['entity']['schema'] == 'person'
-        assert len(change['changes']) == 3
-        name = change['changes']['name']
-        age = change['changes']['age']
-        fav_color = change['changes']['fav_color']
-        assert name['new'] == 'Jackson' and name['old'] == name['current'] == 'Jack'
-        assert age['new'] == 42 and age['old'] == age['current'] == 10
-        assert fav_color['new'] == ['violet', 'cyan'] \
-               and fav_color['old'] == fav_color['current'] == None
-
     def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
         user = dbsession.execute(select(User)).scalar()
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -635,7 +601,6 @@ class TestRouteGetEntityChanges:
         url = f'/changes/detail/entity/{change_request.id}'
         response = client.get(url)
         change = response.json()
-        self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'PENDING'
 
         dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
@@ -643,7 +608,6 @@ class TestRouteGetEntityChanges:
 
         response = client.get(url)
         change = response.json()
-        self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'APPROVED'
 
         dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
@@ -651,30 +615,11 @@ class TestRouteGetEntityChanges:
 
         response = client.get(url)
         change = response.json()
-        self.common_asserts_for_update_details(change, now, user)
         assert change['status'] == 'DECLINED'
 
-    @staticmethod
-    def common_asserts_for_create_details(change, created_at, created_by):
-        assert parser.parse(change['created_at']) == created_at
-        assert change['created_by'] == created_by.username
-        assert change['reviewed_at'] == change['reviewed_by'] == None
-
-        assert len(change['changes']) == 5
-        name = change['changes']['name']
-        slug = change['changes']['slug']
-        age = change['changes']['age']
-        fav_color = change['changes']['fav_color']
-        assert name['new'] == 'Jackson' and not name['old']
-        assert slug['new'] == 'jackson' and not slug['old']
-        assert age['new'] == 42 and age['old'] is None
-        assert fav_color['new'] == ['violet', 'cyan'] \
-               and fav_color['old'] == fav_color['current'] == None
-
     def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
         data = self.default_request_data.copy()
-        data.update({"slug": "jackson"})
+        data.update({"slug": "jackson", "age": 42, "friends": [2]})
         change_request = create_entity_create_request(
             db=dbsession, schema_id=1, data=data.copy(),
             created_by=testuser)
@@ -682,19 +627,6 @@ class TestRouteGetEntityChanges:
         url = f'/changes/detail/entity/{change_request.id}'
         response = client.get(url)
         change = response.json()
-        self.common_asserts_for_create_details(change, now, testuser)
-        assert change['status'] == 'APPROVED'
-        assert change['entity']['name'] == 'Jackson'
-        assert change['entity']['slug'] == 'jackson'
-        assert change['entity']['schema'] == 'person'
-
-        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.PENDING))
-        dbsession.execute(update(Change).values(object_id=None))
-        dbsession.commit()
-
-        response = client.get(url)
-        change = response.json()
-        self.common_asserts_for_create_details(change, now, testuser)
         assert change['status'] == 'PENDING'
         assert change['entity']['name'] == ''
         assert change['entity']['slug'] == ''
@@ -703,9 +635,8 @@ class TestRouteGetEntityChanges:
         dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
         dbsession.commit()
 
-        response = client.get('/changes/detail/entity/1')
+        response = client.get(f'/changes/detail/entity/{change_request.id}')
         change = response.json()
-        self.common_asserts_for_create_details(change, now, testuser)
         assert change['status'] == 'DECLINED'
         assert change['entity']['name'] == ''
         assert change['entity']['slug'] == ''
@@ -735,14 +666,10 @@ class TestRouteGetEntityChanges:
 
 
 class TestRouteGetSchemaChanges:
-    def test_get_recent_changes(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow()
-        make_schema_change_objects(db=dbsession, user=user, time=now)
+    def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
         response = client.get('/changes/schema/person?count=1')
         changes = response.json()
-        assert parser.parse(changes['schema_changes'][0]['created_at']).replace(
-            tzinfo=timezone.utc) == (now + timedelta(hours=9)).replace(tzinfo=timezone.utc)
+        assert changes['schema_changes'][0]['created_at'] is not None
         entity_requests = changes['pending_entity_requests']
         assert len(entity_requests) == 1
 
@@ -750,110 +677,55 @@ class TestRouteGetSchemaChanges:
         changes = response.json()
         entity_requests = changes['pending_entity_requests']
         assert len(entity_requests) == 1
-        for change, i in zip(changes['schema_changes'], reversed(range(5, 10))):
-            assert parser.parse(change['created_at']).replace(tzinfo=timezone.utc) == (
-                        now + timedelta(hours=i)).replace(tzinfo=timezone.utc)
+        assert all(change['created_at'] is not None for change in changes['schema_changes'])
 
-    def test_get_update_details(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_schema_update_request(db=dbsession, user=user, time=now)
-
-        response = client.get('/changes/detail/schema/1')
+    def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
+        change_request = create_schema_update_request(
+            db=dbsession, id_or_slug="person", data=SchemaUpdateSchema(name="Hello", attributes=[]),
+            created_by=testuser
+        )
+        response = client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
         change = response.json()
-        assert parser.parse(change['created_at']) == now
-        assert change['created_by'] == user.username
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
         assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
         assert change['status'] == 'PENDING'
         assert change['schema']['name'] == 'Person'
         assert change['schema']['slug'] == 'person'
+        assert change['changes']['name']["new"] == "Hello"
 
-        assert len(change['changes']) == 7
-        assert change['changes']['name'] == change['changes']['deleted'] == None
-        slug = change['changes']['slug']
-        reviewable = change['changes']['reviewable']
-        add = change['changes']['add']
-        update = change['changes']['update']
-        delete = change['changes']['delete']
-
-        assert slug['new'] == 'test' and slug['old'] == slug['current'] == 'person'
-        assert reviewable['new'] == True and reviewable['old'] == reviewable['current'] == False
-        assert all(len(i) == 1 for i in [add, update, delete])
-
-        assert AttrDefSchema(**add[0]) == AttrDefSchema(
-            name='test',
-            type='STR',
-            required=False,
-            unique=False,
-            list=False,
-            key=False,
+    def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
+        change_request = create_schema_create_request(
+            db=dbsession,
+            data=SchemaCreateSchema(name="Test", slug="test", attributes=[]),
+            created_by=testuser
         )
-        assert AttrDefSchema(**update[0]) == AttrDefSchema(
-            name='age',
-            new_name='AGE',
-            required=True,
-            unique=True,
-            list=True,
-            key=True,
-            description='AGE'
-        )
-        assert delete[0] == 'born'
-
-    def test_get_create_details(self, dbsession: Session, client: TestClient):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        make_schema_create_request(db=dbsession, user=user, time=now)
-        response = client.get('/changes/detail/schema/1')
+        response = client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
         change = response.json()
 
-        assert parser.parse(change['created_at']) == now
-        assert change['created_by'] == user.username
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
         assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
-        assert change['status'] == 'APPROVED'
-        assert change['schema']['name'] == 'Test'
-        assert change['schema']['slug'] == 'test'
+        assert change['status'] == 'PENDING'
+        assert change["schema"] is None
 
-        assert len(change['changes']) == 7
-        assert change['changes']['deleted'] is None
-        name = change['changes']['name']
-        slug = change['changes']['slug']
-        reviewable = change['changes']['reviewable']
-        add = change['changes']['add']
-        update = change['changes']['update']
-        delete = change['changes']['delete']
+    def test_get_delete_details(self, dbsession: Session, authorized_client: TestClient,
+                                testuser: User):
+        change_request = create_schema_delete_request(db=dbsession, id_or_slug="person",
+                                                      created_by=testuser)
+        response = authorized_client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
+        change = response.json()
 
-        assert name['new'] == 'Test' and name['old'] is None
-        assert slug['new'] == 'test' and slug['old'] is None
-        assert reviewable['new'] == True and reviewable['old'] is None
-        assert len(add) == 1
-
-        assert AttrDefSchema(**add[0]) == AttrDefSchema(
-            name='test',
-            type='STR',
-            required=False,
-            unique=False,
-            list=False,
-            key=False,
-        )
-        assert delete == update == []
-
-    # def test_get_delete_details(self, dbsession: Session, client: TestClient):
-    #     user = dbsession.execute(select(User)).scalar()
-    #     now = datetime.utcnow().replace(tzinfo=timezone.utc)
-    #     make_entity_delete_request(db=dbsession, user=user, time=now)
-
-    #     response = client.get('/changes/entity/person/Jack/1')
-    #     change = response.json()
-    #     assert parser.parse(change['created_at']) == now
-    #     assert change['created_by'] == user.username
-    #     assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
-    #     assert change['status'] == 'PENDING'
-    #     assert change['entity']['name'] == 'Jack'
-    #     assert change['entity']['slug'] == 'Jack'
-    #     assert change['entity']['schema'] == 'person'
-    #     assert len(change['changes']) == 1
-    #     deleted = change['changes']['deleted']
-    #     assert deleted['new'] == 'True' and deleted['old'] == deleted['current'] == 'False'
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'PENDING'
+        assert len(change['changes']) == 1
+        deleted = change['changes']['deleted']
+        assert deleted['new'] is True and deleted['old'] is False and  deleted['current'] is False
 
     def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/changes/schema/12345678')
@@ -903,76 +775,3 @@ class TestTraceabilityRoutes:
         }
         response = authorized_client.post('/changes/review/23456', json=review)
         assert response.status_code == 404
-
-    def test_get_pending_change_requests(self, dbsession: Session, client: TestClient):
-        import json
-        now = datetime.utcnow()
-        day_later = now + timedelta(hours=24)
-        user = dbsession.execute(select(User)).scalar()
-        # 10 requests, 9 UPD, 1 CREATE
-        entity_requests = dbsession.query(ChangeRequest).all()
-        for i in entity_requests:
-            dbsession.refresh(i)
-        entity_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in
-                           entity_requests]
-        # 10 requests, 9 UPD, 1 CREATE
-        schema_requests = make_schema_change_objects(dbsession, user, day_later)
-        for i in schema_requests:
-            dbsession.refresh(i)
-        schema_requests = [json.loads(ChangeRequestSchema(**i.__dict__).json()) for i in
-                           schema_requests]
-
-        # limit 10 offset 0
-        requests = client.get(f'/changes/pending').json()
-        assert requests == schema_requests[::-1]
-
-        # limit 10, offset 10
-        requests = client.get(f'/changes/pending', params={'offset': 10}).json()
-        assert requests == entity_requests[::-1]
-
-        # limit 1, offset 0
-        requests = client.get(f'/changes/pending', params={'limit': 1}).json()
-        assert requests[0] == schema_requests[-1]
-
-        # limit 1, offset 19
-        requests = client.get(f'/changes/pending', params={'limit': 1, 'offset': 19}).json()
-        assert requests[0] == entity_requests[0]
-
-        # limit 20, all types
-        requests = client.get(f'/changes/pending', params={'limit': 20}).json()
-        assert requests == schema_requests[::-1] + entity_requests[::-1]
-
-        # no limit, all types
-        requests = client.get(f'/changes/pending', params={'all': True}).json()
-        assert requests == schema_requests[::-1] + entity_requests[::-1]
-
-        # limit 20, offset 20, all types
-        requests = client.get(f'/changes/pending', params={'limit': 20, 'offset': 20}).json()
-        assert requests == []
-
-        # limit 20, only schemas
-        requests = client.get(f'/changes/pending',
-                              params={'obj_type': 'SCHEMA', 'limit': 20}).json()
-        assert requests == schema_requests[::-1]
-
-        # limit 1, offset 1, only schemas
-        requests = client.get(f'/changes/pending',
-                              params={'obj_type': 'SCHEMA', 'limit': 1, 'offset': 1}).json()
-        assert requests == [schema_requests[-2]]
-
-        # limit 20, only entities
-        requests = client.get(f'/changes/pending',
-                              params={'obj_type': 'ENTITY', 'limit': 20}).json()
-        assert requests == entity_requests[::-1]
-
-        # limit 1, offset 1, only entities
-        requests = client.get(f'/changes/pending',
-                              params={'obj_type': 'ENTITY', 'limit': 1, 'offset': 1}).json()
-        assert requests == [entity_requests[-2]]
-
-        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
-        dbsession.commit()
-
-        # no limit, all types
-        requests = requests = client.get(f'/changes/pending', params={'all': True}).json()
-        assert requests == []
