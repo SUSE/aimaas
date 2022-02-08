@@ -1,15 +1,11 @@
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from sqlalchemy import select, update
-from sqlalchemy.exc import PendingRollbackError
+from sqlalchemy import update
 
-from ..crud import create_schema
 from ..models import *
 from ..dynamic_routes import *
 from .. import load_schemas
-from ..schemas.schema import SchemaCreateSchema
-from ..traceability.models import ChangeRequest, Change
 from .test_crud_entity import (
     asserts_after_entities_create,
     asserts_after_entities_update,
@@ -41,15 +37,6 @@ class TestRouteBasics:
 
 
 class TestRouteCreateEntity:
-    def assert_no_change_requests_appeared(self, db: Session):
-        try:
-            assert db.execute(select(ChangeRequest)).scalar() is None
-            assert db.execute(select(Change)).scalar() is None
-        except PendingRollbackError:
-            db.rollback()
-            db.begin()
-            self.assert_no_change_requests_appeared(db=db)
-
     def test_create_without_review(self, dbsession, authorized_client):
         p1 = {
             'name': 'Mike',
@@ -59,11 +46,10 @@ class TestRouteCreateEntity:
             'friends': [],
         }
         response = authorized_client.post(f'/dynamic/person', json=p1)
+        assert response.status_code == 200
         json = response.json()
         mike_id = json.pop('id')
         assert json == {'slug': 'Mike', 'name': 'Mike', 'deleted': False}
-
-        asserts_after_applying_entity_create_request(dbsession, change_request_id=1)
 
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
         tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
@@ -76,11 +62,10 @@ class TestRouteCreateEntity:
             'born': str(born),
         }
         response = authorized_client.post(f'/dynamic/person', json=p2)
+        assert response.status_code == 200
         json = response.json()
         john_id = json.pop('id')
         assert json == {'slug': 'John', 'name': 'John', 'deleted': False}
-
-        asserts_after_applying_entity_create_request(dbsession, change_request_id=2)
 
         p3 = {
             'name': 'Pumpkin Jack',
@@ -91,12 +76,12 @@ class TestRouteCreateEntity:
             'born': str(tz_born)
         }
         response = authorized_client.post(f'/dynamic/person', json=p3)
+        assert response.status_code == 200
         json = response.json()
         del json['id']
         assert json == {'slug': 'pumpkin-jack', 'name': 'Pumpkin Jack', 'deleted': False}
 
         asserts_after_entities_create(dbsession)
-        asserts_after_applying_entity_create_request(dbsession, change_request_id=3)
 
     def test_raise_on_non_unique_slug(self, dbsession, authorized_client):
         p1 = {
@@ -109,15 +94,12 @@ class TestRouteCreateEntity:
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 409
         assert 'already exists in this schema' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_no_raise_on_same_slug_in_different_schemas(self, dbsession, authorized_client):
         data = {'slug': 'Jack', 'name': 'name'}
         response = authorized_client.post(f'/dynamic/unperson', json=data)
         assert response.status_code == 200
 
-        changes = dbsession.execute(select(ChangeRequest)).scalars().all()
-        assert len(changes) == 1
         entity = dbsession.execute(select(Entity).where(Entity.schema_id == 2)).scalar()
         assert entity.slug == 'Jack' and entity.name == 'name'
 
@@ -132,7 +114,6 @@ class TestRouteCreateEntity:
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 409
         assert 'Got non-unique value for field' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_no_raise_on_non_unique_value_if_it_is_deleted(self, dbsession, authorized_client):
         jacks = dbsession.execute(select(ValueStr).where(ValueStr.value == 'jack')).scalars().all()
@@ -143,15 +124,13 @@ class TestRouteCreateEntity:
         p1 = {
             'name': 'name',
             'slug': 'Jackie',
-            'nickname': 'jack', # <-- already exists in db, but for deleted entity
+            'nickname': 'jack',  # <-- already exists in db, but for deleted entity
             'age': 10,
             'friends': []
         }
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 200
 
-        changes = dbsession.execute(select(Change)).scalars().all()
-        assert len(changes) == 8  # name, slug, schema_id + 5 fields defined on schema
         entity = dbsession.execute(select(Entity).where(Entity.slug == 'Jackie')).scalar()
         assert entity is not None
 
@@ -166,7 +145,6 @@ class TestRouteCreateEntity:
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_fk_entity_is_deleted(self, dbsession, authorized_client):
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
@@ -181,7 +159,6 @@ class TestRouteCreateEntity:
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_fk_entity_from_wrong_schema(self, dbsession, authorized_client):
         schema = Schema(name='Test', slug='test')
@@ -199,7 +176,6 @@ class TestRouteCreateEntity:
         response = authorized_client.post(f'/dynamic/person', json=p1)
         assert response.status_code == 422
         assert 'got instead entity' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
 
 class TestRouteGetEntity:
@@ -217,11 +193,11 @@ class TestRouteGetEntity:
         }
         response = client.get('/dynamic/person/1')
         assert response.status_code == 200
-        assert  response.json() == data
+        assert response.json() == data
 
         response = client.get(f'/dynamic/person/Jack')
         assert response.status_code == 200
-        assert  response.json() == data
+        assert response.json() == data
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, client):
         response = client.get('/dynamic/person/99999999')
@@ -288,7 +264,7 @@ class TestRouteGetEntities:
         assert response.json() == data
 
     def test_get_all_fields(self, dbsession, client):
-        data =  {'total': 2, 'entities': [
+        data = {'total': 2, 'entities': [
             {
                 'age': 10,
                 'born': None,
@@ -411,10 +387,6 @@ class TestRouteGetEntities:
 
 
 class TestRouteUpdateEntity:
-    def assert_no_change_requests_appeared(self, db: Session):
-        assert db.execute(select(ChangeRequest)).scalar() is None
-        assert db.execute(select(Change)).scalar() is None
-
     def test_update(self, dbsession, authorized_client):
         data = {
             'name': 'test',
@@ -426,7 +398,6 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('dynamic/person/1', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test', 'deleted': False}
-        asserts_after_applying_entity_update_request(dbsession, change_request_id=1)
 
         born_utc = datetime(2021, 10, 20, 10, 52, 17, tzinfo=timezone.utc)
 
@@ -437,19 +408,16 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('/dynamic/person/Jane', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane', 'deleted': False}
-        asserts_after_applying_entity_update_request(dbsession, change_request_id=2)
         asserts_after_entities_update(dbsession, born_time=born_utc)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client):
         response = authorized_client.put('/dynamic/person/99999999999', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
         response = authorized_client.put('/dynamic/person/qwertyuiop', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
         s = Schema(name='test', slug='test')
         e = Entity(slug='test', schema=s, name='test')
@@ -458,7 +426,6 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('/dynamic/person/test', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_schema_is_deleted(self, dbsession, authorized_client):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
@@ -466,14 +433,12 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('/dynamic/person/1', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_entity_already_exists(self, dbsession, authorized_client):
         data = {'slug': 'Jane'}
         response = authorized_client.put('/dynamic/person/1', json=data)
         assert response.status_code == 409
         assert 'already exists in this schema' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_no_raise_on_changing_to_same_slug(self, dbsession, authorized_client):
         data = {'slug': 'Jack'}
@@ -505,7 +470,6 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('/dynamic/person/1', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_fk_entity_is_from_wrong_schema(self, dbsession, authorized_client):
         s = Schema(name='test', slug='test')
@@ -517,14 +481,12 @@ class TestRouteUpdateEntity:
         response = authorized_client.put('/dynamic/person/1', json=data)
         assert response.status_code == 422
         assert "got instead entity" in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_raise_on_non_unique_value(self, dbsession, authorized_client):
         data = {'nickname': 'jane'}
         response = authorized_client.put('/dynamic/person/1', json=data)
         assert response.status_code == 409
         assert 'Got non-unique value' in response.json()['detail']
-        self.assert_no_change_requests_appeared(dbsession)
 
     def test_no_raise_on_non_unique_if_existing_is_deleted(self, dbsession, authorized_client):
         dbsession.execute(update(Entity).where(Entity.slug == 'Jane').values(deleted=True))
@@ -537,17 +499,14 @@ class TestRouteUpdateEntity:
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
 
-        changes = dbsession.execute(select(ChangeRequest)).scalars().all()
-        assert len(changes) == 1
-
 
 class TestRouteDeleteEntity:
     @pytest.mark.parametrize('entity', [1, 'Jack'])
     def test_delete(self, dbsession, authorized_client, entity):
         response = authorized_client.delete(f'/dynamic/person/{entity}')
+        assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'Jack', 'name': 'Jack', 'deleted': True}
 
-        asserts_after_applying_entity_delete_request(db=dbsession, comment='Autosubmit')
         asserts_after_entity_delete(db=dbsession)
 
     @pytest.mark.parametrize('entity', [1234567, 'qwertyu'])
