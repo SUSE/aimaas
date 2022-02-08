@@ -10,7 +10,7 @@
                    return { value: type, text: ATTR_TYPES_NAMES[type] };
                  })"/>
     <SelectInput v-if="attributes[rowIndex].type === 'FK'" label="Bind to schema"
-                 @change="onChange()" v-model="attributes[rowIndex].bind_to_schema"
+                 @change="onChange()" v-model="attributes[rowIndex].bound_schema_id"
                  :options="schemasToBind.map((schema) => {
                    return { value: schema.id, text: schema.name };
                  })"
@@ -105,7 +105,7 @@ export default {
     addAttr() {
       let attr = {
         name: '', type: 'STR', key: false, unique: false, required: false, list: false,
-        bind_to_schema: null, id: null
+        bound_schema_id: null, id: null
       };
       this.attributes.push(attr);
     }

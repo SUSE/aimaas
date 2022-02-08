@@ -11,7 +11,7 @@
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
           <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
-                                  :args="{id: attr.name}" :fk-schema-id="attr.bind_to_schema"
+                                  :args="{id: attr.name}" :fk-schema-id="attr.bound_schema_id"
                                   :select-type="attr.list ? 'many': 'single'"
                                   :required="requiredAttrs.includes(attr.name)"/>
         </template>

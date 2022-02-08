@@ -101,7 +101,7 @@ export default {
       const fkSchemas = {};
       for (const attr of (this.schemaDetails?.attributes || [])) {
         if (attr.type === 'FK') {
-          fkSchemas[attr.name] = this.refSchemaSlug[attr.bind_to_schema];
+          fkSchemas[attr.name] = this.refSchemaSlug[attr.bound_schema_id];
         }
       }
       return fkSchemas;
