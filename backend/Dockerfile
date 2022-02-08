@@ -6,5 +6,4 @@ RUN pip3 install -r /opt/aimaas/requirements.txt; \
 
 WORKDIR /opt
 EXPOSE 8000
-ENV EXPOSED_HOST=localhost
-ENTRYPOINT uvicorn aimaas.main:app --port 8000 --host $EXPOSED_HOST
+ENTRYPOINT ["uvicorn", "aimaas.main:app", "--port", "8000", "--host", "localhost"]
