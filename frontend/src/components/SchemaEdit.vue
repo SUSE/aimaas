@@ -66,10 +66,8 @@ export default {
   methods: {
     getDetails() {
       if (this.schema) {
-        this.$api.getSchema({slugOrId: this.schema.slug}).then(details => {
-          this.details = details;
-          this.attributeDefinitions = _cloneDeep(details.attributes);
-        });
+        this.details = _cloneDeep(this.schema);
+        this.attributeDefinitions = _cloneDeep(this.schema.attributes);
       } else {
         this.details = {name: "", slug: "", attributes: []};
       }

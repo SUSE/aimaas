@@ -6,10 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
 
 from .config import settings
-from .crud import ALLOWED_FILTERS
 from .database import SessionLocal
+from .enum import FilterEnum
 from .dynamic_routes import create_dynamic_router
-from .models import Schema, AttributeDefinition
+from .models import Schema, AttributeDefinition, AttrType
 from .general_routes import router
 
 
@@ -25,12 +25,12 @@ def load_schemas(db: Session) -> List[models.Schema]:
 
 def generate_api_description() -> str:
     description = '# Filters\n\n**Filters list**:'
-    for filter, desc in dynamic_routes.FILTER_DESCRIPTION.items():
-        description += '\n* `{}` - {}'.format(filter, desc)
+    for filter in FilterEnum:
+        description += '\n* `{}` - {}'.format(filter.value.name, filter.value.description)
 
     description += '\n\n**Available filters for each type**:'
-    for type, filters in ALLOWED_FILTERS.items():
-        description += '\n* `{}`: {}'.format(type.name, ', '.join([f'`{i}`' for i in filters]))
+    for atype in AttrType:
+        description += '\n* `{}`: {}'.format(atype.name, ', '.join([f'`{i.value.name}`' for i in atype.value.filters]))
     return description
 
 

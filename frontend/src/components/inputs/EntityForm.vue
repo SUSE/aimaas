@@ -7,7 +7,7 @@
                  :required="true"/>
 
       <h3 class="mt-3">Attributes</h3>
-      <template v-for="attr in schemaDetails.attributes" :key="attr.name">
+      <template v-for="attr in schema?.attributes || []" :key="attr.name">
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
           <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
@@ -88,17 +88,17 @@ export default {
     ReferencedEntitySelect
   },
   props: ["schema", "entity"],
-  inject: ["activeSchema", "updatePendingRequests"],
+  inject: ["updatePendingRequests"],
   emits: ["update"],
   created() {
     this.updateSchemaMeta();
   },
   watch: {
-    async activeSchema() {
+    async schema() {
       await this.updateSchemaMeta();
     },
     async entity() {
-      if (this.entity?.schema_id && this.entity?.schema_id !== this.activeSchema.id) {
+      if (this.entity?.schema_id && this.entity?.schema_id !== this.schema.id) {
         await this.updateSchemaMeta();
       }
       if (this.entity && this.editEntity?.id !== this.entity?.id) {
@@ -112,14 +112,13 @@ export default {
   data() {
     return {
       editEntity: null,
-      schemaDetails: null,
       loading: true,
       TYPE_INPUT_MAP
     };
   },
   computed: {
     requiredAttrs() {
-      return (this.schemaDetails?.attributes || []).filter(a => a.required).map(a => a.name);
+      return (this.schema?.attributes || []).filter(a => a.required).map(a => a.name);
     }
   },
   methods: {
@@ -131,10 +130,10 @@ export default {
       }
     },
     prepEntity() {
-      const listAttrs = this.schemaDetails.attributes.filter(x => x.list);
+      const listAttrs = (this.schema?.attributes || []).filter(x => x.list);
       if (!this.entity) {
         this.editEntity = {name: null, slug: null};
-        for (const attr of this.schemaDetails.attributes) {
+        for (const attr of this.schema?.attributes || []) {
           this.editEntity[attr.name] = null;
         }
       }
@@ -146,7 +145,6 @@ export default {
     },
     async updateSchemaMeta() {
       this.loading = true;
-      this.schemaDetails = await this.$api.getSchema({slugOrId: this.$route.params.schemaSlug});
        if (!this.entity) {
         this.prepEntity();
       }

@@ -13,6 +13,7 @@ from .auth.enum import PermissionType
 from .auth.models import User
 from .config import settings
 from .database import get_db
+from .enum import FilterEnum
 from .models import AttrType, Schema, AttributeDefinition, Entity
 from . import crud, exceptions, schemas
 
@@ -68,7 +69,6 @@ def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
         'deleted': (bool, Field(description='Indicates whether this entity is marked as deleted')),
         'slug': (str, Field(description='Slug for this entity')),
         'name': (str, Field(description='Name of this entity')),
-        'meta': (Optional[schemas.EntityDetailMeta], Field(description='Metadata'))
     }
     model = create_model(
         name,
@@ -88,21 +88,9 @@ def _description_for_get_entity(schema: Schema) -> str:
     return description
 
 
-def _meta_for_get_entity(schema: Schema) -> dict:
-    meta = {'fields': defaultdict(dict)}
-    for attr_def in schema.attr_defs:
-        attr = attr_def.attribute
-        meta['fields'][attr.name]['type'] = attr.type.name
-        meta['fields'][attr.name]['list'] = attr_def.list
-        if attr.type == AttrType.FK:
-            meta['fields'][attr.name]['bound_schema_id'] = attr_def.bound_schema.slug
-    return meta
-
-
 def route_get_entity(router: APIRouter, schema: Schema):
     entity_get_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}Get") 
     description = _description_for_get_entity(schema=schema)
-    metadata = _meta_for_get_entity(schema=schema)
 
     @router.get(
         f'/{schema.slug}/{{id_or_slug}}',
@@ -120,11 +108,9 @@ def route_get_entity(router: APIRouter, schema: Schema):
             }
         }
     )
-    def get_entity(id_or_slug: Union[int, str], meta: bool = Query(False, description='Include metadata'), db: Session = Depends(get_db)):
+    def get_entity(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
         try:
             res = crud.get_entity(db=db, id_or_slug=id_or_slug, schema=schema)
-            if meta:
-                res['meta'] = metadata
             return res
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
@@ -149,19 +135,6 @@ def _description_for_get_entities(schema: Schema) -> str:
     return description
 
 
-FILTER_DESCRIPTION = {
-    'eq': 'equal to',
-    'lt': 'less than',
-    'gt': 'greater than',
-    'le': 'less than or equal to',
-    'ge': 'greater than or equal to',
-    'ne': 'not equal to',
-    'contains': 'contains substring',
-    'regexp': 'matches regular expression',
-    'starts': 'starts with substring',
-}
-
-
 def _filters_request_model(schema: Schema):
     '''Creates a dataclass that will be used to
     capture filters like `<attr_name>.<operator>=<value>`
@@ -169,50 +142,40 @@ def _filters_request_model(schema: Schema):
     '''
     fields = []
 
-    fields.append(('name', Optional[str], Query(None, description=FILTER_DESCRIPTION['eq'])))
-    for filter in crud.ALLOWED_FILTERS[AttrType.STR]:
-        fields.append((f'name_{filter}', Optional[str], Query(None, alias=f'name.{filter}', description=FILTER_DESCRIPTION[filter])))
+    fields.append(('name', Optional[str], Query(None, description=FilterEnum.EQ.value.description)))
+    for filter in AttrType.STR.value.filters:
+        fields.append((f'name_{filter.value.name}', Optional[str],
+                       Query(None, alias=f'name.{filter.value.name}', description=filter.value.description)))
 
     for attr_def in schema.attr_defs:
         attr = attr_def.attribute
-        if attr.type not in crud.ALLOWED_FILTERS:
+        if not attr.type.value.filters:
             continue
 
         type_ = (attr.type  # Attribute.type -> AttrType
             .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
             .value.property.columns[0].type.python_type)  # get python type of value column in Value child
         # default filter {attr.name} which works as {attr.name}.eq, i.e. for equality filtering
-        fields.append((attr.name, Optional[type_], Query(None, alias=attr.name, description=FILTER_DESCRIPTION['eq'])))
-        for filter in crud.ALLOWED_FILTERS[attr.type]:
-            fields.append((f'{attr.name}_{filter}', Optional[type_], Query(None, alias=f'{attr.name}.{filter}', description=FILTER_DESCRIPTION[filter])))
+        fields.append((attr.name, Optional[type_],
+                       Query(None, alias=attr.name, description=FilterEnum.EQ.value.description)))
+        for filter in attr.type.value.filters:
+            fields.append((f'{attr.name}_{filter.value.name}', Optional[type_],
+                           Query(None, alias=f'{attr.name}.{filter.value.name}',
+                                 description=filter.value.description)))
 
-    filter_model = make_dataclass(f"{schema.slug.capitalize().replace('-', '_')}Filters", fields=fields)
+    filter_model = make_dataclass(f"{schema.slug.capitalize().replace('-', '_')}Filters",
+                                  fields=fields)
     return filter_model
 
-
-def _meta_for_get_entities(schema: Schema) -> dict:
-    meta = {'filter_fields': {'fields': defaultdict(dict), 'operators': defaultdict(dict)}}
-    for attr_def in schema.attr_defs:
-        if attr_def.attribute.type == AttrType.FK:
-            continue
-        type_ = (attr_def.attribute.type  # Attribute.type -> AttrType
-            .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
-            .value.property.columns[0].type.python_type)  # get python type of value column in Value child
-        # default filter {attr.name} which works as {attr.name}.eq, i.e. for equality filtering
-        meta['filter_fields']['operators'][type_.__name__] = crud.ALLOWED_FILTERS[attr_def.attribute.type]
-        meta['filter_fields']['fields'][attr_def.attribute.name]['type'] = type_.__name__
-    return meta
 
 def route_get_entities(router: APIRouter, schema: Schema):
     entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
     description = _description_for_get_entities(schema=schema)
     filter_model = _filters_request_model(schema=schema)
-    metadata = _meta_for_get_entities(schema=schema)
     response_model = create_model(
         f'Get{entity_schema.__name__}', 
         total=(int, Field(description='Total number of entities satisfying conditions')),
-        entities=(List[entity_schema], Field(description='List of returned entities')),
-        meta=(Optional[schemas.EntityListMeta], Field(description='Metadata'))
+        entities=(List[entity_schema], Field(description='List of returned entities'))
     )
     @router.get(
         f'/{schema.slug}',
@@ -228,7 +191,6 @@ def route_get_entities(router: APIRouter, schema: Schema):
         all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
         deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
         all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'),
-        meta: bool = Query(False, description='Include metadata'),
         filters: filter_model = Depends(),
         order_by: str = Query('name', description='Ordering field'),
         ascending: bool = Query(True, description='Direction of ordering'),
@@ -242,7 +204,7 @@ def route_get_entities(router: APIRouter, schema: Schema):
             filter = split[-1] if len(split) > 1 else 'eq'
             new_filters[f'{attr}.{filter}'] = v
         try:
-            entities = crud.get_entities(
+            return crud.get_entities(
                 db=db, 
                 schema=schema,
                 limit=limit,
@@ -254,10 +216,6 @@ def route_get_entities(router: APIRouter, schema: Schema):
                 order_by=order_by,
                 ascending=ascending
             )
-            if meta:
-                entities = entities.dict()
-                entities['meta'] = metadata
-            return entities
         # these two exceptions are not supposed to be ever raised
         except exceptions.InvalidFilterAttributeException as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))

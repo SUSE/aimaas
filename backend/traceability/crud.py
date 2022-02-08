@@ -44,8 +44,8 @@ def is_user_authorized_to_review(db: Session, user: User, request_id: int) -> No
             schema_id = db\
                 .query(ChangeValueInt.new_value)\
                 .join(Change, ChangeValueInt.id == Change.value_id)\
-                .filter(Change.change_request_id == request.id)\
-                .one()
+                .filter(Change.change_request_id == request.id, Change.field_name == "schema_id")\
+                .scalar()
         except NoResultFound:
             schema_id = None
         req_perm.target = Model(id=schema_id)

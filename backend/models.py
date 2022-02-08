@@ -7,10 +7,11 @@ from sqlalchemy import (
     Integer, String, Float)
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
-from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
+from sqlalchemy.sql.schema import UniqueConstraint
 
 from .base_models import Value, Mapping
 from .database import Base
+from .enum import FilterEnum
 from .utils import make_aware_datetime
 
 
@@ -49,13 +50,19 @@ class ValueDate(Value):
 
 
 class AttrType(enum.Enum):
-    STR = Mapping(ValueStr, str)
-    BOOL = Mapping(ValueBool, bool)
-    INT = Mapping(ValueInt, int)
-    FLOAT = Mapping(ValueFloat, float)
+    STR = Mapping(ValueStr, str, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT, FilterEnum.LE,
+                                  FilterEnum.GE, FilterEnum.NE, FilterEnum.CONTAINS,
+                                  FilterEnum.REGEXP, FilterEnum.STARTS])
+    BOOL = Mapping(ValueBool, bool, [FilterEnum.EQ, FilterEnum.NE])
+    INT = Mapping(ValueInt, int, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT, FilterEnum.LE,
+                                  FilterEnum.GE, FilterEnum.NE])
+    FLOAT = Mapping(ValueFloat, float, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT, FilterEnum.LE,
+                                        FilterEnum.GE, FilterEnum.NE])
     FK = Mapping(ValueForeignKey, int)
-    DT = Mapping(ValueDatetime, make_aware_datetime)
-    DATE = Mapping(ValueDate, lambda x: x)
+    DT = Mapping(ValueDatetime, make_aware_datetime, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT,
+                                                      FilterEnum.LE, FilterEnum.GE, FilterEnum.NE])
+    DATE = Mapping(ValueDate, lambda x: x, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT,
+                                            FilterEnum.LE, FilterEnum.GE, FilterEnum.NE])
 
 
 class Schema(Base):

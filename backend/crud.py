@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
 
+from .enum import FilterEnum
 from .models import (
     AttrType,
     Attribute,
@@ -381,66 +382,50 @@ def _get_attr_values_batch(db: Session, entities: List[Entity], attrs_to_include
     return results
 
 
-FILTER_MAP = {
-    'eq': '__eq__',
-    'lt': '__lt__',
-    'gt': '__gt__',
-    'le': '__le__',
-    'ge': '__ge__',
-    'ne': '__ne__',
-    'contains': 'contains',
-    'regexp': 'regexp_match',
-    'starts': 'startswith'
-}
-
-ALLOWED_FILTERS = {
-    AttrType.STR: ['eq', 'lt', 'gt', 'le', 'ge', 'ne', 'contains', 'regexp', 'starts'],
-    AttrType.INT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
-    AttrType.FLOAT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
-    AttrType.DT: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
-    AttrType.DATE: ['eq', 'lt', 'gt', 'le', 'ge', 'ne'],
-    AttrType.BOOL: ['eq', 'ne'],
-}
-
-
-def _parse_filters(filters: dict, attrs: List[str]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
-    '''Returns tuple of two `dict`s like `{attr_name: {op1: value, op2: value}}`.
+def _parse_filters(filters: dict, attrs: List[str]) \
+        -> Tuple[Dict[str, Dict[FilterEnum, Any]], Dict[FilterEnum, Any]]:
+    '''
+    Returns tuple of two `dict`s like `{attr_name: {op1: value, op2: value}}`.
     First `dict` is for attribute filters, second is for `Entity.name` filters
     '''
+    filter_map = {f.value.name: f for f in FilterEnum}
     attrs_filters = defaultdict(dict)
     name_filters = {}
     for f, v in filters.items():
         split = f.rsplit('.', maxsplit=1)
         attr = split[0]
-        filter = 'eq' if len(split) == 1 else split[-1]
+        filter = FilterEnum.EQ if len(split) == 1 else filter_map.get(split[-1], None)
+        if attr != "name" and attr not in attrs:
+            raise InvalidFilterAttributeException(attr=attr, allowed_attrs=attrs)
+        if not filter:
+            raise InvalidFilterOperatorException(attr=attr, filter=split[-1])
+
         if attr == 'name':
             name_filters[filter] = v
             continue
-        elif attr not in attrs:
-            raise InvalidFilterAttributeException(attr=attr, allowed_attrs=attrs)
-        elif filter not in FILTER_MAP:
-            raise InvalidFilterOperatorException(attr=attr, filter=filter)
-        attrs_filters[attr][FILTER_MAP[filter]] = v
-    
-    name_filters = {k: v for k,v in name_filters.items() if k in FILTER_MAP and k in ALLOWED_FILTERS[AttrType.STR]}
+        attrs_filters[attr][filter] = v
+
     return attrs_filters, name_filters
 
 
-def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False, deleted_only: bool = False) -> CompoundSelect:
-    '''Returns intersection query of several queries with filters
+def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
+                               deleted_only: bool = False) -> CompoundSelect:
+    '''
+    Returns intersection query of several queries with filters
     to get entities that satisfy all conditions from `filters`
     '''
-    
-    attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type in ALLOWED_FILTERS}
-    attrs_filters, name_filters = _parse_filters(filters=filters, attrs=list(attrs))
+    attrs = {i.attribute.name: i.attribute
+             for i in schema.attr_defs if i.attribute.type.value.filters}
+    attrs_filters, name_filters = _parse_filters(filters=filters, attrs=attrs.keys())
     selects = []
 
-    if name_filters: # since `name` is defined in `Entity`, not in `Value` tables, we need to query it separately
+    # since `name` is defined in `Entity`, not in `Value` tables, we need to query it separately
+    if name_filters:
         q = select(Entity).where(Entity.schema_id == schema.id)
         if not all:
             q = q.where(Entity.deleted == deleted_only)
         for f, v in name_filters.items():
-            q = q.where(getattr(Entity.name, FILTER_MAP[f])(v))
+            q = q.where(getattr(Entity.name, f.value.op)(v))
         selects.append(q)
 
     for attr_name, filters in attrs_filters.items():
@@ -450,7 +435,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
         if not all:
             q = q.where(Entity.deleted == deleted_only)
         for filter, value in filters.items():
-            q = q.where(getattr(value_model.value, filter)(value))
+            q = q.where(getattr(value_model.value, filter.value.op)(value))
         q = q.where(value_model.attribute_id == attr.id)
         selects.append(q)
     return intersect(*selects)
@@ -492,7 +477,7 @@ def get_entities(
     except AttributeError:
         pass
     if order_by != 'name':
-        attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type in ALLOWED_FILTERS}
+        attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type.value.filters}
         attr = attrs[order_by]
         value_model = attr.type.value.model
         direction = asc if ascending else desc
@@ -611,7 +596,7 @@ def create_entity(db: Session, schema_id: int, data: dict, commit: bool = True) 
             raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
 
         attr: Attribute = attr_def.attribute
-        model, caster = attr.type.value
+        model, caster, _ = attr.type.value
         values = _convert_values(attr_def=attr_def, value=value, caster=caster)
         if attr.type == AttrType.FK:
             _check_fk_value(db=db, attr_def=attr_def, entity_ids=values)
@@ -651,7 +636,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
             raise AttributeNotDefinedException(attr_id=None, schema_id=schema_id)
         
         attr: Attribute = attr_def.attribute
-        model, caster = attr.type.value
+        model, caster, _ = attr.type.value
         if value is None:
             if attr_def.required:
                 raise RequiredFieldException(field=field)

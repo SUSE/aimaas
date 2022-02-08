@@ -43,6 +43,9 @@
               </div>
             </div>
           </template>
+          <template v-else-if="field in dateFields">
+            {{ formatDT(field, e[field]) }}
+          </template>
           <template v-else>
             {{ e[field] }}
           </template>
@@ -73,14 +76,18 @@ export default {
   inject: ["availableSchemas"],
   components: {RefEntity, RefEntityList},
   emits: ['reorder', 'select'],
+  async created() {
+    this.datetimeFormat = new Intl.DateTimeFormat(
+        navigator.language,
+        {dateStyle: "medium", timeStyle: "short"}
+    );
+    this.dateFormat = new Intl.DateTimeFormat(navigator.language, {dateStyle: "medium"});
+  },
   async updated() {
     if (this.previousSchema !== this.schema) {
       this.previousSchema = this.schema;
       this.ascending = true;
       this.orderBy = 'name';
-      if (this.schema) {
-        this.schemaDetails = await this.$api.getSchema({slugOrId: this.schema.slug});
-      }
     }
   },
   computed: {
@@ -99,7 +106,7 @@ export default {
     },
     fkFields() {
       const fkSchemas = {};
-      for (const attr of (this.schemaDetails?.attributes || [])) {
+      for (const attr of (this.schema?.attributes || [])) {
         if (attr.type === 'FK') {
           fkSchemas[attr.name] = this.refSchemaSlug[attr.bound_schema_id];
         }
@@ -107,7 +114,14 @@ export default {
       return fkSchemas;
     },
     listFields() {
-      return (this.schemaDetails?.attributes || []).filter(a => a.list).map(a => a.name);
+      return (this.schema?.attributes || []).filter(a => a.list).map(a => a.name);
+    },
+    dateFields() {
+      const fields = {};
+      for (let a of (this.schema?.attributes || []).filter(a => ['DATE', 'DT'].includes(a.type))) {
+        fields[a.name] = a.type;
+      }
+      return fields;
     },
     inputType() {
       if (this.selectType === "many") {
@@ -133,8 +147,7 @@ export default {
     return {
       orderBy: 'name',
       ascending: true,
-      previousSchema: null,
-      schemaDetails: null
+      previousSchema: null
     };
   }
   ,
@@ -149,8 +162,7 @@ export default {
         s.push(parseInt(e.value));
       }
       return s;
-    }
-    ,
+    },
     orderByField(field) {
       if (this.listFields.includes(field) || field in this.fkFields) {
         return;
@@ -162,10 +174,18 @@ export default {
         this.ascending = true;
       }
       this.$emit('reorder', {orderBy: this.orderBy, ascending: this.ascending})
+    },
+    formatDT(field, value) {
+      if (!value) {
+        return null;
+      }
+      const dvalue = new Date(value);
+      if (this.dateFields[field] === "DATE") {
+        return this.dateFormat.format(dvalue);
+      }
+      return this.datetimeFormat.format(dvalue);
     }
-    ,
-  }
-  ,
+  },
 }
 ;
 </script>

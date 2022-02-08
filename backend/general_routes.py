@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from .config import settings, VERSION
 from . import crud, schemas, exceptions, auth
 from .database import get_db
-from .models import Schema
+from .enum import FilterEnum
+from .models import Schema, AttrType
 from .dynamic_routes import create_dynamic_router
 from .auth import authenticated_user, authorized_user, crud as auth_crud
 from .auth.enum import PermissionType, RecipientType, PermissionTargetType
@@ -20,9 +21,7 @@ from .schemas.auth import (
     BaseGroupSchema,
     Token
 )
-from .schemas.entity import EntityBaseSchema
-from .schemas.info import InfoModel
-from .schemas.schema import SchemaBaseSchema
+from .schemas.info import InfoModel, FilterModel
 from .schemas.traceability import ChangeRequestSchema, SchemaChangeRequestSchema
 from .traceability.crud import review_changes, get_pending_change_requests, \
     is_user_authorized_to_review
@@ -38,7 +37,13 @@ router = APIRouter()
 
 @router.get("/info", response_model=InfoModel)
 def get_info():
-    return {"version": VERSION}
+    return {
+        "version": VERSION,
+        "filters": [FilterModel(name=f.value.name, description=f.value.description)
+                    for f in FilterEnum],
+        "filters_per_type": {atype.name: [filter.value.name for filter in atype.value.filters]
+                             for atype in AttrType}
+    }
 
 
 @router.get(

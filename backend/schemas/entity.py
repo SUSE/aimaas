@@ -45,19 +45,6 @@ class EntityListSchema(BaseModel):
     entities: List[dict]
 
 
-class MetaFilterField(BaseModel):
-    operators: List[str]
-    type: str
-
-
 class FilterFields(BaseModel):
     operators: Dict[str, List[str]]
     fields: Dict[str, Dict[str, str]]
-
-
-class EntityListMeta(BaseModel):
-    filter_fields: FilterFields
-
-
-class EntityDetailMeta(BaseModel):
-    fields: Dict[str, Dict[str, Union[bool, str]]]

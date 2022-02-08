@@ -1,3 +1,4 @@
+import typing
 from typing import NamedTuple
 
 from .database import Base
@@ -28,3 +29,5 @@ class Value(Base):
 class Mapping(NamedTuple):
     model: Value
     converter: type
+    filters: list = []
+

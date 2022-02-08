@@ -54,7 +54,9 @@ export default {
   components: {SchemaList, AlertDisplay, AuthNav, ReviewNav, HelpNav},
   data: function () {
     return {
-      activeSchema: null
+      activeSchema: null,
+      schemaDetails: {},
+      apiInfo: null
     }
   },
   provide() {
@@ -62,7 +64,8 @@ export default {
       activeSchema: computed(() => this.activeSchema),
       availableSchemas: computed(() => this.$refs.schemalist.schemas),
       pendingRequests: computed(() => this.$refs.pendingrequests.changes),
-      updatePendingRequests: this.onPendingReviews
+      updatePendingRequests: this.onPendingReviews,
+      apiInfo: computed(() => this.apiInfo)
     }
   },
   computed: {
@@ -87,19 +90,12 @@ export default {
       if (!schemaSlug) {
         return null;
       }
-      if (Object.keys(this.availableSchemas).length < 1) {
-        if (!this.$refs.schemalist) {
-          console.warn("Schema list not ready, yet")
-          return
-        }
-        await this.$refs.schemalist.load();
+
+      if (!(schemaSlug in this.schemaDetails)){
+        this.schemaDetails[schemaSlug] = await this.$api.getSchema({slugOrId: schemaSlug});
       }
-      try {
-        // First, try to reuse data in storage
-        this.activeSchema = this.availableSchemas[schemaSlug];
-      } catch (e) {
-        this.activeSchema = await this.$api.getSchema({slugOrId: schemaSlug});
-      }
+
+      this.activeSchema = this.schemaDetails[schemaSlug];
     }
   },
   watch: {
@@ -107,6 +103,9 @@ export default {
       handler: "getSchemaFromRoute",
       immediate: true, // runs immediately with mount() instead of calling method on mount hook
     },
+  },
+  async created() {
+    this.apiInfo = await this.$api.getInfo();
   }
 }
 </script>

@@ -203,7 +203,7 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     for field, value in data.items():
         attr_def = attr_defs.get(field)
         attr: Attribute = attr_def.attribute
-        model, caster = attr.type.value
+        model, caster, _ = attr.type.value
         model = ChangeAttrType[attr.type.name].value.model
         values = crud._convert_values(attr_def=attr_def, value=value, caster=caster) or [None]
         for val in values:
@@ -365,7 +365,7 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     for field, value in data.items():
         attr_def = attr_defs.get(field)
         attr: Attribute = attr_def.attribute
-        model, caster = attr.type.value
+        model, caster, _ = attr.type.value
         model = ChangeAttrType[attr.type.name].value.model
         
         if value is None:

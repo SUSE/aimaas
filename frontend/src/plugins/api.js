@@ -175,7 +175,6 @@ class API {
                           all = false,
                           deletedOnly = false,
                           allFields = false,
-                          meta = false,
                           filters = {},
                           orderBy = 'name',
                           ascending = true,
@@ -186,7 +185,6 @@ class API {
         params.set('all', all);
         params.set('all_fields', allFields);
         params.set('deletedOnly', deletedOnly);
-        params.set('meta', meta);
         params.set('order_by', orderBy);
         params.set('ascending', ascending);
         for (const [filter, value] of Object.entries(filters)) {
@@ -197,9 +195,8 @@ class API {
         });
     }
 
-    async getEntity({schemaSlug, entityIdOrSlug, meta = false} = {}) {
+    async getEntity({schemaSlug, entityIdOrSlug} = {}) {
         const params = new URLSearchParams();
-        params.set('meta', meta);
         return this._fetch({
             url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`
         });
