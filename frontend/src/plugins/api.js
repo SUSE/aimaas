@@ -126,16 +126,16 @@ class API {
         const params = new URLSearchParams();
         params.set('all', all);
         params.set('deleted_only', deletedOnly);
-        return this._fetch({url: `${this.base}/schemas?${params.toString()}`});
+        return this._fetch({url: `${this.base}/schema?${params.toString()}`});
     }
 
     async getSchema({slugOrId} = {}) {
-        return this._fetch({url: `${this.base}/schemas/${slugOrId}`});
+        return this._fetch({url: `${this.base}/schema/${slugOrId}`});
     }
 
     async createSchema({body} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/schemas`,
+            url: `${this.base}/schema`,
             method: 'POST',
             body: body,
         });
@@ -147,7 +147,7 @@ class API {
 
     async updateSchema({schemaSlug, body} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/schemas/${schemaSlug}`,
+            url: `${this.base}/schema/${schemaSlug}`,
             method: "PUT",
             body: body
         });
@@ -159,7 +159,7 @@ class API {
 
     async deleteSchema({slugOrId} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/schemas/${slugOrId}`,
+            url: `${this.base}/schema/${slugOrId}`,
             method: 'DELETE'
         });
         if (response !== null) {
@@ -191,20 +191,20 @@ class API {
             params.set(filter, value);
         }
         return this._fetch({
-            url: `${this.base}/dynamic/${schemaSlug}?${params.toString()}`
+            url: `${this.base}/entity/${schemaSlug}?${params.toString()}`
         });
     }
 
     async getEntity({schemaSlug, entityIdOrSlug} = {}) {
         const params = new URLSearchParams();
         return this._fetch({
-            url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`
+            url: `${this.base}/entity/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`
         });
     }
 
     async createEntity({schemaSlug, body} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/dynamic/${schemaSlug}`,
+            url: `${this.base}/entity/${schemaSlug}`,
             method: 'POST',
             body: body
         });
@@ -216,7 +216,7 @@ class API {
 
     async updateEntity({schemaSlug, entityIdOrSlug, body} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`,
+            url: `${this.base}/entity/${schemaSlug}/${entityIdOrSlug}`,
             method: 'PUT',
             body: body
         });
@@ -228,7 +228,7 @@ class API {
 
     async deleteEntity({schemaSlug, entityIdOrSlug} = {}) {
         const response = await this._fetch({
-            url: `${this.base}/dynamic/${schemaSlug}/${entityIdOrSlug}`,
+            url: `${this.base}/entity/${schemaSlug}/${entityIdOrSlug}`,
             method: 'DELETE'
         });
         if (response !== null) {

@@ -68,7 +68,7 @@ def get_attribute(attr_id: int, db: Session = Depends(get_db)):
 
 
 @router.get(
-    '/schemas', 
+    '/schema',
     response_model=List[schemas.SchemaForListSchema],
     tags=['General routes']
 )
@@ -81,7 +81,7 @@ def get_schemas(
 
 
 @router.post(
-    '/schemas', 
+    '/schema',
     response_model=schemas.SchemaForListSchema,
     tags=['General routes']
 )
@@ -108,7 +108,7 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
 
 
 @router.get(
-    '/schemas/{id_or_slug}', 
+    '/schema/{id_or_slug}',
     response_model=schemas.SchemaDetailSchema,
     tags=['General routes']
 )
@@ -120,7 +120,7 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
 
 
 @router.put(
-    '/schemas/{id_or_slug}', 
+    '/schema/{id_or_slug}',
     response_model=schemas.SchemaBaseSchema,
     tags=['General routes']
 )
@@ -163,7 +163,7 @@ def update_schema(
 
 
 @router.delete(
-    '/schemas/{id_or_slug}', 
+    '/schema/{id_or_slug}',
     response_model=schemas.SchemaDetailSchema,
     response_model_exclude=['attributes', 'attr_defs'],
     tags=['General routes']

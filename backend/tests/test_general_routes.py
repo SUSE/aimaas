@@ -48,7 +48,7 @@ class TestRouteSchemasGet:
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas')
+        response = client.get('/schema')
         assert response.status_code == 200
         assert response.json() == [
             {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
@@ -66,11 +66,11 @@ class TestRouteSchemasGet:
             {'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}
         ]
 
-        response = client.get('/schemas?all=True')
+        response = client.get('/schema?all=True')
         assert response.status_code == 200
         assert response.json() == expected
 
-        response = client.get('/schemas?all=True&deleted_only=True')
+        response = client.get('/schema?all=True&deleted_only=True')
         assert response.status_code == 200
         assert response.json() == expected
 
@@ -79,7 +79,7 @@ class TestRouteSchemasGet:
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas?deleted_only=True')
+        response = client.get('/schema?deleted_only=True')
         assert response.status_code == 200
         assert response.json() == [{'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}]
 
@@ -146,18 +146,18 @@ class TestRouteSchemasGet:
         attrs = sorted(attrs, key=lambda x: x['name'])
 
         for id_or_slug in ('1', 'person'):
-            response = client.get(f'/schemas/{id_or_slug}')
+            response = client.get(f'/schema/{id_or_slug}')
             json = response.json()
             assert {a["name"] for a in json['attributes']} == {a["name"] for a in attrs}
             del json['attributes']
             assert json == schema
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, client):
-        response = client.get('/schemas/12345678')
+        response = client.get('/schema/12345678')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-        response = client.get('/schemas/qwertyui')
+        response = client.get('/schema/qwertyui')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -204,14 +204,14 @@ class TestRouteSchemaCreate:
                 }
             ]
         }
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 200
         json = response.json()
         del json['id']
         assert json == {'name': 'Car', 'slug': 'car', 'deleted': False}
-        assert '/dynamic/car' in [i.path for i in authorized_client.app.routes]
+        assert '/entity/car' in [i.path for i in authorized_client.app.routes]
 
-        response = authorized_client.get('/dynamic/car')
+        response = authorized_client.get('/entity/car')
         assert response.status_code == 200
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession, authorized_client):
@@ -220,7 +220,7 @@ class TestRouteSchemaCreate:
             'slug': 'test',
             'attributes': []
         }
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert dbsession.query(Schema).filter(Schema.name == "Person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
@@ -230,7 +230,7 @@ class TestRouteSchemaCreate:
             'slug': 'person',
             'attributes': []
         }
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert dbsession.query(Schema).filter(Schema.slug == "person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
@@ -250,7 +250,7 @@ class TestRouteSchemaCreate:
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 422
         assert "Attribute type FK must be bound to a specific schema" in response.text
 
@@ -270,7 +270,7 @@ class TestRouteSchemaCreate:
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -292,7 +292,7 @@ class TestRouteSchemaCreate:
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -319,7 +319,7 @@ class TestRouteSchemaCreate:
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 409
         assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
         assert "Found multiple occurrences of attribute" in response.json()['detail']
@@ -405,15 +405,15 @@ class TestRouteSchemaUpdate:
             'delete_attributes': ['friends']
         }
         result = {'name': 'Person', 'slug': 'test', 'deleted': False}
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 200
         json = response.json()
         del json['id']
         assert json == result
 
         routes = [i.path for i in authorized_client.app.routes]
-        assert '/dynamic/test' in routes
-        assert '/dynamic/person' not in routes
+        assert '/entity/test' in routes
+        assert '/entity/person' not in routes
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, authorized_client):
         data = {
@@ -421,7 +421,7 @@ class TestRouteSchemaUpdate:
             'slug': 'person',
             'attributes': []
         }
-        response = authorized_client.put('/schemas/12345678', json=data)
+        response = authorized_client.put('/schema/12345678', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -434,7 +434,7 @@ class TestRouteSchemaUpdate:
             'name': 'Test',
             'slug': 'person'
         }
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
@@ -443,7 +443,7 @@ class TestRouteSchemaUpdate:
             'slug': 'test',
             'attributes': []
         }
-        response = authorized_client.put('/schemas/person', json=data)
+        response = authorized_client.put('/schema/person', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
@@ -463,7 +463,7 @@ class TestRouteSchemaUpdate:
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         print("===DEBUG===", response.json())
         assert response.status_code == 404
         assert "is not defined on schema" in response.json()['detail']
@@ -484,7 +484,7 @@ class TestRouteSchemaUpdate:
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert "is listed, can't make unlisted" in response.text
 
@@ -504,7 +504,7 @@ class TestRouteSchemaUpdate:
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -523,7 +523,7 @@ class TestRouteSchemaUpdate:
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 422
         assert "Attribute type FK must be bound to a specific schema" in response.text
 
@@ -552,7 +552,7 @@ class TestRouteSchemaUpdate:
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
@@ -560,7 +560,7 @@ class TestRouteSchemaUpdate:
 class TestRouteSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
     def test_delete(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True, 'reviewable': False}
 
@@ -568,12 +568,12 @@ class TestRouteSchemaDelete:
     def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
         dbsession.commit()
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
         assert response.status_code == 404
 
     @pytest.mark.parametrize('id_or_slug', [1234567, 'qwerty'])
     def test_raise_on_delete_nonexistent(self, dbsession, authorized_client, id_or_slug):
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
         assert response.status_code == 404
 
 

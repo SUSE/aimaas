@@ -23,15 +23,15 @@ class TestRouteBasics:
 
     def test_routes_were_generated(self, dbsession, client):
         routes = [
-            '/dynamic/person/{id_or_slug}',
-            '/dynamic/person',
-            '/dynamic/unperson/{id_or_slug}',
-            '/dynamic/unperson',
+            '/entity/person/{id_or_slug}',
+            '/entity/person',
+            '/entity/unperson/{id_or_slug}',
+            '/entity/unperson',
             '/attributes',
             '/attributes/{attr_id}',
-            '/schemas/{id_or_slug}',
-            '/schemas/{id_or_slug}',
-            '/schemas'
+            '/schema/{id_or_slug}',
+            '/schema/{id_or_slug}',
+            '/schema'
         ]
         assert all([i in [route.path for route in client.app.routes] for i in routes])
 
@@ -45,7 +45,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [],
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 200
         json = response.json()
         mike_id = json.pop('id')
@@ -61,7 +61,7 @@ class TestRouteCreateEntity:
             'friends': [mike_id, 1],
             'born': str(born),
         }
-        response = authorized_client.post(f'/dynamic/person', json=p2)
+        response = authorized_client.post(f'/entity/person', json=p2)
         assert response.status_code == 200
         json = response.json()
         john_id = json.pop('id')
@@ -75,7 +75,7 @@ class TestRouteCreateEntity:
             'friends': [mike_id, john_id],
             'born': str(tz_born)
         }
-        response = authorized_client.post(f'/dynamic/person', json=p3)
+        response = authorized_client.post(f'/entity/person', json=p3)
         assert response.status_code == 200
         json = response.json()
         del json['id']
@@ -91,13 +91,13 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': []
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 409
         assert 'already exists in this schema' in response.json()['detail']
 
     def test_no_raise_on_same_slug_in_different_schemas(self, dbsession, authorized_client):
         data = {'slug': 'Jack', 'name': 'name'}
-        response = authorized_client.post(f'/dynamic/unperson', json=data)
+        response = authorized_client.post(f'/entity/unperson', json=data)
         assert response.status_code == 200
 
         entity = dbsession.execute(select(Entity).where(Entity.schema_id == 2)).scalar()
@@ -111,7 +111,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': []
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 409
         assert 'Got non-unique value for field' in response.json()['detail']
 
@@ -128,7 +128,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': []
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 200
 
         entity = dbsession.execute(select(Entity).where(Entity.slug == 'Jackie')).scalar()
@@ -142,7 +142,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [99999999]
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -156,7 +156,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [1]
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -173,7 +173,7 @@ class TestRouteCreateEntity:
             'age': 10,
             'friends': [entity.id]
         }
-        response = authorized_client.post(f'/dynamic/person', json=p1)
+        response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 422
         assert 'got instead entity' in response.json()['detail']
 
@@ -191,16 +191,16 @@ class TestRouteGetEntity:
             'nickname': 'jack',
             'fav_color': ['red', 'blue']
         }
-        response = client.get('/dynamic/person/1')
+        response = client.get('/entity/person/1')
         assert response.status_code == 200
         assert response.json() == data
 
-        response = client.get(f'/dynamic/person/Jack')
+        response = client.get(f'/entity/person/Jack')
         assert response.status_code == 200
         assert response.json() == data
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, client):
-        response = client.get('/dynamic/person/99999999')
+        response = client.get('/entity/person/99999999')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -210,7 +210,7 @@ class TestRouteGetEntity:
         dbsession.add_all([e, s])
         dbsession.commit()
 
-        response = client.get(f'/dynamic/person/{e.id}')
+        response = client.get(f'/entity/person/{e.id}')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -234,7 +234,7 @@ class TestRouteGetEntities:
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'},
             {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
         ]
-        response = client.get(f'/dynamic/person/')
+        response = client.get(f'/entity/person/')
         assert response.status_code == 200
         assert response.json()['entities'] == data
 
@@ -243,7 +243,7 @@ class TestRouteGetEntities:
         dbsession.commit()
 
         data = [{'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}]
-        response = client.get(f'/dynamic/person?deleted_only=True')
+        response = client.get(f'/entity/person?deleted_only=True')
         assert response.status_code == 200
         assert response.json()['entities'] == data
 
@@ -255,11 +255,11 @@ class TestRouteGetEntities:
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'},
             {'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}
         ]}
-        response = client.get(f'/dynamic/person?all=True')
+        response = client.get(f'/entity/person?all=True')
         assert response.status_code == 200
         assert response.json() == data
 
-        response = client.get(f'/dynamic/person?all=True&deleted_only=True')
+        response = client.get(f'/entity/person?all=True&deleted_only=True')
         assert response.status_code == 200
         assert response.json() == data
 
@@ -287,7 +287,7 @@ class TestRouteGetEntities:
                 'fav_color': ['red', 'black']
              }
         ]}
-        response = client.get(f'/dynamic/person?all_fields=True')
+        response = client.get(f'/entity/person?all_fields=True')
         assert response.status_code == 200
         assert response.json() == data
 
@@ -295,15 +295,15 @@ class TestRouteGetEntities:
         jack = {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}
         jane = {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
 
-        response = client.get(f'/dynamic/person?limit=1')
+        response = client.get(f'/entity/person?limit=1')
         assert response.status_code == 200
         assert response.json() ==  {'total': 2, 'entities': [jack]}
 
-        response = client.get(f'/dynamic/person?limit=1&offset=1')
+        response = client.get(f'/entity/person?limit=1&offset=1')
         assert response.status_code == 200
         assert response.json() ==  {'total': 2, 'entities': [jane]}
 
-        response = client.get(f'/dynamic/person?offset=10')
+        response = client.get(f'/entity/person?offset=10')
         assert response.status_code == 200
         assert response.json() ==  {'total': 2, 'entities': []}
 
@@ -326,14 +326,14 @@ class TestRouteGetEntities:
     def test_get_with_filter(self, dbsession, client, request, q, resp):
         ents = [request.getfixturevalue(i) for i in resp]
         resp =  {'total': len(ents), 'entities': ents}
-        response = client.get(f'/dynamic/person?{q}')
+        response = client.get(f'/entity/person?{q}')
         assert response.json() == resp
 
     def test_get_with_multiple_filters_for_same_attr(self, dbsession, client, jane):
-        response = client.get('/dynamic/person?age.gt=9&age.ne=10')
+        response = client.get('/entity/person?age.gt=9&age.ne=10')
         assert response.json()['entities'] == [jane]
 
-        response = client.get('/dynamic/person?age.gt=9&age.ne=10&age.lt=12')
+        response = client.get('/entity/person?age.gt=9&age.ne=10&age.lt=12')
         assert response.json()['entities'] == []
 
     @pytest.mark.parametrize(['q', 'resp'], [
@@ -344,17 +344,17 @@ class TestRouteGetEntities:
     ])
     def test_get_with_multiple_filters(self, dbsession, client, request, q, resp):
         resp = [request.getfixturevalue(i) for i in resp]
-        response = client.get(f'/dynamic/person?{q}')
+        response = client.get(f'/entity/person?{q}')
         assert response.json()['entities'] == resp
 
     def test_get_with_filters_and_offset_limit(self, dbsession, client, jack, jane):
-        response = client.get('/dynamic/person?age.gt=0&age.lt=20&limit=1')
+        response = client.get('/entity/person?age.gt=0&age.lt=20&limit=1')
         assert response.json()['entities'] == [jack]
 
-        response = client.get('/dynamic/person?age.gt=0&age.lt=20&limit=1&offset=1')
+        response = client.get('/entity/person?age.gt=0&age.lt=20&limit=1&offset=1')
         assert response.json()['entities'] == [jane]
 
-        response = client.get('/dynamic/person?age.gt=0&age.lt=20&offset=2')
+        response = client.get('/entity/person?age.gt=0&age.lt=20&offset=2')
         assert response.json()['entities'] == []
 
     @pytest.mark.parametrize(['q', 'resp'], [
@@ -368,21 +368,21 @@ class TestRouteGetEntities:
         dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
         dbsession.commit()
         resp = [request.getfixturevalue(i) for i in resp]
-        response = client.get(f'/dynamic/person?{q}')
+        response = client.get(f'/entity/person?{q}')
         assert response.json()['entities'] == resp
 
     def test_ignore_invalid_filter(self, dbsession, client, jack, jane):
-        response = client.get('/dynamic/person?age.gt=0&age.lt=20&qwe.rty=123')
+        response = client.get('/entity/person?age.gt=0&age.lt=20&qwe.rty=123')
         assert response.json()['entities'] == [jack, jane]
 
-        response = client.get('/dynamic/person?age.gt=0&age.lt=20&friends.lt=1234')
+        response = client.get('/entity/person?age.gt=0&age.lt=20&friends.lt=1234')
         assert response.json()['entities'] == [jack, jane]
 
-        response = client.get('/dynamic/person?age.qwe=1234')
+        response = client.get('/entity/person?age.qwe=1234')
         assert response.json()['entities'] == [jack, jane]
 
     def test_ignore_filters_for_fk(self, dbsession, client, jack, jane):
-        response = client.get('/dynamic/person?friends=1')
+        response = client.get('/entity/person?friends=1')
         assert response.json()['entities'] == [jack, jane]
 
 
@@ -395,7 +395,7 @@ class TestRouteUpdateEntity:
             'born': '2021-10-20T13:52:17+03',
             'friends': [1, 2],
         }
-        response = authorized_client.put('dynamic/person/1', json=data)
+        response = authorized_client.put('entity/person/1', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'test', 'name': 'test', 'deleted': False}
 
@@ -405,17 +405,17 @@ class TestRouteUpdateEntity:
             'slug': 'test2',
             'nickname': 'test'
         }
-        response = authorized_client.put('/dynamic/person/Jane', json=data)
+        response = authorized_client.put('/entity/person/Jane', json=data)
         assert response.status_code == 200
         assert response.json() == {'id': 2, 'slug': 'test2', 'name': 'Jane', 'deleted': False}
         asserts_after_entities_update(dbsession, born_time=born_utc)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client):
-        response = authorized_client.put('/dynamic/person/99999999999', json={})
+        response = authorized_client.put('/entity/person/99999999999', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-        response = authorized_client.put('/dynamic/person/qwertyuiop', json={})
+        response = authorized_client.put('/entity/person/qwertyuiop', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -423,51 +423,51 @@ class TestRouteUpdateEntity:
         e = Entity(slug='test', schema=s, name='test')
         dbsession.add_all([s, e])
         dbsession.commit()
-        response = authorized_client.put('/dynamic/person/test', json={})
+        response = authorized_client.put('/entity/person/test', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
     def test_raise_on_schema_is_deleted(self, dbsession, authorized_client):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
         dbsession.commit()
-        response = authorized_client.put('/dynamic/person/1', json={})
+        response = authorized_client.put('/entity/person/1', json={})
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
     def test_raise_on_entity_already_exists(self, dbsession, authorized_client):
         data = {'slug': 'Jane'}
-        response = authorized_client.put('/dynamic/person/1', json=data)
+        response = authorized_client.put('/entity/person/1', json=data)
         assert response.status_code == 409
         assert 'already exists in this schema' in response.json()['detail']
 
     def test_no_raise_on_changing_to_same_slug(self, dbsession, authorized_client):
         data = {'slug': 'Jack'}
-        response = authorized_client.put('/dynamic/person/1', json=data)
+        response = authorized_client.put('/entity/person/1', json=data)
         assert response.status_code == 200
 
     def test_raise_on_invalid_slug(self, dbsession, authorized_client):
         p1 = {
             'slug': '-Jake-',
         }
-        response = authorized_client.put('/dynamic/person/1', json=p1)
+        response = authorized_client.put('/entity/person/1', json=p1)
         assert response.status_code == 422
         assert 'is invalid value for slug field' in response.json()['detail'][0]['msg']
 
     def test_raise_on_deleting_required_value(self, dbsession, authorized_client):
         data = {'age': None}
-        response = authorized_client.put('dynamic/person/1', json=data)
+        response = authorized_client.put('entity/person/1', json=data)
         assert response.status_code == 422
         assert 'Missing required field' in response.json()['detail']
 
     def test_raise_on_passing_list_for_not_listed_attr(self, dbsession, authorized_client):
         data = {'age': [1, 2, 3, 4, 5]}
-        response = authorized_client.put('dynamic/person/1', json=data)
+        response = authorized_client.put('entity/person/1', json=data)
         assert response.status_code == 422
         assert 'value is not a valid integer' in response.json()['detail'][0]['msg']
 
     def test_raise_on_fk_entity_doesnt_exist(self, dbsession, authorized_client):
         data = {'friends': [9999999999]}
-        response = authorized_client.put('/dynamic/person/1', json=data)
+        response = authorized_client.put('/entity/person/1', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -478,13 +478,13 @@ class TestRouteUpdateEntity:
         dbsession.commit()
 
         data = {'friends': [e.id]}
-        response = authorized_client.put('/dynamic/person/1', json=data)
+        response = authorized_client.put('/entity/person/1', json=data)
         assert response.status_code == 422
         assert "got instead entity" in response.json()['detail']
 
     def test_raise_on_non_unique_value(self, dbsession, authorized_client):
         data = {'nickname': 'jane'}
-        response = authorized_client.put('/dynamic/person/1', json=data)
+        response = authorized_client.put('/entity/person/1', json=data)
         assert response.status_code == 409
         assert 'Got non-unique value' in response.json()['detail']
 
@@ -493,7 +493,7 @@ class TestRouteUpdateEntity:
         dbsession.commit()
 
         data = {'nickname': 'jane'}
-        response = authorized_client.put('/dynamic/person/Jack', json=data)
+        response = authorized_client.put('/entity/person/Jack', json=data)
         assert response.status_code == 200
 
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
@@ -503,7 +503,7 @@ class TestRouteUpdateEntity:
 class TestRouteDeleteEntity:
     @pytest.mark.parametrize('entity', [1, 'Jack'])
     def test_delete(self, dbsession, authorized_client, entity):
-        response = authorized_client.delete(f'/dynamic/person/{entity}')
+        response = authorized_client.delete(f'/entity/person/{entity}')
         assert response.status_code == 200
         assert response.json() == {'id': 1, 'slug': 'Jack', 'name': 'Jack', 'deleted': True}
 
@@ -511,12 +511,12 @@ class TestRouteDeleteEntity:
 
     @pytest.mark.parametrize('entity', [1234567, 'qwertyu'])
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client, entity):
-        response = authorized_client.delete(f'/dynamic/person/{entity}')
+        response = authorized_client.delete(f'/entity/person/{entity}')
         assert response.status_code == 404
 
     @pytest.mark.parametrize('entity', [1, 'Jack'])
     def test_raise_on_already_deleted(self, dbsession, authorized_client, entity):
         dbsession.execute(update(Entity).where(Entity.id == 1).values(deleted=True))
         dbsession.commit()
-        response = authorized_client.delete(f'/dynamic/person/{entity}')
+        response = authorized_client.delete(f'/entity/person/{entity}')
         assert response.status_code == 404
