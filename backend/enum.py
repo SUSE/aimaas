@@ -15,7 +15,7 @@ class FilterEnum(Enum):
     LE = Filter('le', '__le__', 'less than of equal to')
     GE = Filter('ge', '__ge__', 'greater than or equal to')
     NE = Filter('ne', '__ne__', 'not equal to')
-    CONTAINS = Filter('contains', 'contains', 'constains substring')
+    CONTAINS = Filter('contains', 'contains', 'contains substring')
     REGEXP = Filter('regexp', 'regexp_match', 'matches regular expression')
     STARTS = Filter('starts', 'startswith', 'starts with substring')
 
