@@ -4,9 +4,9 @@ from typing import Optional, Any
 from ldap3 import Server, Connection, LEVEL, ALL_ATTRIBUTES, SYNC, Entry
 
 from ...config import settings
-from ...models import User
 from ...schemas.auth import UserCreateSchema
 from ..crud import get_or_create_user
+from ..models import User
 from .abstract import AbstractBackend
 
 

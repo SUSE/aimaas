@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm.session import Session
 
-from ...models import User
+from ..models import User
 
 
 class AbstractBackend(ABC):

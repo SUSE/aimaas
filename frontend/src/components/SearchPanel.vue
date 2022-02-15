@@ -22,9 +22,9 @@
             type="button" data-bs-toggle="tooltip" title="Search">
       <i class='eos-icons'>search</i>
     </button>
-    <button class="btn btn-dark px-3 disabled" type="button" data-bs-toggle="collapse"
+    <button class="btn btn-dark px-3" type="button" data-bs-toggle="collapse"
             data-bs-target="#collapsed-filters" aria-expanded="false"
-            aria-controls="collapsed-filters" title="Click to expand more filter options (Not implemented yet)">
+            aria-controls="collapsed-filters" title="Click to expand more filter options">
       <i class="eos-icons">more_vert</i>
     </button>
   </div>
@@ -87,7 +87,7 @@
 
 <script>
 import {shallowRef} from "vue";
-import {OPERATOR_DESCRIPTION_MAP, TYPE_INPUT_MAP} from "@/utils";
+import {TYPE_INPUT_MAP} from "@/utils";
 import IntegerInput from "@/components/inputs/IntegerInput.vue";
 import FloatInput from "@/components/inputs/FloatInput.vue";
 import TextInput from "@/components/inputs/TextInput.vue";
@@ -98,7 +98,8 @@ import SelectInput from "@/components/inputs/SelectInput.vue";
 
 export default {
   name: "SearchPanel",
-  props: ["filterableFields", "operators", "advancedControls"],
+  props: ["schema", "advancedControls"],
+  inject: ["apiInfo"],
   components: {TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput, SelectInput},
   emits: ["search"],
   computed: {
@@ -122,11 +123,18 @@ export default {
       return params;
     },
     fieldOptions() {
-      let r = Object.keys(this.filterableFields).map(x => {
-        return {value: x}
+      let r = this.schema?.attributes.map(x => {
+        return {value: x.name}
       });
       r.unshift({value: '', text: '-- select one --'})
       return r;
+    },
+    fieldTypes() {
+      const t = {};
+      for (let a of this.schema?.attributes) {
+        t[a.name] = a.type;
+      }
+      return t;
     }
   },
   methods: {
@@ -152,7 +160,7 @@ export default {
         return null;
       }
       try {
-        const fieldType = this.filterableFields[row.field].type.toUpperCase();
+        const fieldType = this.fieldTypes[row.field].toUpperCase();
         return TYPE_INPUT_MAP[fieldType];
       } catch (e) {
         console.error(e);
@@ -163,12 +171,14 @@ export default {
       if (!row || !row.field) {
         return [];
       }
-
-      const fieldType = this.filterableFields[row.field]?.type;
+      const fieldType = this.fieldTypes[row.field];
       if (fieldType) {
-        return (this.operators[fieldType] || []).map(o => {
-          return {value: o, text: OPERATOR_DESCRIPTION_MAP[o]};
-        });
+        const allowed_operators = this.apiInfo.filters_per_type[fieldType];
+        if (allowed_operators) {
+          return this.apiInfo.filters.filter(x => allowed_operators.includes(x.name)).map(x => {
+            return {value: x.name, text: x.description};
+          })
+        }
       }
       return [];
     },
@@ -182,7 +192,6 @@ export default {
       searchQuery: "",
       allValues: false,
       listMode: 'active',
-      OPERATOR_DESCRIPTION_MAP,
       TYPE_INPUT_MAP,
     };
   },

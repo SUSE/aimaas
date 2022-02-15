@@ -1,12 +1,24 @@
-from sqlalchemy import update
+from datetime import timedelta, timezone, datetime
+
+from fastapi.testclient import TestClient
+from dateutil import parser
+from sqlalchemy import update, select
+from sqlalchemy.orm import Session
 import pytest
 
-from ..crud import RESERVED_SCHEMA_SLUGS
-from ..models import *
+from ..auth.models import User
+from ..models import Schema
+from ..schemas import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema
+from ..traceability.entity import create_entity_update_request, create_entity_create_request, \
+    create_entity_delete_request
+from ..traceability.enum import ChangeStatus
+from ..traceability.models import ChangeRequest, Change
+from ..traceability.schema import create_schema_create_request, create_schema_delete_request, \
+    create_schema_update_request
 
 
 class TestRouteAttributes:
-    def test_get_attributes(self, dbsession, client):
+    def test_get_attributes(self, dbsession: Session, client: TestClient):
         attrs = [
             {'id': 1, 'name': 'age', 'type': 'FLOAT'},
             {'id': 2, 'name': 'age', 'type': 'INT'},
@@ -20,143 +32,145 @@ class TestRouteAttributes:
         response = client.get('/attributes')
         assert response.json() == attrs
 
-    def test_get_attribute(self, dbsession, client):
+    def test_get_attribute(self, dbsession: Session, client: TestClient):
         response = client.get('/attributes/1')
         assert response.json() == {'id': 1, 'name': 'age', 'type': 'FLOAT'}
 
-    def test_raise_on_attribute_doesnt_exist(self, dbsession, client):
+    def test_raise_on_attribute_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/attributes/123456789')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
 
 class TestRouteSchemasGet:
-    def test_get_schemas(self, dbsession, client):
+    def test_get_schemas(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas')
+        response = client.get('/schema')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'},
-                                   {'id': 2, 'name': 'UnPerson', 'slug': 'unperson'},]
+        assert response.json() == [
+            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
+            {'id': 2, 'name': 'UnPerson', 'slug': 'unperson', 'deleted': False}
+        ]
 
-    def test_get_all(self, dbsession, client):
+    def test_get_all(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas?all=True')
-        assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'},
-                                   {'id': 2, 'name': 'UnPerson', 'slug': 'unperson'},
-                                   {'id': 3, 'name': 'Test', 'slug': 'test'}]
+        expected = [
+            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
+            {'id': 2, 'name': 'UnPerson', 'slug': 'unperson', 'deleted': False},
+            {'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}
+        ]
 
-        response = client.get('/schemas?all=True&deleted_only=True')
+        response = client.get('/schema?all=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 1, 'name': 'Person', 'slug': 'person'},
-                                   {'id': 2, 'name': 'UnPerson', 'slug': 'unperson'},
-                                   {'id': 3, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == expected
 
-    def test_get_deleted_only(self, dbsession, client):
+        response = client.get('/schema?all=True&deleted_only=True')
+        assert response.status_code == 200
+        assert response.json() == expected
+
+    def test_get_deleted_only(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
         dbsession.add(test)
         dbsession.commit()
 
-        response = client.get('/schemas?deleted_only=True')
+        response = client.get('/schema?deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 3, 'name': 'Test', 'slug': 'test'}]
+        assert response.json() == [{'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}]
 
-    def test_get_schema(self, dbsession, client):
+    def test_get_schema(self, dbsession: Session, client: TestClient):
+        attrs = [
+            {
+                'bound_schema_id': None,
+                'description': 'Age of this person',
+                'key': True,
+                'list': False,
+                'name': 'age',
+                'required': True,
+                'type': 'INT',
+                'unique': False
+            },
+            {
+                'bound_schema_id': None,
+                'description': None,
+                'key': False,
+                'list': False,
+                'name': 'born',
+                'required': False,
+                'type': 'DT',
+                'unique': False
+            },
+            {
+                'bound_schema_id': 1,
+                'description': None,
+                'key': False,
+                'list': True,
+                'name': 'friends',
+                'required': True,
+                'type': 'FK',
+                'unique': False
+            },
+            {
+                'bound_schema_id': None,
+                'description': None,
+                'key': False,
+                'list': False,
+                'name': 'nickname',
+                'required': False,
+                'type': 'STR',
+                'unique': True
+            },
+            {
+                'bound_schema_id': None,
+                'description': None,
+                'key': False,
+                'list': True,
+                'name': 'fav_color',
+                'required': False,
+                'type': 'STR',
+                'unique': False
+            }
+        ]       
         schema = {
-            'attributes': [
-                {'bind_to_schema': None,
-                 'description': 'Age of this person',
-                 'key': True,
-                 'list': False,
-                 'name': 'age',
-                 'required': True,
-                 'type': 'INT',
-                 'unique': False
-                },
-                {'bind_to_schema': None,
-                 'description': None,
-                 'key': False,
-                 'list': False,
-                 'name': 'born',
-                 'required': False,
-                 'type': 'DT',
-                 'unique': False
-                },
-                {'bind_to_schema': None,
-                 'description': None,
-                 'key': False,
-                 'list': True,
-                 'name': 'friends',
-                 'required': True,
-                 'type': 'FK',
-                 'unique': False
-                },
-                {'bind_to_schema': None,
-                 'description': None,
-                 'key': False,
-                 'list': False,
-                 'name': 'nickname',
-                 'required': False,
-                 'type': 'STR',
-                 'unique': True
-                 },
-                 {'bind_to_schema': None,
-                 'description': None,
-                 'key': False,
-                 'list': True,
-                 'name': 'fav_color',
-                 'required': False,
-                 'type': 'STR',
-                 'unique': False
-                 }
-            ],
             'deleted': False,
             'id': 1,
             'name': 'Person',
-            'slug': 'person'
+            'slug': 'person',
+            'reviewable': False
         }
+        attrs = sorted(attrs, key=lambda x: x['name'])
 
-        response = client.get('/schemas/1')
-        assert response.json() == schema
-
-        response = client.get('/schemas/person')
-        assert response.json() == schema
+        for id_or_slug in ('1', 'person'):
+            response = client.get(f'/schema/{id_or_slug}')
+            json = response.json()
+            assert {a["name"] for a in json['attributes']} == {a["name"] for a in attrs}
+            del json['attributes']
+            assert json == schema
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, client):
-        response = client.get('/schemas/12345678')
+        response = client.get('/schema/12345678')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-        response = client.get('/schemas/qwertyui')
+        response = client.get('/schema/qwertyui')
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
 
 class TestRouteSchemaCreate:
-    def attrs(self, db: Session) -> List[Attribute]:
-        color = Attribute(name='color', type=AttrType.STR)
-        max_speed =  Attribute(name='max_speed', type=AttrType.INT)
-        release_year = Attribute(name='release_year', type=AttrType.DT)
-        owner = Attribute(name='owner', type=AttrType.FK)
-
-        db.add_all([color, max_speed, release_year, owner])
-        db.commit()
-        return [color, max_speed, release_year, owner]
-
-    def test_create(self, dbsession, authorized_client):
-        color, max_speed, release_year, owner = self.attrs(dbsession)
+    def test_create(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Car',
             'slug': 'car',
             'attributes': [
                 {
-                    'attribute_id': color.id,   # this
+                    'name': 'color',
+                    'type': 'STR',
                     'required': False,
                     'unique': False,
                     'list': False,
@@ -164,138 +178,41 @@ class TestRouteSchemaCreate:
                     'description': 'Color of this car'
                 },
                 {
-                    'attr_id': max_speed.id,  # and this are the same
+                    'name': 'max_speed',
+                    'type': 'INT',
                     'required': True,
                     'unique': False,
                     'list': False,
                     'key': False,
                 },
                 {
-                    'attr_id': release_year.id,
+                    'name': 'release_year',
+                    'type': 'DT',
                     'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
                 },
                 {
-                    'attr_id': owner.id,
+                    'name': 'owner',
+                    'type': 'FK',
                     'required': True,
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 1
+                    'bound_schema_id': 1
                 }
             ]
         }
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 200
-        assert response.json() == {'id': 3, 'name': 'Car', 'slug': 'car'}
-        assert '/car' in [i.path for i in authorized_client.app.routes]
+        json = response.json()
+        del json['id']
+        assert json == {'name': 'Car', 'slug': 'car', 'deleted': False}
+        assert '/entity/car' in [i.path for i in authorized_client.app.routes]
 
-
-        car = dbsession.execute(select(Schema).where(Schema.name == 'Car')).scalar()
-        assert car is not None and car.id == 3 and car.slug == 'car'
-
-        attr_defs = dbsession.execute(select(AttributeDefinition).where(AttributeDefinition.schema_id == car.id)).scalars().all()
-        assert len(attr_defs) == 4
-
-        color_ = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == car.id)
-            .where(AttributeDefinition.attribute_id == color.id)
-        ).scalar()
-        assert not any([color_.required, color_.unique, color_.list, color_.key])
-        assert color_.description == 'Color of this car'
-
-        ry = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == car.id)
-            .where(AttributeDefinition.attribute_id == release_year.id)
-        ).scalar()
-        assert not any([ry.required, ry.unique, ry.list, ry.key])
-        assert ry.description is None
-
-        owner_ = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == car.id)
-            .where(AttributeDefinition.attribute_id == owner.id)
-        ).scalar()
-        bfk = dbsession.execute(select(BoundFK).where(BoundFK.attr_def_id == owner_.id)).scalars().all()
-        assert len(bfk) == 1 and bfk[0].schema.name == 'Person'
-
-    def test_create_with_attr_data(self, dbsession, authorized_client):
-        color, *_ = self.attrs(dbsession)
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'attributes': [
-                {
-                    'name': 'test1',
-                    'type': 'STR',
-                    'required': True,
-                    'unique': True,
-                    'list': False,
-                    'key': True,
-                    'description': 'Test 1'
-                },
-                {
-                    'name': 'test2',
-                    'type': 'STR',
-                    'required': True,
-                    'unique': True,
-                    'list': False,
-                    'key': True,
-                    'description': 'Test 2'
-                },
-                {
-                    'attribute_id': color.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'Color of this car'
-                }
-            ]
-        }
-
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.get('/entity/car')
         assert response.status_code == 200
-        assert response.json() == {'id': 3, 'name': 'Test', 'slug': 'test'}
-
-        schemas = dbsession.execute(select(Schema)).scalars().all()
-        assert len(schemas) == 3
-
-        schema = dbsession.execute(select(Schema).where(Schema.name == 'Test')).scalar()
-        assert schema is not None
-        
-        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'test1')).scalar()
-        assert attr is not None
-
-        attr2 = dbsession.execute(select(Attribute).where(Attribute.name == 'test2')).scalar()
-        assert attr2 is not None
-
-        attr_defs = dbsession.execute(
-            select(AttributeDefinition).where(AttributeDefinition.schema_id == schema.id)
-        ).scalars().all()
-        assert len(attr_defs) == 3
-
-        attr_def = attr_defs[0]
-        assert attr_def is not None
-        assert attr_def.attribute == attr
-        assert all([attr_def.required, attr_def.unique, attr_def.key])
-        assert not attr_def.list
-        assert attr_def.description == 'Test 1'
-
-    def test_raise_on_reserved_slug(self, dbsession, authorized_client):
-        for i in RESERVED_SCHEMA_SLUGS:
-            data = {
-                'name': 'Person',
-                'slug': i,
-                'attributes': []
-            }
-            response = authorized_client.post('/schemas', json=data)
-            assert response.status_code == 409
-            assert "Can't create schema with slug" in response.json()['detail']
 
     def test_raise_on_duplicate_name_or_slug(self, dbsession, authorized_client):
         data = {
@@ -303,7 +220,7 @@ class TestRouteSchemaCreate:
             'slug': 'test',
             'attributes': []
         }
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert dbsession.query(Schema).filter(Schema.name == "Person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
@@ -313,94 +230,73 @@ class TestRouteSchemaCreate:
             'slug': 'person',
             'attributes': []
         }
-        response = authorized_client.post('/schemas', json=data)
-        # dbsession.begin()
+        response = authorized_client.post('/schema', json=data)
         assert dbsession.query(Schema).filter(Schema.slug == "person").count() == 1
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
-    def test_raise_on_nonexistent_attr_id(self, dbsession, authorized_client):
+    def test_raise_on_empty_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
             'attributes': [
                 {
-                    'attribute_id': 123456789,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'Nonexistent attribute'
-                }
-            ]
-        }
-        response = authorized_client.post('/schemas', json=data)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
-
-    def test_raise_on_empty_schema_when_binding(self, dbsession, authorized_client):
-        *_, owner = self.attrs(dbsession)
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'attributes': [
-                {
-                    'attribute_id': owner.id,
-                    'required':False,
+                    'name': 'owner',
+                    'type': 'FK',
+                    'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 422
-        assert "You must bind attribute" in response.json()['detail']
+        assert "Attribute type FK must be bound to a specific schema" in response.text
 
-    def test_raise_on_nonexistent_schema_when_binding(self, dbsession, authorized_client):
-        *_, owner = self.attrs(dbsession)
+    def test_raise_on_nonexistent_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
             'attributes': [
                 {
-                    'attribute_id': owner.id,
-                    'required':False,
+                    'name': 'owner',
+                    'type': 'FK',
+                    'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 123456789
+                    'bound_schema_id': 123456789
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-    def test_raise_on_passed_deleted_schema_for_binding(self, dbsession, authorized_client):
+    def test_raise_on_passed_deleted_schema_for_binding(self, dbsession: Session, authorized_client: TestClient):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
         dbsession.commit()
-        *_, owner = self.attrs(dbsession)
         data = {
             'name': 'Test',
             'slug': 'test',
             'attributes': [
                 {
-                    'attribute_id': owner.id,
+                    'name': 'owner',
+                    'type': 'FK',
                     'required':False,
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bind_to_schema': 1
+                    'bound_schema_id': 1
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-    def test_raise_on_multiple_attrs_with_same_name(self, dbsession, authorized_client):
-        color, *_ = self.attrs(dbsession)
+    def test_raise_on_multiple_attrs_with_same_name(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
@@ -408,7 +304,7 @@ class TestRouteSchemaCreate:
                 {
                     'name': 'test1',
                     'type': 'STR',
-                    'required':False,
+                    'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
@@ -416,737 +312,466 @@ class TestRouteSchemaCreate:
                 {
                     'name': 'test1',
                     'type': 'INT',
-                    'required':False,
+                    'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
                 }
             ]
         } 
-        response = authorized_client.post('/schemas', json=data)
+        response = authorized_client.post('/schema', json=data)
         assert response.status_code == 409
         assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'attributes': [
-                {
-                    'name': 'color',
-                    'type': 'INT',
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                },
-                {
-                    'attr_id': color.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.post('/schemas', json=data)
-        assert response.status_code == 409
-        assert "Found multiple occurrences of attribute" in response.json()['detail']
-
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'attributes': [
-                {
-                    'attr_id': color.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                },
-                {
-                    'attr_id': color.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.post('/schemas', json=data)
-        assert response.status_code == 409
-        assert "Found multiple occurrences of attribute" in response.json()['detail']
-
 
 class TestRouteSchemaUpdate:
-    def test_update(self, dbsession, authorized_client):
-        address = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
-        age = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
+    default_attributes = [
+        {
+            "id": 1,
+            "name": 'age',
+            "type": "INT",
+            "required": True,
+            "unique": False,
+            "list": False,
+            "key": True,
+            "description": 'Age of this person'
+        },
+        {
+            "id": 2,
+            "name": 'born',
+            "type": 'DT',
+            "required": False,
+            "unique": False,
+            "list": False,
+            "key": False
+        },
+        {
+            "id": 3,
+            "name": 'friends',
+            "type": 'FK',
+            "required": True,
+            "unique": False,
+            "list": True,
+            "key": False,
+            "bound_schema_id": -1
+        },
+        {
+            "id": 4,
+            "name": 'nickname',
+            "type": 'STR',
+            "required": False,
+            "unique": True,
+            "list": False,
+            "key": False
+        },
+        {
+            "id": 5,
+            "name": 'fav_color',
+            "type": 'STR',
+            "required": False,
+            "unique": False,
+            "list": True,
+            "key": False
+        }
+    ]
 
+    def test_update(self, dbsession: Session, authorized_client: TestClient):
+        attributes = [a for a in self.default_attributes if a["id"] != 1]
         data = {
-            'name': 'Test',
             'slug': 'test',
-            'update_attributes': [
+            'reviewable': True,
+            'attributes': attributes + [
                 {
-                    'attr_def_id': age.id,
+                    'id': 1,
+                    'name': 'age',
+                    'type': 'INT',
                     'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
                     'description': 'Age of this person'
-                }
-            ],
-            'add_attributes': [
+                },
                 {
-                    'attribute_id': address.id,
+                    'name': 'address',
+                    'type': 'FK',
                     'required': True,
                     'unique': True,
                     'list': True,
                     'key': True,
-                    'bind_to_schema': -1
-                }
-            ]
-        } 
-        result = {
-            'attributes': [
-                {
-                    'bind_to_schema': None,
-                    'description': 'Age of this person',
-                    'key': False,
-                    'list': False,
-                    'name': 'age',
-                    'required': False,
-                    'type': 'INT',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'born',
-                    'required': False,
-                    'type': 'DT',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'friends',
-                    'required': True,
-                    'type': 'FK',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'nickname',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': True
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'fav_color',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': True,
-                    'list': True,
-                    'name': 'address',
-                    'required': True,
-                    'type': 'FK',
-                    'unique': False
+                    'bound_schema_id': -1
                 }
             ],
-            'deleted': False,
-            'id': 1,
-            'name': 'Test',
-            'slug': 'test'
+            'delete_attributes': ['friends']
         }
-
-        response = authorized_client.put('/schemas/1', json=data)
+        result = {'name': 'Person', 'slug': 'test', 'deleted': False}
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 200
-        assert response.json() == result
+        json = response.json()
+        del json['id']
+        assert json == result
+
         routes = [i.path for i in authorized_client.app.routes]
-        assert '/test' in routes
-        assert '/person' not in routes
-
-        dbsession.expire_all()
-        age_def = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert age_def is not None
-        assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
-
-        address_def = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.attribute_id == address.id)
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert address_def is not None
-        assert all([address_def.list, address_def.key, address_def.required])
-        assert not address_def.unique
-
-        bfk = dbsession.execute(
-            select(BoundFK)
-            .where(BoundFK.schema_id == 1)
-            .where(BoundFK.attr_def_id == address_def.id)
-        ).scalar()
-        assert bfk is not None
-
-        sch = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        assert sch.name == 'Test' and sch.slug == 'test'
-
-    def test_update_attr_def_with_name(self, dbsession, authorized_client):
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [
-                {
-                    'name': 'age',
-                    'required': False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'Age of this person'
-                }
-            ],
-            'add_attributes': []
-        } 
-        result = {
-            'attributes': [
-                {
-                    'bind_to_schema': None,
-                    'description': 'Age of this person',
-                    'key': False,
-                    'list': False,
-                    'name': 'age',
-                    'required': False,
-                    'type': 'INT',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'born',
-                    'required': False,
-                    'type': 'DT',
-                    'unique': False},
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'friends',
-                    'required': True,
-                    'type': 'FK',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'nickname',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': True
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'fav_color',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': False
-                }
-            ],
-            'deleted': False,
-            'id': 1,
-            'name': 'Test',
-            'slug': 'test'
-        }
-
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 200
-        assert response.json() == result
-
-
-        age_def = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert age_def is not None
-        assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
-
-    def test_update_with_attr_data(self, dbsession, authorized_client):
-        address = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()
-        age = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [
-                {
-                    'attr_def_id': age.id,
-                    'required': False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'Age of this person'
-                }
-            ],
-            'add_attributes': [
-                {
-                    'attribute_id': address.id,
-                    'required': True,
-                    'unique': True,
-                    'list': True,
-                    'key': True,
-                    'bind_to_schema': -1
-                },
-                {
-                    'name': 'test',
-                    'type': 'FK',
-                    'required': False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'test',
-                    'bind_to_schema': -1
-                }
-            ]
-        } 
-        result = {
-            'attributes': [
-                {
-                    'bind_to_schema': None,
-                    'description': 'Age of this person',
-                    'key': False,
-                    'list': False,
-                    'name': 'age',
-                    'required': False,
-                    'type': 'INT',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'born',
-                    'required': False,
-                    'type': 'DT',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'friends',
-                    'required': True,
-                    'type': 'FK',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': False,
-                    'name': 'nickname',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': True
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': False,
-                    'list': True,
-                    'name': 'fav_color',
-                    'required': False,
-                    'type': 'STR',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': None,
-                    'key': True,
-                    'list': True,
-                    'name': 'address',
-                    'required': True,
-                    'type': 'FK',
-                    'unique': False
-                },
-                {
-                    'bind_to_schema': None,
-                    'description': 'test',
-                    'key': False,
-                    'list': False,
-                    'name': 'test',
-                    'required': False,
-                    'type': 'FK',
-                    'unique': False
-                }
-            ],
-            'deleted': False,
-            'id': 1,
-            'name': 'Test',
-            'slug': 'test'
-        }
-
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 200
-        assert response.json() == result
-
-        dbsession.expire_all()
-        address_def = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.attribute_id == address.id)
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert address_def is not None
-        assert not address_def.unique and address_def.list
-        age_def = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'age')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert age_def is not None
-        assert not any([age_def.required, age_def.unique, age_def.list, age_def.key])
-        
-        sch = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        assert sch.name == 'Test' and sch.slug == 'test'
-
-        test_def = dbsession.execute(
-            select(AttributeDefinition)
-            .join(Attribute)
-            .where(Attribute.name == 'test')
-            .where(AttributeDefinition.schema_id == 1)
-        ).scalar()
-        assert test_def is not None
-        assert test_def.attribute.type == AttrType.FK
-        bfk = dbsession.execute(
-            select(BoundFK)
-            .where(BoundFK.schema_id == 1)
-            .where(BoundFK.attr_def_id == test_def.id)
-        ).scalar()
-        assert bfk
-
-    def test_raise_on_reserved_slug(self, dbsession, authorized_client):
-        for i in RESERVED_SCHEMA_SLUGS:
-            data = {
-                'name': 'Person',
-                'slug': i,
-                'update_attributes': [],
-                'add_attributes': []
-            }
-            response = authorized_client.put('/schemas/1', json=data)
-            assert response.status_code == 409
-            assert "Can't create schema with slug" in response.json()['detail']
+        assert '/entity/test' in routes
+        assert '/entity/person' not in routes
 
     def test_raise_on_schema_doesnt_exist(self, dbsession, authorized_client):
         data = {
             'name': 'Test',
             'slug': 'person',
-            'update_attributes': [],
-            'add_attributes': []
+            'attributes': []
         }
-        response = authorized_client.put('/schemas/12345678', json=data)
+        response = authorized_client.put('/schema/12345678', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-    def test_raise_on_existing_slug_or_name(self, dbsession, authorized_client):
+    def test_raise_on_existing_slug_or_name(self, dbsession: Session, authorized_client: TestClient):
         new_sch = Schema(name='Test', slug='test')
         dbsession.add(new_sch)
         dbsession.commit()
         
         data = {
             'name': 'Test',
-            'slug': 'person',
-            'update_attributes': [],
-            'add_attributes': []
+            'slug': 'person'
         }
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
-        ata = {
+        data = {
             'name': 'Person',
             'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': []
+            'attributes': []
         }
-        response = authorized_client.put('/schemas/person', json=data)
+        response = authorized_client.put('/schema/person', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
-    def test_raise_on_attr_def_doesnt_exist(self, dbsession, authorized_client):
+    def test_raise_on_attr_not_defined_on_schema(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [
+            'attributes': self.default_attributes + [
                 {
-                    'attr_def_id': 12345678,
+                    'id': 56789,
+                    'name': 'address',
+                    'type': 'STR',
                     'required': True,
                     'unique': True,
                     'list': False,
                     'key': True
                 }
-            ],
-            'add_attributes': []
+            ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
+        print("===DEBUG===", response.json())
         assert response.status_code == 404
         assert "is not defined on schema" in response.json()['detail']
 
-    def test_raise_on_convert_list_to_single(self, dbsession, authorized_client):
-        attr_def = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == 1)
-            .join(Attribute)
-            .where(Attribute.name == 'friends')
-        ).scalar()
+    def test_raise_on_convert_list_to_single(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [
+            'attributes': [a for a in self.default_attributes if a["id"] != 3] + [
                 {
-                    'attr_def_id': attr_def.id,
+                    'id': 3,
+                    'name': 'friends',
+                    'type': 'STR',
                     'required': True,
                     'unique': True,
                     'list': False,
                     'key': True
                 }
-            ],
-            'add_attributes': []
+            ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
-        assert "is listed, can't make unlisted" in response.json()['detail']
+        assert "is listed, can't make unlisted" in response.text
 
-    def test_raise_on_attr_doesnt_exist(self, dbsession, authorized_client):
+    def test_raise_on_nonexistent_schema_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
             'name': 'Test',
             'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'attr_id': 12345678,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
-    
-    def test_raise_on_attr_def_already_exists(self, dbsession, authorized_client):
-        attr = dbsession.execute(select(Attribute).where(Attribute.name == 'born')).scalar()
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'attr_id': attr.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 409
-        assert "already defined" in response.json()['detail']
-
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'name': 'born',
-                    'type': 'STR',
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 409
-        assert "already defined" in response.json()['detail']
-
-    def test_raise_on_nonexistent_schema_when_binding(self, dbsession, authorized_client):
-        attr = dbsession.execute(
-            select(Attribute)
-            .where(Attribute.name == 'address')
-        ).scalar()
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'attr_id': attr.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'bind_to_schema': 123456789
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
-
-    def test_raise_on_schema_not_passed_when_binding(self, dbsession, authorized_client):
-        attr = dbsession.execute(
-            select(Attribute)
-            .where(Attribute.name == 'address')
-        ).scalar()
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'attr_id': attr.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 422
-        assert "You must bind attribute" in response.json()['detail']
-
-    def test_raise_on_multiple_attrs_with_same_name(self, dbsession, authorized_client):
-        address = dbsession.execute(
-            select(Attribute)
-            .where(Attribute.name == 'address')
-        ).scalar()
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
-                {
-                    'attr_id': address.id,
-                    'type': 'STR',
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'bind_to_schema': -1
-                },
-                {
-                    'attribute_id': address.id,
-                    'type': 'INT',
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'bind_to_schema': -1
-                }
-            ]
-        } 
-        response = authorized_client.put('/schemas/1', json=data)
-        assert response.status_code == 409
-        assert "Found multiple occurrences of attribute" in response.json()['detail']
-
-        data = {
-            'name': 'Test',
-            'slug': 'test',
-            'update_attributes': [],
-            'add_attributes': [
+            'attributes': self.default_attributes + [
                 {
                     'name': 'address',
-                    'type': 'DT',
-                    'required':False,
+                    'type': 'FK',
+                    'required': False,
                     'unique': False,
                     'list': False,
                     'key': False,
-                },
-                {
-                    'attr_id': address.id,
-                    'required':False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'bind_to_schema': -1
+                    'bound_schema_id': 123456789
                 }
             ]
         } 
-        response = authorized_client.put('/schemas/1', json=data)
+        response = authorized_client.put('/schema/1', json=data)
+        assert response.status_code == 404
+        assert "doesn't exist or was deleted" in response.json()['detail']
+
+    def test_raise_on_schema_not_passed_when_binding(self, dbsession: Session, authorized_client: TestClient):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'attributes': self.default_attributes + [
+                {
+                    'name': 'address',
+                    'type': 'FK',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                }
+            ]
+        } 
+        response = authorized_client.put('/schema/1', json=data)
+        assert response.status_code == 422
+        assert "Attribute type FK must be bound to a specific schema" in response.text
+
+    def test_raise_on_multiple_attrs_with_same_name(self, dbsession: Session, authorized_client: TestClient):
+        data = {
+            'name': 'Test',
+            'slug': 'test',
+            'attributes': self.default_attributes + [
+                {
+                    'name': 'address',
+                    'type': 'STR',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                    'bound_schema_id': -1
+                },
+                {
+                    'name': 'address',
+                    'type': 'INT',
+                    'required': False,
+                    'unique': False,
+                    'list': False,
+                    'key': False,
+                    'bound_schema_id': -1
+                }
+            ]
+        } 
+        response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
 
 class TestRouteSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
-    def test_delete(self, dbsession, authorized_client, id_or_slug):
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+    def test_delete(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
         assert response.status_code == 200
-        assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True}
-
-        schemas = dbsession.execute(select(Schema).order_by(Schema.id)).scalars().all()
-        assert len(schemas) == 2
-        assert schemas[0].deleted
-
-        entities = dbsession.execute(select(Entity).where(Entity.schema_id == 1)).scalars().all()
-        assert len(entities) == 2
-        assert all([i.deleted for i in entities])
+        assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True, 'reviewable': False}
 
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
-    def test_raise_on_already_deleted(self, dbsession, authorized_client, id_or_slug):
+    def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
         dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
         dbsession.commit()
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
         assert response.status_code == 404
 
     @pytest.mark.parametrize('id_or_slug', [1234567, 'qwerty'])
     def test_raise_on_delete_nonexistent(self, dbsession, authorized_client, id_or_slug):
-        response = authorized_client.delete(f'/schemas/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{id_or_slug}')
+        assert response.status_code == 404
+
+
+class TestRouteGetEntityChanges:
+    default_request_data = {
+        "name": "Jackson",
+        "age": 42,
+        "fav_color": ['violet', 'cyan']
+    }
+
+    def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
+        response = client.get('/changes/entity/person/Jack?count=1')
+        changes = response.json()
+        parsed_timestamp = parser.parse(changes[0]['created_at'])
+        assert parsed_timestamp.tzinfo is not None
+
+    def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
+        user = dbsession.execute(select(User)).scalar()
+        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        change_request = create_entity_update_request(
+            db=dbsession, id_or_slug=1, schema_id=1, data=self.default_request_data.copy(),
+            created_by=testuser
+        )
+
+        url = f'/changes/detail/entity/{change_request.id}'
+        response = client.get(url)
+        change = response.json()
+        assert change['status'] == 'PENDING'
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
+        dbsession.commit()
+
+        response = client.get(url)
+        change = response.json()
+        assert change['status'] == 'APPROVED'
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
+        dbsession.commit()
+
+        response = client.get(url)
+        change = response.json()
+        assert change['status'] == 'DECLINED'
+
+    def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
+        data = self.default_request_data.copy()
+        data.update({"slug": "jackson", "age": 42, "friends": [2]})
+        change_request = create_entity_create_request(
+            db=dbsession, schema_id=1, data=data.copy(),
+            created_by=testuser)
+
+        url = f'/changes/detail/entity/{change_request.id}'
+        response = client.get(url)
+        change = response.json()
+        assert change['status'] == 'PENDING'
+        assert change['entity']['name'] == ''
+        assert change['entity']['slug'] == ''
+        assert change['entity']['schema'] == 'person'
+
+        dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.DECLINED))
+        dbsession.commit()
+
+        response = client.get(f'/changes/detail/entity/{change_request.id}')
+        change = response.json()
+        assert change['status'] == 'DECLINED'
+        assert change['entity']['name'] == ''
+        assert change['entity']['slug'] == ''
+        assert change['entity']['schema'] == 'person'
+
+    def test_get_delete_details(self, dbsession: Session, client: TestClient, testuser: User):
+        now = datetime.now(timezone.utc)
+        change_request = create_entity_delete_request(db=dbsession, id_or_slug=1, schema_id=1,
+                                                      created_by=testuser)
+
+        response = client.get(f'/changes/detail/entity/{change_request.id}')
+        change = response.json()
+        assert parser.parse(change['created_at']) >= now
+        assert change['created_by'] == testuser.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'PENDING'
+        assert change['entity']['name'] == 'Jack'
+        assert change['entity']['slug'] == 'Jack'
+        assert change['entity']['schema'] == 'person'
+        assert len(change['changes']) == 1
+        deleted = change['changes']['deleted']
+        assert deleted['new'] and not deleted['old'] and not deleted['current']
+
+    def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
+        response = client.get('/changes/detail/entity/12345678')
+        assert response.status_code == 404
+
+
+class TestRouteGetSchemaChanges:
+    def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
+        response = client.get('/changes/schema/person?count=1')
+        changes = response.json()
+        assert changes['schema_changes'][0]['created_at'] is not None
+        entity_requests = changes['pending_entity_requests']
+        assert len(entity_requests) == 1
+
+        response = client.get('/changes/schema/person')
+        changes = response.json()
+        entity_requests = changes['pending_entity_requests']
+        assert len(entity_requests) == 1
+        assert all(change['created_at'] is not None for change in changes['schema_changes'])
+
+    def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
+        change_request = create_schema_update_request(
+            db=dbsession, id_or_slug="person", data=SchemaUpdateSchema(name="Hello", attributes=[]),
+            created_by=testuser
+        )
+        response = client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
+        change = response.json()
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'PENDING'
+        assert change['schema']['name'] == 'Person'
+        assert change['schema']['slug'] == 'person'
+        assert change['changes']['name']["new"] == "Hello"
+
+    def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
+        change_request = create_schema_create_request(
+            db=dbsession,
+            data=SchemaCreateSchema(name="Test", slug="test", attributes=[]),
+            created_by=testuser
+        )
+        response = client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
+        change = response.json()
+
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'PENDING'
+        assert change["schema"] is None
+
+    def test_get_delete_details(self, dbsession: Session, authorized_client: TestClient,
+                                testuser: User):
+        change_request = create_schema_delete_request(db=dbsession, id_or_slug="person",
+                                                      created_by=testuser)
+        response = authorized_client.get(f'/changes/detail/schema/{change_request.id}')
+        assert response.status_code == 200
+        change = response.json()
+
+        assert change['created_at'] is not None
+        assert change['created_by'] == testuser.username
+        assert change['reviewed_at'] == change['reviewed_by'] == change['comment'] == None
+        assert change['status'] == 'PENDING'
+        assert len(change['changes']) == 1
+        deleted = change['changes']['deleted']
+        assert deleted['new'] is True and deleted['old'] is False and  deleted['current'] is False
+
+    def test_raise_on_change_doesnt_exist(self, dbsession: Session, client: TestClient):
+        response = client.get('/changes/schema/12345678')
+        assert response.status_code == 404
+
+
+class TestTraceabilityRoutes:
+    def test_review_changes(self, dbsession: Session, authorized_client: TestClient,
+                            testuser: User):
+        data = {"name": "Føø Bar"}
+        change_request = create_entity_update_request(
+            db=dbsession, id_or_slug=1, schema_id=1, data=data.copy(), created_by=testuser
+        )
+
+        # APPROVE
+        review = {
+            'result': 'APPROVE',
+            'comment': 'test'
+        }
+
+        response = authorized_client.post(f'/changes/review/{change_request.id}', json=review)
+        assert response.status_code == 200
+        data = response.json()
+        expected = {
+            'created_by': 'tester', 'reviewed_by': 'tester', 'status': 'APPROVED',
+            'comment': 'test', 'object_type': 'ENTITY', 'change_type': 'UPDATE'
+        }
+        for key, value in expected.items():
+            assert data.get(key, None) == value
+
+        dbsession.commit()
+        change_request.status = ChangeStatus.PENDING
+        dbsession.commit()
+
+        # DECLINE
+        review['result'] = 'DECLINE'
+        review['comment'] = 'test2'
+        response = authorized_client.post(f'/changes/review/{change_request.id}', json=review)
+        json = response.json()
+        assert json['status'] == 'DECLINED'
+        assert json['comment'] == 'test2'
+
+    def test_raise_on_change_doesnt_exist(self, dbsession: Session, authorized_client: TestClient):
+        review = {
+            'result': 'APPROVE',
+            'comment': 'test'
+        }
+        response = authorized_client.post('/changes/review/23456', json=review)
         assert response.status_code == 404

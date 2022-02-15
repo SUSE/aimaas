@@ -336,12 +336,16 @@ export default {
     },
     async load() {
       this.loading = true;
-      this.permissions = await this.$api.getPermissions({
-        recipientType: this.recipientType,
-        recipientId: this.recipientId,
-        objType: this.objectType,
-        objId: this.objectId
-      });
+      if ((this.recipientType && this.recipientId) || (this.objectType && this.objectId)) {
+        this.permissions = await this.$api.getPermissions({
+          recipientType: this.recipientType,
+          recipientId: this.recipientId,
+          objType: this.objectType,
+          objId: this.objectId
+        });
+      } else {
+        this.permissions = [];
+      }
       this.selected = [];
       this.loading = false;
     },

@@ -34,6 +34,7 @@ export const ATTR_TYPES_NAMES = {
     DATE: "date",
 };
 
+
 export const TYPE_INPUT_MAP = {
     STR: "TextInput",
     DT: "DateTime",
@@ -41,18 +42,6 @@ export const TYPE_INPUT_MAP = {
     FLOAT: "FloatInput",
     BOOL: "Checkbox",
     DATE: "DateInput",
-};
-
-export const OPERATOR_DESCRIPTION_MAP = {
-    eq: "equals to",
-    ne: "not equal to",
-    lt: "less than",
-    le: "less than or equal to",
-    gt: "greater than",
-    ge: "greater than or equal",
-    contains: "contains substring",
-    regexp: "matches regular expression",
-    starts: "starts with substring",
 };
 
 

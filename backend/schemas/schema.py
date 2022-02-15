@@ -1,10 +1,11 @@
 import re
 from enum import Enum
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Any
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, root_validator
 
 from ..models import AttrType, AttributeDefinition
+
 
 class AttrTypeMapping(Enum):
     STR = 'STR'
@@ -13,13 +14,24 @@ class AttrTypeMapping(Enum):
     FLOAT = 'FLOAT'
     FK = 'FK'
     DT = 'DT'
+    DATE = 'DATE'
+
 
 assert set(AttrType.__members__.keys()) == set(AttrTypeMapping.__members__.keys())
+
+
+def validate_attribute_name(cls, v: str):
+    if v.isidentifier() and re.match('(^_.*)|(.*_$)', v) is None:
+        return v
+    raise ValueError(
+        'Attribute name must be a valid Python identifier and must not start/end with underscore')
 
 
 class AttributeCreateSchema(BaseModel):
     name: str
     type: AttrTypeMapping
+
+    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
 
 class AttributeDefinitionBase(BaseModel):
@@ -27,19 +39,24 @@ class AttributeDefinitionBase(BaseModel):
     unique: bool
     list: bool
     key: bool
-    description: Optional[str]
-    bind_to_schema: Optional[int]
+    description: Optional[str] = None
+    bound_schema_id: Optional[int] = None
+    id: Optional[int] = None
+
+    @root_validator(pre=True)
+    def check_type_and_bound_id(cls, values):
+        if values.get("type", None) in (AttrTypeMapping.FK, 'FK') \
+                and values.get("bound_schema_id") is None:
+            raise ValueError("Attribute type FK must be bound to a specific schema")
+
+        return values
 
     class Config:
         orm_mode = True
         allow_population_by_field_name = True
 
 
-class AttrDefSchema(AttributeDefinitionBase):
-    attr_id: int = Field(alias='attribute_id')
-
-
-class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
+class AttrDefSchema(AttributeDefinitionBase, AttributeCreateSchema):
     @classmethod
     def from_orm(cls, obj: Any):
         if isinstance(obj, AttributeDefinition):
@@ -48,15 +65,9 @@ class AttrDefWithAttrDataSchema(AttributeDefinitionBase, AttributeCreateSchema):
         return super().from_orm(obj)
 
 
-class AttributeDefinitionUpdateSchema(AttributeDefinitionBase):
-    attr_def_id: int
-
-
-class AttributeDefinitionUpdateWithNameSchema(AttributeDefinitionBase):
-    name: str
-
-
 def validate_slug(cls, slug: str):
+    if slug is None:
+        return slug
     if re.match('^[a-zA-Z]+[0-9]*(-[a-zA-Z0-9]+)*$', slug) is None:
         raise ValueError(f'`{slug}` is invalid value for slug field')
     return slug
@@ -65,17 +76,17 @@ def validate_slug(cls, slug: str):
 class SchemaCreateSchema(BaseModel):
     name: str
     slug: str
-    attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+    reviewable: bool = False
+    attributes: List[AttrDefSchema]
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
 
 class SchemaUpdateSchema(BaseModel):
-    name: str
-    slug: str
-
-    update_attributes: List[Union[AttributeDefinitionUpdateSchema, AttributeDefinitionUpdateWithNameSchema]]
-    add_attributes: List[Union[AttrDefSchema, AttrDefWithAttrDataSchema]]
+    name: Optional[str]
+    slug: Optional[str]
+    reviewable: Optional[bool]
+    attributes: List[AttrDefSchema] = []
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
@@ -84,6 +95,7 @@ class SchemaBaseSchema(BaseModel):
     id: int
     name: str
     slug: str
+    deleted: bool
 
     slug_validator = validator('slug', allow_reuse=True)(validate_slug)
 
@@ -98,13 +110,16 @@ class SchemaForListSchema(SchemaBaseSchema):
 
 class SchemaDetailSchema(SchemaBaseSchema):
     deleted: bool
-    attr_defs: List[AttrDefWithAttrDataSchema] = Field(alias='attributes')
+    reviewable: bool
+    attr_defs: List[AttrDefSchema] = Field(alias='attributes')
 
 
 class AttributeSchema(BaseModel):
     id: int
     name: str
     type: str
+
+    validate_attribute_name_ = validator('name', allow_reuse=True)(validate_attribute_name)
 
     @validator('type', pre=True)
     def convert_to_str(cls, v):
@@ -117,19 +132,3 @@ class AttributeSchema(BaseModel):
 
     class Config:
         orm_mode = True
-
-
-class EntityBaseSchema(BaseModel):
-    id: int
-    slug: str
-    name: str
-    deleted: bool
-
-    slug_validator = validator('slug', allow_reuse=True)(validate_slug)
-    class Config:
-        orm_mode = True
-
-
-class EntityListSchema(BaseModel):
-    total: int
-    entities: List[dict]

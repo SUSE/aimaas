@@ -9,7 +9,7 @@
       <div class="dropdown-divider"></div>
       <div class="dropdown-item d-flex justify-content-between">
         <span>Backend version:</span>
-        <span class="ms-2">{{ backendVersion }}</span>
+        <span class="ms-2">{{ apiInfo?.version }}</span>
       </div>
       <div class="dropdown-item d-flex justify-content-between">
         <span>Front version:</span>
@@ -22,20 +22,11 @@
 <script>
 export default {
   name: "HelpNav",
+  inject: ["apiInfo"],
   data() {
     return {
-      backendVersion: null,
       frontendVersion: "0.1.0rc1"
     };
-  },
-  async created() {
-    await this.load();
-  },
-  methods: {
-    async load() {
-      const response = await this.$api.getInfo();
-      this.backendVersion = response.version;
-    }
   }
 }
 </script>

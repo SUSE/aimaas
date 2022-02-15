@@ -8,19 +8,28 @@ from sqlalchemy.orm import Session
 from .config import settings, VERSION
 from . import crud, schemas, exceptions, auth
 from .database import get_db
-from .models import User, Schema, Group, Entity
+from .enum import FilterEnum
+from .models import Schema, AttrType
 from .dynamic_routes import create_dynamic_router
 from .auth import authenticated_user, authorized_user, crud as auth_crud
 from .auth.enum import PermissionType, RecipientType, PermissionTargetType
+from .auth.models import User, Group
 from .schemas.auth import (
     GroupSchema, RequirePermission, PermissionSchema,
-    # GroupDetailsSchema,
-    UserSchema, UserIDSchema,
+    UserSchema,
     UserCreateSchema,
     BaseGroupSchema,
     Token
 )
-from .schemas.info import InfoModel
+from .schemas.info import InfoModel, FilterModel
+from .schemas.traceability import ChangeRequestSchema, SchemaChangeRequestSchema
+from .traceability.crud import review_changes, get_pending_change_requests, \
+    is_user_authorized_to_review
+from .traceability.entity import get_recent_entity_changes, entity_change_details
+from .traceability.enum import ContentType
+from .traceability.schema import create_schema_create_request, create_schema_update_request, \
+    create_schema_delete_request, apply_schema_create_request, apply_schema_update_request, \
+    apply_schema_delete_request, get_recent_schema_changes, schema_change_details
 
 
 router = APIRouter()
@@ -28,7 +37,13 @@ router = APIRouter()
 
 @router.get("/info", response_model=InfoModel)
 def get_info():
-    return {"version": VERSION}
+    return {
+        "version": VERSION,
+        "filters": [FilterModel(name=f.value.name, description=f.value.description)
+                    for f in FilterEnum],
+        "filters_per_type": {atype.name: [filter.value.name for filter in atype.value.filters]
+                             for atype in AttrType}
+    }
 
 
 @router.get(
@@ -53,7 +68,7 @@ def get_attribute(attr_id: int, db: Session = Depends(get_db)):
 
 
 @router.get(
-    '/schemas', 
+    '/schema',
     response_model=List[schemas.SchemaForListSchema],
     tags=['General routes']
 )
@@ -66,18 +81,20 @@ def get_schemas(
 
 
 @router.post(
-    '/schemas', 
+    '/schema',
     response_model=schemas.SchemaForListSchema,
     tags=['General routes']
 )
 def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.CREATE_SCHEMA)))):
     try:
-        schema = crud.create_schema(db=db, data=data)
-        create_dynamic_router(schema=schema, app=request.app, get_db=get_db)
+        change_request = create_schema_create_request(db=db, data=data, created_by=user,
+                                                      commit=False)
+        _, schema = apply_schema_create_request(db=db, change_request=change_request,
+                                                reviewed_by=user, comment='Autosubmit')
+        db.commit()
+        create_dynamic_router(schema=schema, app=request.app)
         return schema
-    except exceptions.ReservedSchemaSlugException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.SchemaExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.MissingAttributeException as e:
@@ -91,7 +108,7 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
 
 
 @router.get(
-    '/schemas/{id_or_slug}', 
+    '/schema/{id_or_slug}',
     response_model=schemas.SchemaDetailSchema,
     tags=['General routes']
 )
@@ -103,20 +120,30 @@ def get_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db)):
 
 
 @router.put(
-    '/schemas/{id_or_slug}', 
-    response_model=schemas.SchemaDetailSchema,
+    '/schema/{id_or_slug}',
+    response_model=schemas.SchemaBaseSchema,
     tags=['General routes']
 )
-def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str], request: Request,
-                  db: Session = Depends(get_db),
-                  user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.UPDATE_SCHEMA, target=Schema())))):
+def update_schema(
+        data: schemas.SchemaUpdateSchema,
+        id_or_slug: Union[int, str],
+        request: Request,
+        db: Session = Depends(get_db),
+        user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.UPDATE_SCHEMA, target=Schema())))
+    ):
     try:
         old_slug = crud.get_schema(db=db, id_or_slug=id_or_slug).slug
-        schema = crud.update_schema(db=db, id_or_slug=id_or_slug, data=data)
-        create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app, get_db=get_db)
+        change_request = create_schema_update_request(
+            db=db, id_or_slug=id_or_slug, data=data, created_by=user, commit=False
+        )
+        _, schema = apply_schema_update_request(
+            db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
+        )
+        db.commit()
+        create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app)
         return schema
-    except exceptions.ReservedSchemaSlugException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except exceptions.NoOpChangeException as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     except exceptions.MissingAttributeException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except exceptions.MissingSchemaException as e:
@@ -136,7 +163,7 @@ def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str],
 
 
 @router.delete(
-    '/schemas/{id_or_slug}', 
+    '/schema/{id_or_slug}',
     response_model=schemas.SchemaDetailSchema,
     response_model_exclude=['attributes', 'attr_defs'],
     tags=['General routes']
@@ -144,9 +171,93 @@ def update_schema(data: schemas.SchemaUpdateSchema, id_or_slug: Union[int, str],
 def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.DELETE_SCHEMA)))):
     try:
-        return crud.delete_schema(db=db, id_or_slug=id_or_slug)
+        change_request = create_schema_delete_request(
+            db=db, id_or_slug=id_or_slug, created_by=user, commit=False
+        )
+        _, schema = apply_schema_delete_request(db=db, change_request=change_request,
+                                                reviewed_by=user, comment='Autosubmit')
+        db.commit()
+        return schema
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.post('/changes/review/{request_id}', tags=["Reviews & Changes"], response_model=ChangeRequestSchema)
+def reviewchanges(request_id: int, review: schemas.ChangeReviewSchema, response: Response,
+                  db: Session = Depends(get_db), user: User = Depends(authenticated_user)):
+    try:
+        is_user_authorized_to_review(db=db, user=user, request_id=request_id)
+        change_request, changed = review_changes(db=db, change_request_id=request_id, review=review,
+                                                 reviewed_by=user)
+        if not changed:
+            response.status_code = status.HTTP_208_ALREADY_REPORTED
+        return change_request
+    except exceptions.MissingObjectException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/changes/pending', tags=["Reviews & Changes"],
+            response_model=List[schemas.ChangeRequestSchema])
+def get_pending_changerequests(
+    obj_type: Optional[ContentType] = Query(None),
+    limit: Optional[int] = Query(10),
+    offset: Optional[int] = Query(0),
+    all: Optional[bool] = Query(False),
+    db: Session = Depends(get_db)
+):
+    return get_pending_change_requests(obj_type=obj_type, limit=limit, offset=offset,
+                                                    all=all, db=db)
+
+
+@router.get('/changes/schema/{id_or_slug}', tags=["Reviews & Changes"],
+            response_model=schemas.SchemaChangeRequestSchema)
+def get_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query(5),
+                              db: Session = Depends(get_db)):
+    try:
+        schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
+        schema_changes, pending_entity_requests = get_recent_schema_changes(db=db, schema_id=schema.id, count=count)
+        return SchemaChangeRequestSchema(schema_changes=schema_changes, pending_entity_requests=pending_entity_requests)
+    except exceptions.MissingSchemaException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/changes/detail/schema/{change_id}', tags=["Reviews & Changes"])
+def get_schema_change_details(change_id: int, db: Session = Depends(get_db)):
+    try:
+        return schema_change_details(db=db, change_request_id=change_id)
+    except exceptions.MissingObjectException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get(
+    '/changes/entity/{schema_id_or_slug}/{entity_id_or_slug}', tags=["Reviews & Changes"],
+    response_model=List[schemas.ChangeRequestSchema]
+)
+def get_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
+    try:
+        schema = crud.get_schema(db=db, id_or_slug=schema_id_or_slug)
+        entity = crud.get_entity_model(db=db, id_or_slug=entity_id_or_slug, schema=schema)
+        if entity is None:
+            raise exceptions.MissingEntityException(obj_id=entity_id_or_slug)
+        return get_recent_entity_changes(db=db, entity_id=entity.id, count=count)
+    except exceptions.MissingObjectException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get(
+    '/changes/detail/entity/{change_id}', tags=["Reviews & Changes"],
+    response_model=schemas.EntityChangeDetailSchema
+)
+def get_entity_change_details(change_id: int, db: Session = Depends(get_db)):
+    try:
+        return entity_change_details(db=db, change_request_id=change_id)
+    except exceptions.MissingObjectException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+
+
+@router.get('/entities/{entity_id}', response_model=schemas.EntityByIdSchema)
+def get_entity_by_id(entity_id: int, db: Session = Depends(get_db)):
+    return crud.get_entity_by_id(db=db, entity_id=entity_id)
 
 
 @router.get('/groups', response_model=List[GroupSchema], tags=["Auth"])

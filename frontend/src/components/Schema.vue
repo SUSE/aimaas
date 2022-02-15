@@ -53,8 +53,7 @@ export default {
           name: "History",
           component: shallowRef(Changes),
           icon: 'history',
-          tooltip: 'Change history of schema',
-          disabled: true
+          tooltip: 'Change history of schema'
         }
       ],
     }

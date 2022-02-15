@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from ..database import STATEMENTS
 from .. import exceptions
-from ..models import User, Group, Permission, UserGroup, Schema, Entity
+from ..models import Schema, Entity
+from .models import User, Group, Permission, UserGroup
 from ..schemas.auth import BaseGroupSchema, PermissionSchema, GroupSchema, \
     UserCreateSchema, RequirePermission, PermissionWithIdSchema
 from .enum import PermissionType, PermissionTargetType, RecipientType

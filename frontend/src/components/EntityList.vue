@@ -2,8 +2,7 @@
   <SearchPanel
       @search="setFiltersAndSearch"
       :key="schema?.slug"
-      :filterable-fields="filterableFields"
-      :operators="operators"
+      :schema="schema"
       :advanced-controls="advancedControls"/>
   <Pagination :total-items="totalEntities" v-model="currentPage" ref="paginator"
               @change="getEntities({resetPage: true})">
@@ -41,6 +40,7 @@ import SearchPanel from "./SearchPanel.vue";
 export default {
   components: {EntityListTable, Pagination, SearchPanel, ConfirmButton},
   name: "EntityList",
+  inject: ["apiInfo"],
   props: {
     schema: Object,
     selectType: {
@@ -93,14 +93,9 @@ export default {
         filters: this.filters,
         orderBy: this.orderBy,
         ascending: this.ascending,
-        meta: true
       });
       this.entities = response.entities;
       this.totalEntities = response.total;
-      if (response.meta) {
-        this.operators = response.meta.filter_fields.operators;
-        this.filterableFields = response.meta.filter_fields.fields;
-      }
       this.loading = false;
     },
     async setFiltersAndSearch(filters) {
@@ -140,8 +135,6 @@ export default {
       entities: [],
       totalEntities: 0,
       currentPage: 1,
-      filterableFields: {},
-      operators: {},
       filters: {},
       orderBy: "name",
       ascending: true,
