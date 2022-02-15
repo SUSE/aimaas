@@ -160,17 +160,6 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     return schema
 
 
-def _check_no_op_changes(schema: Schema, data: SchemaUpdateSchema):
-    attrs = {i.attribute.name: i.attribute.type.name for i in schema.attr_defs}
-    deleted = {i.attribute.name: i.attribute.type.name
-               for i in schema.attr_defs
-               if i.attribute.name in data.delete_attributes}
-    for attr in data.add_attributes:
-        if attr.name in deleted and deleted[attr.name] == attr.type.name:
-            raise NoOpChangeException('No-op change: made an attempt to add and delete the same attribute')
-    for attr in data.update_attributes:
-        if attr.name in deleted and deleted[attr.name] == attrs[attr.name]:
-            raise NoOpChangeException('No-op change: made an attempt to update and delete the same attribute')
 
 
 def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema: Schema):
