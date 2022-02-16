@@ -1,3 +1,4 @@
+import typing
 from typing import List, Optional, Tuple
 
 import sqlalchemy
@@ -11,6 +12,7 @@ from ..models import Schema, Entity
 from .models import User, Group, Permission, UserGroup
 from ..schemas.auth import BaseGroupSchema, PermissionSchema, GroupSchema, \
     UserCreateSchema, RequirePermission, PermissionWithIdSchema
+from .context import get_password_hash
 from .enum import PermissionType, PermissionTargetType, RecipientType
 
 
@@ -21,12 +23,32 @@ def _is_circular_group_reference(child_id: int, parent_id: int, db: Session) -> 
         raise exceptions.CircularGroupReferenceException()
 
 
-def get_users(db: Session) -> List[User]:
-    return db.execute(select(User)).scalars().all()
+def get_users(db: Session, user_ids: typing.Optional[typing.List[int]] = None) -> List[User]:
+    users = db.query(User)
+
+    if user_ids:
+        users = users.filter(User.id.in_(user_ids))
+        missing_user_ids = set(user_ids) - {u.id for u in users}
+        if missing_user_ids:
+            raise exceptions.MissingUserException(obj_id=next(iter(missing_user_ids)))
+
+    return users
 
 
 def get_user(db: Session, username: str) -> Optional[User]:
     return db.execute(select(User).where(User.username == username)).scalar()
+
+
+def create_user(db: Session, data: UserCreateSchema) -> User:
+    datadict = data.dict()
+    if datadict.get("password"):
+        datadict["password"] = get_password_hash(datadict["password"])
+
+    user = User(**datadict)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def get_or_create_user(db: Session, data: UserCreateSchema) -> Tuple[User, bool]:
@@ -34,11 +56,7 @@ def get_or_create_user(db: Session, data: UserCreateSchema) -> Tuple[User, bool]
     if user:
         return user, False
 
-    user = User(**data.dict())
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user, True
+    return create_user(db=db, data=data), True
 
 
 def get_user_by_id(user_id: int, db: Session) -> Optional[User]:
@@ -107,12 +125,7 @@ def get_group_details(group_id: int, db: Session) -> GroupSchema:
 
 def get_group_members(group_id: int, db: Session) -> List[User]:
     group = get_group_or_raise(group_id=group_id, db=db)
-    users = db.execute(
-        select(User)
-        .join(UserGroup)
-        .where(UserGroup.group_id == group.id)
-    ).scalars().all()
-    return users
+    return [assoc.user for assoc in group.members]
 
 
 def create_group(data: BaseGroupSchema, db: Session) -> Group:
@@ -123,6 +136,7 @@ def create_group(data: BaseGroupSchema, db: Session) -> Group:
     except IntegrityError as error:
         raise exceptions.GroupExistsException(name=data.name) from error
 
+    db.refresh(group)
     return group
 
 
@@ -149,11 +163,7 @@ def update_group(group_id: int, data: BaseGroupSchema, db: Session) -> [Group, b
 
 def add_members(group_id: int, user_ids: List[int], db: Session) -> bool:
     group = get_group_or_raise(group_id=group_id, db=db)
-    users = db.query(User).filter(User.id.in_(user_ids))
-
-    missing_user_ids = set(user_ids) - {u.id for u in users}
-    if missing_user_ids:
-        raise exceptions.MissingUserException(obj_id=next(iter(missing_user_ids)))
+    users = get_users(db=db, user_ids=user_ids)
 
     already_members = get_group_members(group_id=group_id, db=db)
     was_added = False
@@ -171,9 +181,13 @@ def add_members(group_id: int, user_ids: List[int], db: Session) -> bool:
 
 
 def delete_members(group_id: int, user_ids: List[int], db: Session) -> bool:
-    group = get_group_or_raise(group_id=group_id, db=db)
+    # Check for existence of group
+    get_group_or_raise(group_id=group_id, db=db)
     if not user_ids:
         return False
+
+    # Check for existence of users
+    get_users(db=db, user_ids=user_ids)
     count = db.query(UserGroup)\
         .filter(UserGroup.group_id == group_id, UserGroup.user_id.in_(user_ids))\
         .delete()
@@ -207,18 +221,21 @@ def has_permission(user: User, permission: RequirePermission, db: Session) -> bo
                      Permission.obj_id == permission.target.id))
     elif isinstance(permission.target, Entity):
         q = or_(Permission.obj_id == None,
-                and_(Permission.obj_type == PermissionTargetType.SCHEMA,
-                     Permission.obj_id == permission.target.schema_id),
                 and_(Permission.obj_type == PermissionTargetType.ENTITY,
                      Permission.obj_id == permission.target.id))
+        schema_id = permission.target.schema_id or db.query(Entity.schema_id)\
+                                                     .filter(Entity.id == permission.target.id)\
+                                                     .scalar()
+        q = or_(q, and_(Permission.obj_type == PermissionTargetType.SCHEMA,
+                        Permission.obj_id == schema_id),)
     elif permission.target is None:
         q = Permission.obj_id == None
     else:
         raise TypeError(f"Permission management for type {type(permission.target)} "
                         f"not supported")
 
-    has_user_perm.filter(q)
-    has_group_perm.filter(q)
+    has_user_perm = has_user_perm.filter(q)
+    has_group_perm = has_group_perm.filter(q)
 
     return db.query(literal(True))\
         .filter(is_superuser.union(has_user_perm, has_group_perm).exists())\
