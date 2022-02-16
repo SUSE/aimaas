@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-from ..auth import get_password_hash, authenticated_user, authorized_user
+from ..auth import authenticated_user, authorized_user
 from ..auth.crud import get_or_create_user, get_user, grant_permission
 from ..auth.enum import RecipientType, PermissionType
 from ..auth.models import User
@@ -19,7 +19,7 @@ from .. import create_app
 
 TEST_USER = UserCreateSchema(
     username="tester",
-    password=get_password_hash("password"),
+    password="password",
     email="tester@tests.org",
     firstname="Test",
     lastname="Test"
