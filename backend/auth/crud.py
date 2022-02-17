@@ -335,6 +335,7 @@ def grant_permission(data: PermissionSchema, db: Session) -> bool:
         db.commit()
         return True
     except sqlalchemy.exc.IntegrityError:
+        db.rollback()
         return False
 
 

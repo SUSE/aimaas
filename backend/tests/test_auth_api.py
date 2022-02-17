@@ -1,13 +1,14 @@
 import json
 from fastapi.testclient import TestClient
-from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
-from .. import auth
-from ..auth.backends.local import Backend
-from ..auth.crud import add_members
-from ..auth.models import User
-from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema
+from ..auth.crud import add_members, has_permission
+from ..auth.enum import RecipientType, PermissionTargetType, PermissionType
+from ..auth.models import User, Permission
+from ..config import settings
+from ..models import Schema, Entity
+from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema, PermissionSchema, \
+    RequirePermission
 from .conftest import TEST_USER
 from .mixins import CreateMixin
 
@@ -151,28 +152,105 @@ class TestRouteGroup(CreateMixin):
 
 
 class TestRoutePermission(CreateMixin):
-    def test_revoke_permission__raise_on_missing(self, dbsession: Session, authorized_client: TestClient):
-        group = make_group('test', dbsession)
-        dbsession.commit()
-        data = UpdateGroupSchema(delete_permissions=[
-            PermissionSchema(
-                    obj=PermObject.SCHEMA,
-                    type=PermType.UPDATE
-                )
-        ])
-        response = client.put(f'/groups/{group.id}', json=json.loads(data.json()))
+    def test_grant_permission(self, dbsession: Session, authorized_client: TestClient):
+        user = self._create_user(dbsession)
+        data = PermissionSchema(
+            recipient_type=RecipientType.USER,
+            recipient_name=user.username,
+            obj_type=PermissionTargetType.SCHEMA,
+            obj_id=1,
+            permission=PermissionType.CREATE_ENTITY
+        )
+
+        response = authorized_client.post("/permissions", json=json.loads(data.json()))
+        assert response.status_code == 200
+        assert has_permission(user,
+                              RequirePermission(permission=PermissionType.CREATE_ENTITY,
+                                                target=Schema(id=1)),
+                              dbsession) is True
+
+    def test_grant_permission__riase_on_already_exists(self, dbsession: Session,
+                                                       authorized_client: TestClient):
+        user = self._create_user(dbsession)
+        data = PermissionSchema(
+            recipient_type=RecipientType.USER,
+            recipient_name=user.username,
+            obj_type=PermissionTargetType.SCHEMA,
+            obj_id=1,
+            permission=PermissionType.CREATE_ENTITY
+        )
+        self._grant_permission(dbsession, data)
+
+        response = authorized_client.post("/permissions", json=json.loads(data.json()))
+        assert response.status_code == 208
+        assert has_permission(user,
+                              RequirePermission(permission=PermissionType.CREATE_ENTITY,
+                                                target=Schema(id=1)),
+                              dbsession) is True
+
+    def test_grant_permission__raise_on_invalid_recipient(self, dbsession: Session,
+                                                          authorized_client: TestClient):
+        data = PermissionSchema(
+            recipient_type=RecipientType.USER,
+            recipient_name='no-such-username',
+            obj_type=PermissionTargetType.SCHEMA,
+            obj_id=1,
+            permission=PermissionType.CREATE_ENTITY
+        )
+
+        response = authorized_client.post("/permissions", json=json.loads(data.json()))
+        assert response.status_code == 404
+
+    def test_grant_permission__raise_ob_invalid_target(self, dbsession: Session,
+                                                       authorized_client: TestClient):
+        user = self._create_user(dbsession)
+        data = PermissionSchema(
+            recipient_type=RecipientType.USER,
+            recipient_name=user.username,
+            obj_type=PermissionTargetType.SCHEMA,
+            obj_id=9999,
+            permission=PermissionType.CREATE_ENTITY
+        )
+
+        response = authorized_client.post("/permissions", json=json.loads(data.json()))
+        assert response.status_code == 404
+
+    def test_revoke_permission(self, dbsession: Session, authorized_client: TestClient):
+        user, group, pgroup = self._create_user_group_with_perm(dbsession)
+
+        permisison_id = dbsession\
+            .query(Permission.id)\
+            .filter(Permission.recipient_type == RecipientType.GROUP,
+                    Permission.recipient_id == pgroup.id)\
+            .scalar()
+
+        response = authorized_client.delete("/permissions", json=[permisison_id])
+        assert response.status_code == 200
+
+        assert has_permission(user,
+                              RequirePermission(permission=PermissionType.READ_ENTITY,
+                                                target=Entity(id=1)),
+                              dbsession) is False
+
+    def test_revoke_permission__raise_on_missing(self, dbsession: Session,
+                                                 authorized_client: TestClient):
+        response = authorized_client.delete("/permissions", json=[9999])
         assert response.status_code == 404
 
 
 class TestRouteLogin:
-    def test_login(self, client: TestClient, testuser: User, mocker: MockerFixture):
-        with mocker.patch("backend.auth._enabled_backends", return_value=[]):
-            response = client.post('/login', data={'username': TEST_USER.username,
-                                                   'password': TEST_USER.password})
-        print("===DEBUG===", response.status_code, response.json())
+    def _override_settings(self):
+        # Make sure that only the local auth. backend is used!
+        settings.auth_backends = "local"
+
+    def test_login(self, client: TestClient, testuser: User):
+        self._override_settings()
+        response = client.post('/login', data={'username': TEST_USER.username,
+                                               'password': TEST_USER.password})
         assert response.json()['access_token']
 
     def test_login__raise_on_invalid_cred(self, client: TestClient, testuser: User):
+        self._override_settings()
         response = client.post('/login', data={'username': TEST_USER.username,
                                                'password': 'this-is-not-my-password'})
         assert response.status_code == 401
