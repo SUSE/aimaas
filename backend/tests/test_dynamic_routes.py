@@ -496,6 +496,10 @@ class TestRouteUpdateEntity:
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
 
+    def test_raise_on_value_out_of_range(self, dbsession, authorized_client):
+        response = authorized_client.put('/entity/person/Jack', json={"age": 2147483648})
+        assert response.status_code == 422
+
 
 class TestRouteDeleteEntity:
     @pytest.mark.parametrize('entity', [1, 'Jack'])

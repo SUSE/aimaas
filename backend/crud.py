@@ -1,7 +1,6 @@
-import typing
 from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
-from itertools import chain, groupby
+from itertools import groupby
 
 from psycopg2.errors import ForeignKeyViolation
 from sqlalchemy import func, distinct, column, asc, desc, or_, select, update

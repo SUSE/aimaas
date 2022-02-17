@@ -1,6 +1,7 @@
 from datetime import timezone, timedelta, datetime
 
 import pytest
+from sqlalchemy.exc import DataError
 
 from ..crud import *
 from ..models import *
@@ -227,6 +228,11 @@ class TestEntityCreate:
         }
         with pytest.raises(RequiredFieldException):
             create_entity(dbsession, schema_id=1, data=p1)
+
+    def test_raise_on_value_out_of_range(self, dbsession):
+        with pytest.raises(DataError):
+            create_entity(dbsession, schema_id=1, data={"name": "Frank", "slug": "frank",
+                                                        "age": 2147483648})
 
 
 class TestEntityRead:

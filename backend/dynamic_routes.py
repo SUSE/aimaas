@@ -1,81 +1,26 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 from dataclasses import make_dataclass
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.applications import FastAPI
+from sqlalchemy.exc import DataError
 from sqlalchemy.orm.session import Session
-from pydantic import create_model, Field, validator
-from pydantic.main import BaseModel, ModelMetaclass
 
 from .auth import authorized_user, authenticated_user
 from .auth.enum import PermissionType
 from .auth.models import User
 from .config import settings
 from .database import get_db
-from .enum import FilterEnum
-from .models import AttrType, Schema, AttributeDefinition, Entity
-from . import crud, exceptions, schemas
+from .enum import FilterEnum, ModelVariant
+from .models import AttrType, Schema, Entity
+from .schemas.auth import RequirePermission
+from .schemas.entity import EntityModelFactory, EntityBaseSchema
+from .schemas.traceability import ChangeRequestSchema
+from . import crud, exceptions
 
 from .traceability.entity import create_entity_create_request, create_entity_update_request, \
     create_entity_delete_request, apply_entity_create_request, apply_entity_update_request, \
     apply_entity_delete_request
-
-
-def _make_type(attr_def: AttributeDefinition, optional: bool = False) -> tuple:
-    '''Given `AttributeDefinition` returns a type that will be for type annotations in Pydantic model'''
-    kwargs = {'description': attr_def.description, 'alias': attr_def.attribute.name}
-    type_ = (attr_def.attribute.type  # AttributeDefinition.Attribute.type -> AttrType
-            .value.model  # AttrType.value -> Mapping, Mapping.model -> Value model
-            .value.property.columns[0].type.python_type)  # get python type of value column in Value child
-    if attr_def.list:
-        type_ = List[type_]
-    if not attr_def.required or optional:
-        type_ = Optional[type_]
-    return (type_, Field(**kwargs))
-
-
-def _fieldname_for_schema(name: str):
-    """Returns modified version of `name` if it shadows member of `pydantic.BaseModel`"""
-    if name in dir(BaseModel):
-        return name + '__'
-    return name
-
-
-def _get_entity_request_model(schema: Schema, name: str) -> ModelMetaclass:
-    '''
-    Creates Pydantic entity get model
-
-    Model includes all entity attributes, which are all marked as `Optional`,
-    and their descriptions, if defined in `AttributeDefinition`.
-    Also includes fields `id`, `slug`, `name` and `deleted`.
-
-    Why attributes are `Optional`: currently, if we add new requried
-    field to schema, which already holds some entities, values for this
-    field in these entities will be `None` and if we don't mark fields
-    as `Optional`, Pydantic will raise exception after receiving `None`
-    for required field.
-
-    So make it clear, which fields are not `Optional` and expected to be
-    in response in any case, it is advised to provide documentation
-    in API that will list all fields and mark them as required/optional.
-    '''
-    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
-    types = [_make_type(i, optional=True) for i in schema.attr_defs]
-    fields_types = dict(zip(field_names, types))
-
-    default_fields = {
-        'id': (int, Field(description='ID of this entity')),
-        'deleted': (bool, Field(description='Indicates whether this entity is marked as deleted')),
-        'slug': (str, Field(description='Slug for this entity')),
-        'name': (str, Field(description='Name of this entity')),
-    }
-    model = create_model(
-        name,
-        **fields_types,
-        **default_fields
-    )
-    return model
 
 
 def _description_for_get_entity(schema: Schema) -> str:
@@ -89,7 +34,8 @@ def _description_for_get_entity(schema: Schema) -> str:
 
 
 def route_get_entity(router: APIRouter, schema: Schema):
-    entity_get_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}Get") 
+    factory = EntityModelFactory()
+    entity_get_schema = factory(schema, ModelVariant.GET)
     description = _description_for_get_entity(schema=schema)
 
     @router.get(
@@ -169,17 +115,13 @@ def _filters_request_model(schema: Schema):
 
 
 def route_get_entities(router: APIRouter, schema: Schema):
-    entity_schema = _get_entity_request_model(schema=schema, name=f"{schema.slug.capitalize().replace('-', '_')}ListItem")
+    factory = EntityModelFactory()
     description = _description_for_get_entities(schema=schema)
     filter_model = _filters_request_model(schema=schema)
-    response_model = create_model(
-        f'Get{entity_schema.__name__}', 
-        total=(int, Field(description='Total number of entities satisfying conditions')),
-        entities=(List[entity_schema], Field(description='List of returned entities'))
-    )
+
     @router.get(
         f'/{schema.slug}',
-        response_model=response_model,
+        response_model=factory(schema=schema, variant=ModelVariant.LIST),
         tags=[schema.name],
         summary=f'List {schema.name} entities',
         description=description,
@@ -221,50 +163,20 @@ def route_get_entities(router: APIRouter, schema: Schema):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
         except exceptions.InvalidFilterOperatorException as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-       
-
-def _create_entity_request_model(schema: Schema) -> ModelMetaclass:
-    '''
-    Creates Pydantic entity create model
-
-    Model includes all entity attributes, which are marked as `Optional`
-    if defined so in `AttributeDefinition`,
-    plus required `slug` field with custom validator for it and required
-    `name` field.
-
-    This model will raise exception if passed fields that don't
-    belong to it.
-    '''
-    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
-    types = [_make_type(i) for i in schema.attr_defs]
-    fields_types = dict(zip(field_names, types))
-    
-    class Config:
-        extra = 'forbid'
-
-    model = create_model(
-        f"{schema.slug.capitalize().replace('-', '_')}Create",
-        **fields_types,
-        slug=(str, Field(description='Slug of this entity')),
-        name=(str, Field(description='Name of this entity')),
-        __config__=Config,
-        __validators__={'slug_validator': validator('slug', allow_reuse=True)(schemas.validate_slug)}
-    )
-    return model
 
 
 def route_create_entity(router: APIRouter, schema: Schema):
-    entity_create_schema = _create_entity_request_model(schema=schema)
+    factory = EntityModelFactory()
     req_permission = authenticated_user
     if schema.reviewable:
-        req_permission = authorized_user(schemas.RequirePermission(
+        req_permission = authorized_user(RequirePermission(
             permission=PermissionType.CREATE_ENTITY,
             target=Schema()
         ))
 
     @router.post(
         f'/{schema.slug}',
-        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
+        response_model=Union[EntityBaseSchema, ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Create new {schema.name} entity',
         responses={
@@ -294,8 +206,8 @@ def route_create_entity(router: APIRouter, schema: Schema):
             }
         }
     )
-    def create_entity(data: entity_create_schema, response: Response, db: Session = Depends(get_db),
-                      user: User = Depends(req_permission)):
+    def create_entity(data: factory(schema=schema, variant=ModelVariant.CREATE), response: Response,
+                      db: Session = Depends(get_db), user: User = Depends(req_permission)):
         try:
             change_request = create_entity_create_request(
                 db=db, schema_id=schema.id, data=data.dict(), created_by=user, commit=False)
@@ -305,64 +217,30 @@ def route_create_entity(router: APIRouter, schema: Schema):
             db.commit()
             response.status_code = status.HTTP_202_ACCEPTED
             return change_request
-        except exceptions.MissingSchemaException as e:
+        except (
+                exceptions.MissingSchemaException, exceptions.AttributeNotDefinedException,
+                exceptions.MissingEntityException) as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-        except exceptions.EntityExistsException as e:
+        except (exceptions.EntityExistsException, exceptions.UniqueValueException) as e:
             raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-        except exceptions.AttributeNotDefinedException as e:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-        except exceptions.NotListedAttributeException as e:
+        except (exceptions.NotListedAttributeException, exceptions.WrongSchemaToBindException) as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-        except exceptions.MissingEntityException as e:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-        except exceptions.WrongSchemaToBindException as e:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-        except exceptions.UniqueValueException as e:
-            raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-
-
-def _update_entity_request_model(schema: Schema) -> ModelMetaclass:
-    '''
-    Creates Pydantic entity update model
-
-    Model includes all entity attributes as `Optional` fields,
-    with descriptions taken from `AttributeDefinition`,
-    plus `Optional` `slug` field with custom validator for it
-    and `Optional` `name` field.
-
-    This model will raise exception if passed fields that don't
-    belong to it.
-    '''
-    field_names = [_fieldname_for_schema(i.attribute.name) for i in schema.attr_defs]
-    types = [_make_type(i, optional=True) for i in schema.attr_defs]
-    fields_types = dict(zip(field_names, types))
-    
-    class Config:
-        extra = 'forbid'
-    
-    model = create_model(
-        f"{schema.slug.capitalize().replace('-', '_')}Update",
-        **fields_types,
-        slug=(Optional[str], Field(description='Slug of this entity')),
-        name=(Optional[str], Field(description='Name of this entity')),
-        __config__=Config,
-        __validators__={'slug_validator': validator('slug', allow_reuse=True)(schemas.validate_slug)}
-    )
-    return model
+        except DataError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, e.orig.args[0].strip())
 
 
 def route_update_entity(router: APIRouter, schema: Schema):
-    entity_update_schema = _update_entity_request_model(schema=schema)
+    factory = EntityModelFactory()
     req_permission = authenticated_user
     if schema.reviewable:
-        req_permission = authorized_user(schemas.RequirePermission(
+        req_permission = authorized_user(RequirePermission(
             permission=PermissionType.UPDATE_ENTITY,
             target=Entity()
         ))
 
     @router.put(
         f'/{schema.slug}/{{id_or_slug}}',
-        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
+        response_model=Union[EntityBaseSchema, ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Update {schema.name} entity',
         responses={
@@ -395,7 +273,8 @@ def route_update_entity(router: APIRouter, schema: Schema):
             }
         }
     )
-    def update_entity(id_or_slug: Union[int, str], data: entity_update_schema, response: Response,
+    def update_entity(id_or_slug: Union[int, str],
+                      data: factory(schema=schema, variant=ModelVariant.UPDATE), response: Response,
                       db: Session = Depends(get_db), user: User = Depends(req_permission)):
         try:
             change_request = create_entity_update_request(
@@ -409,31 +288,27 @@ def route_update_entity(router: APIRouter, schema: Schema):
             db.commit()
             response.status_code = status.HTTP_202_ACCEPTED
             return change_request
-        except exceptions.MissingEntityException as e:
+        except (exceptions.MissingEntityException, exceptions.MissingSchemaException) as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-        except exceptions.MissingSchemaException as e:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-        except exceptions.EntityExistsException as e:
+        except (exceptions.EntityExistsException, exceptions.UniqueValueException) as e:
             raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-        except exceptions.WrongSchemaToBindException as e:
+        except (exceptions.WrongSchemaToBindException, exceptions.RequiredFieldException) as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-        except exceptions.UniqueValueException as e:
-            raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-        except exceptions.RequiredFieldException as e:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) 
+        except DataError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, e.orig.args[0].strip())
 
 
 def route_delete_entity(router: APIRouter, schema: Schema):
     req_permission = authenticated_user
     if schema.reviewable:
-        req_permission = authorized_user(schemas.RequirePermission(
+        req_permission = authorized_user(RequirePermission(
             permission=PermissionType.DELETE_ENTITY,
             target=Entity()
         ))
 
     @router.delete(
         f'/{schema.slug}/{{id_or_slug}}',
-        response_model=Union[schemas.EntityBaseSchema, schemas.ChangeRequestSchema],
+        response_model=Union[EntityBaseSchema, ChangeRequestSchema],
         tags=[schema.name],
         summary=f'Delete {schema.name} entity',
         responses={
