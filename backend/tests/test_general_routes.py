@@ -324,6 +324,27 @@ class TestRouteSchemaCreate:
         assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
+    def test_raise_on_invalid_attribute_name(self, dbsession: Session,
+                                             authorized_client: TestClient):
+        data = {
+            "name": "Test",
+            "slug": "test",
+            "attributes": [{
+                "name": '403',
+                "type": "INT",
+                "required": True,
+                "unique": False,
+                "list": False,
+                "key": True,
+                "description": 'Age of this person'
+            }]
+        }
+
+        response = authorized_client.post('/schema', json=data)
+        assert response.status_code == 422
+
+        assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
+
 
 class TestRouteSchemaUpdate:
     default_attributes = [
@@ -555,6 +576,29 @@ class TestRouteSchemaUpdate:
         response = authorized_client.put('/schema/1', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
+
+    def test_raise_on_invalid_attribute_name(self, dbsession: Session,
+                                             authorized_client: TestClient):
+        data = {
+            "name": "Test",
+            "slug": "test",
+            "attributes": self.default_attributes + [{
+                "name": '403',
+                "type": "INT",
+                "required": True,
+                "unique": False,
+                "list": False,
+                "key": True,
+                "description": 'Age of this person'
+            }]
+        }
+
+        response = authorized_client.put('/schema/1', json=data)
+        assert response.status_code == 422
+
+        schema = dbsession.query(Schema).get(1)
+        assert schema.name == "Person"
+        assert schema.slug == "person"
 
 
 class TestRouteSchemaDelete:

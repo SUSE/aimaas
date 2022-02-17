@@ -1,10 +1,9 @@
 from pydantic.error_wrappers import ValidationError
 import pytest
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
 
 from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema
-from ..exceptions import SchemaExistsException, NoSchemaToBindException, MissingSchemaException, \
+from ..exceptions import SchemaExistsException, MissingSchemaException, \
     NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
@@ -657,7 +656,23 @@ class TestSchemaUpdate:
         )
         with pytest.raises(MultipleAttributeOccurencesException):
             update_schema(dbsession, id_or_slug=1, data=upd_schema)
-   
+
+    def test_raise_on_invalid_attribute_name(self, dbsession):
+        with pytest.raises(ValidationError):
+            SchemaUpdateSchema(
+                name="Test",
+                slug="test",
+                attributes=self.default_attributes + [AttrDefSchema(
+                    name='403',
+                    type="INT",
+                    required=True,
+                    unique=False,
+                    list=False,
+                    key=True,
+                    description='This is an invalid name'
+                )]
+            )
+
 
 class TestSchemaDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'person'])
