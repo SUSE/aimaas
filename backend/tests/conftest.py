@@ -160,7 +160,7 @@ def populate_db(db: Session):
 
     db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2, p2_fav_color_1, p2_fav_color_2])
 
-    unperson = Schema(name="UnPerson", slug="unperson")
+    unperson = Schema(name="UnPerson", slug="unperson", reviewable=True)
     db.add(unperson)
 
     time = datetime.now(timezone.utc)

@@ -1,4 +1,6 @@
 import json
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -258,3 +260,50 @@ class TestRouteLogin:
         response = client.post('/login', data={'username': 'this-is-no-user',
                                                'password': 'this-could-have-been-a-password'})
         assert response.status_code == 401
+
+
+class TestRoutesRequiringAuth:
+    authenticated = (
+        # method, route
+        ('post', '/changes/review/1'),
+        ('get', '/groups'),
+        ('get', '/groups/1'),
+        ('get', '/groups/1/members'),
+        ('get', '/users'),
+        ('get', '/users/tester/memberships'),
+        ('get', '/permissions'),
+    )
+    authorized = (
+        ('post', '/schema'),
+        ('put', '/schema/unperson'),
+        ('delete', '/schema/unperson'),
+        ('post', '/groups'),
+        ('put', '/groups/1'),
+        # ('delete', '/groups/1'), No route for deleting groups
+        ('patch', '/groups/1/members'),
+        ('delete', '/groups/1/members'),
+        ('patch', '/users/tester'),
+        ('delete', '/users/tester'),
+        ('post', '/permissions'),
+        ('delete', '/permissions'),
+        ('post', '/entity/unperson'),
+        ('put', '/entity/unperson/foo'),
+        ('delete', '/entity/unperson/foo'),
+    )
+
+    @pytest.mark.parametrize("method, url", authenticated + authorized)
+    def test_require_authentication(self, method, url, client: TestClient):
+        func = getattr(client, method)
+        response = func(url)
+        assert response.status_code == 401
+
+    @pytest.mark.parametrize("method, url", authorized)
+    def test_require_authorization(self, method, url, dbsession: Session, testuser: User,
+                                   authenticated_client: TestClient):
+        # The testuser is a superuser. Remove permissions first.
+        dbsession.query(Permission).filter(Permission.recipient_type == RecipientType.USER,
+                                           Permission.recipient_id == testuser.id).delete()
+
+        func = getattr(authenticated_client, method)
+        response = func(url)
+        assert response.status_code == 403
