@@ -1,6 +1,7 @@
+import typing
 from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
-from itertools import chain
+from itertools import chain, groupby
 
 from psycopg2.errors import ForeignKeyViolation
 from sqlalchemy import func, distinct, column, asc, desc, or_, select, update
@@ -651,6 +652,23 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
         for val in values:
             v = model(value=val, entity_id=e.id, attribute_id=attr.id)
             db.add(v)
+
+    # Ensure that no required attribute remains unset
+    non_updated_required_fields = [attr_def for name, attr_def in attr_defs.items()
+                                   if attr_def.required and name not in data]
+    for model, req_attr_defs in groupby(non_updated_required_fields,
+                                        lambda x: x.attribute.type.value[0]):
+        expected_attr_ids = {attr_def.attribute_id for attr_def in req_attr_defs}
+        present_attr_ids = set(db.query(model.attribute_id)
+                                 .filter(model.attribute_id.in_(expected_attr_ids),
+                                         model.entity_id == e.id)
+                                 .distinct())
+        missing_attr_ids = expected_attr_ids - present_attr_ids
+        if missing_attr_ids:
+            attr_id = next(iter(missing_attr_ids))
+            for name, attr_def in attr_defs.items():
+                if attr_id == attr_def.attribute_id:
+                    raise RequiredFieldException(name)
 
     if commit:
         db.commit()

@@ -21,6 +21,7 @@ def asserts_after_entities_create(db: Session):
     assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
     assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(timezone.utc)
 
+
 class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)

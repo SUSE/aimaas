@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
 from pydantic.error_wrappers import ValidationError
 import pytest
 from sqlalchemy import select, update
 
-from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema
-from ..exceptions import SchemaExistsException, MissingSchemaException, \
+from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema, \
+    get_entities, update_entity
+from ..exceptions import SchemaExistsException, MissingSchemaException, RequiredFieldException, \
     NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
@@ -328,8 +330,7 @@ class TestSchemaUpdate:
         upd_schema = SchemaUpdateSchema(
             slug='test',
             reviewable=True,
-            attributes=attributes,
-            delete_attributes=['friends']
+            attributes=attributes
         )
         update_schema(dbsession, id_or_slug='person', data=upd_schema)
 
@@ -672,6 +673,33 @@ class TestSchemaUpdate:
                     description='This is an invalid name'
                 )]
             )
+
+    def test_make_attr_required(self, dbsession):
+        """
+        Make sure that optional attributes (with empty values) can be made required
+        """
+        attributes = [a for a in self.default_attributes if a.name != "born"] + [
+            AttrDefSchema(
+                id=2,
+                name='born',
+                type='DT',
+                required=True,
+                unique=False,
+                list=False,
+                key=False
+            ),
+        ]
+
+        upd_schema = SchemaUpdateSchema(
+            attributes=attributes
+        )
+        update_schema(dbsession, id_or_slug='person', data=upd_schema)
+
+        entities = get_entities(dbsession, get_schema(dbsession, 1)).entities
+        assert all(e.get("born", None) is None for e in entities)
+
+        with pytest.raises(RequiredFieldException):
+            update_entity(dbsession, 1, 1, {"name": "Frank", "age": 99})
 
 
 class TestSchemaDelete:
