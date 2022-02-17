@@ -248,7 +248,8 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
     return new, updated, deleted
 
 
-def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema, commit: bool = True) -> Schema:
+def update_schema(db: Session, id_or_slug: Union[int, str], data: SchemaUpdateSchema,
+                  commit: bool = True) -> Schema:
     schema = get_schema(db=db, id_or_slug=id_or_slug)
     if schema.deleted:
         raise MissingSchemaException(obj_id=id_or_slug)
