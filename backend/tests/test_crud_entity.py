@@ -21,6 +21,7 @@ def asserts_after_entities_create(db: Session):
     assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
     assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(timezone.utc)
 
+
 class TestEntityCreate:
     def test_create(self, dbsession):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
@@ -568,6 +569,7 @@ def asserts_after_entity_delete(db: Session):
     assert len(entities) == 2
     e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
     assert e.deleted
+
 
 class TestEntityDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'Jack'])
