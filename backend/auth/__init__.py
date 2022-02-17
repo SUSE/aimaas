@@ -19,16 +19,11 @@ from .enum import PermissionType
 from .models import User, Group
 
 
-_enabled_backends = get()
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=s.token_url, auto_error=True)
 
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
-
-
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
+    _enabled_backends = get()
     for backend_class in _enabled_backends:
         backend = backend_class(db=db)
         user = backend.authenticate(username=username, password=password)

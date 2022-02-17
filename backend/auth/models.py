@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Enum, Table
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql.schema import UniqueConstraint
 
 from ..base_models import Base
 from .enum import RecipientType, PermissionTargetType, PermissionType
+
 
 class Group(Base):
     __tablename__ = 'groups'
@@ -11,7 +12,9 @@ class Group(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(128), unique=True, nullable=False)
     parent_id = Column(Integer, ForeignKey('groups.id'))
+
     parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
+    members = relationship('UserGroup', back_populates="group")
 
     def __str__(self):
         return self.name
@@ -19,6 +22,7 @@ class Group(Base):
 
 class User(Base):
     __tablename__ = 'users'
+
     id = Column(Integer, primary_key=True)
     username = Column(String(128), unique=True, nullable=False)
     email = Column(String(128), unique=True, nullable=False)
@@ -26,6 +30,8 @@ class User(Base):
     firstname = Column(String(128), nullable=True)
     lastname = Column(String(128), nullable=True)
     is_active = Column(Boolean, default=True)
+
+    groups = relationship('UserGroup', back_populates="user")
 
     def __str__(self):
         return self.username
@@ -72,6 +78,18 @@ class Permission(Base):
     def recipient_name(self):
         return self.user.username if self.recipient_type == RecipientType.USER else self.group.name
 
+    @property
+    def recipient(self):
+        return self.user if self.recipient_type == RecipientType.USER else self.group
+
+    @property
+    def object(self):
+        if self.obj_type == PermissionTargetType.ENTITY:
+            return self.entity
+        if self.obj_type == PermissionTargetType.SCHEMA:
+            return self.schema
+        return self.managed_group
+
 
 class UserGroup(Base):
     __tablename__ = 'user_groups'
@@ -79,8 +97,8 @@ class UserGroup(Base):
     group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
 
-    group = relationship('Group')
-    user = relationship('User')
+    group = relationship('Group', back_populates="members")
+    user = relationship('User', back_populates="groups")
 
     __table_args__ = (
         UniqueConstraint('user_id', 'group_id'),

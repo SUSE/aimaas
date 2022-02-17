@@ -6,12 +6,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from .config import settings, VERSION
-from . import crud, schemas, exceptions, auth
+from . import crud, schemas, exceptions
 from .database import get_db
 from .enum import FilterEnum
 from .models import Schema, AttrType
 from .dynamic_routes import create_dynamic_router
-from .auth import authenticated_user, authorized_user, crud as auth_crud
+from .auth import authenticate_user, authenticated_user, authorized_user, create_access_token,\
+    crud as auth_crud
 from .auth.enum import PermissionType, RecipientType, PermissionTargetType
 from .auth.models import User, Group
 from .schemas.auth import (
@@ -356,10 +357,7 @@ def update_group(group_id: int, data: BaseGroupSchema, response: Response,
 
 @router.post('/users', response_model=UserSchema, tags=["Auth"])
 def create_user(user: UserCreateSchema, db: Session = Depends(get_db)):
-    user_ = User(email=user.email, username=user.username, password=auth.get_password_hash(user.password))
-    db.add(user_)
-    db.commit()
-    return user_
+    return auth_crud.create_user(db=db, data=user)
 
 
 @router.get('/users', response_model=List[UserSchema], tags=["Auth"], )
@@ -457,15 +455,15 @@ def revoke_permissions(permission_ids: List[int], response: Response, db: Sessio
 
 @router.post(settings.token_url, response_model=Token, tags=["Auth"])
 async def login(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-    user = auth.authenticate_user(db, form_data.username, form_data.password)
+    user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='Incorrect username or password',
             headers={'WWW-Authenticate': 'Bearer'},
         )
-    access_token, expiration_date = auth.create_access_token(
-        data={'sub': user.username}, expires_delta=timedelta(minutes=auth.s.token_exp_minutes)
+    access_token, expiration_date = create_access_token(
+        data={'sub': user.username}, expires_delta=timedelta(minutes=settings.token_exp_minutes)
     )
     return {'access_token': access_token, 'token_type': 'bearer',
             'expiration_date': expiration_date}

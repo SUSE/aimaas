@@ -98,10 +98,7 @@ class TestRouteCreateEntity:
     def test_no_raise_on_same_slug_in_different_schemas(self, dbsession, authorized_client):
         data = {'slug': 'Jack', 'name': 'name'}
         response = authorized_client.post(f'/entity/unperson', json=data)
-        assert response.status_code == 200
-
-        entity = dbsession.execute(select(Entity).where(Entity.schema_id == 2)).scalar()
-        assert entity.slug == 'Jack' and entity.name == 'name'
+        assert response.status_code == 202  # schema is reviewable
 
     def test_raise_on_non_unique_field(self, dbsession, authorized_client):
         p1 = {

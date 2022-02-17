@@ -78,6 +78,9 @@ class Schema(Base):
     attr_defs = relationship('AttributeDefinition', back_populates='schema',
                              foreign_keys="[AttributeDefinition.schema_id]")
 
+    def __str__(self):
+        return self.name
+
 
 class Entity(Base):
     __tablename__ = 'entities'
@@ -93,6 +96,9 @@ class Entity(Base):
     __table_args__ = (
         UniqueConstraint('slug', 'schema_id'),
     )
+
+    def __str__(self):
+        return self.name
 
     def get(self, attr_name: str, db: Session) -> Union[Optional[Value], List[Value]]:
         attr_def: AttributeDefinition = db.execute(
