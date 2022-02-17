@@ -570,6 +570,7 @@ def asserts_after_entity_delete(db: Session):
     e = db.execute(select(Entity).where(Entity.id == 1)).scalar()
     assert e.deleted
 
+
 class TestEntityDelete:
     @pytest.mark.parametrize('id_or_slug', [1, 'Jack'])
     def test_delete(self, dbsession, id_or_slug):

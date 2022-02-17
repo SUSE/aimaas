@@ -659,7 +659,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     for model, req_attr_defs in groupby(non_updated_required_fields,
                                         lambda x: x.attribute.type.value[0]):
         expected_attr_ids = {attr_def.attribute_id for attr_def in req_attr_defs}
-        present_attr_ids = set(db.query(model.attribute_id)
+        present_attr_ids = set(aid[0] for aid in db.query(model.attribute_id)
                                  .filter(model.attribute_id.in_(expected_attr_ids),
                                          model.entity_id == e.id)
                                  .distinct())

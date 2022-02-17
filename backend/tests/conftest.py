@@ -56,7 +56,7 @@ def populate_db(db: Session):
       -------|---------|----------|--------|------|----
       age    |    2    |     +    |   -    |   -  |  + 
       born   |    4    |     -    |   -    |   -  |  - 
-      friends|    5    |     +    |   -    |   +  |  - 
+      friends|    5    |     -    |   -    |   +  |  -
     nickname |    7    |     -    |   +    |   -  |  -
     fav_color|    8    |     -    |   -    |   +  |  -
 
@@ -116,7 +116,7 @@ def populate_db(db: Session):
     friends_ = AttributeDefinition(
         schema_id=person.id,
         attribute_id=friends.id,
-        required=True,
+        required=False,
         unique=False,
         list=True,
         key=False,

@@ -173,7 +173,7 @@ class TestUpdateSchema:
                 id=3,
                 name='friends',
                 type='FK',
-                required=True,
+                required=False,
                 unique=False,
                 list=True,
                 key=False,
