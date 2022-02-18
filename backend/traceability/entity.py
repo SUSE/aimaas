@@ -8,17 +8,19 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from .. import crud
-from .. import dynamic_routes
 from ..auth.models import User
+from ..enum import ModelVariant
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
     AttributeNotDefinedException, MissingEntityUpdateRequestException, \
     MissingEntityDeleteRequestException, MissingChangeRequestException
 from ..models import Entity, AttributeDefinition, Schema, Attribute
+from ..schemas.entity import EntityModelFactory
 from ..schemas.traceability import EntityChangeDetailSchema
 
 from .enum import EditableObjectType, ContentType, ChangeType, ChangeStatus
 from .models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, ChangeValueBool, \
     ChangeValueStr
+
 
 def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> List[ChangeRequest]:
     return db.execute(
@@ -303,7 +305,8 @@ def apply_entity_create_request(db: Session, change_request: ChangeRequest, revi
         values = db.execute(select(ChangeValueModel).where(ChangeValueModel.id.in_(value_ids))).scalars().all()
         data[attr_name] = [i.new_value for i in values if i.new_value is not None]
 
-    EntityCreateModel = dynamic_routes._create_entity_request_model(schema=schema)
+    factory = EntityModelFactory()
+    EntityCreateModel = factory(schema=schema, variant=ModelVariant.CREATE)
 
     e = crud.create_entity(
         db=db, 
@@ -359,8 +362,7 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
             change_type=ChangeType.UPDATE
         )
         db.add(change)
-    
-    
+
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in entity.schema.attr_defs}
     for field, value in data.items():
         attr_def = attr_defs.get(field)
@@ -462,8 +464,9 @@ def apply_entity_update_request(db: Session, change_request: ChangeRequest, revi
         value_ids = [i.value_id for i in changes]
         values = db.execute(select(ValueModel).where(ValueModel.id.in_(value_ids))).scalars().all()
         data[attr_name] = [i.new_value for i in values if i.new_value is not None]
-    
-    UpdateModel = dynamic_routes._update_entity_request_model(schema=entity.schema)
+
+    factory = EntityModelFactory()
+    UpdateModel = factory(schema=entity.schema, variant=ModelVariant.UPDATE)
     entity = crud.update_entity(
         db=db, 
         id_or_slug=entity.id, 

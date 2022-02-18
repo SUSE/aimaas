@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 from typing import NamedTuple
 
 
@@ -20,3 +20,8 @@ class FilterEnum(Enum):
     STARTS = Filter('starts', 'startswith', 'starts with substring')
 
 
+class ModelVariant(Enum):
+    CREATE = auto()
+    GET = auto()
+    LIST = auto()
+    UPDATE = auto()
