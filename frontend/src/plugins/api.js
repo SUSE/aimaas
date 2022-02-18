@@ -170,8 +170,8 @@ class API {
 
     async getEntities({
                           schemaSlug,
-                          limit = 10,
-                          offset = 0,
+                          page = 1,
+                          size = 10,
                           all = false,
                           deletedOnly = false,
                           allFields = false,
@@ -180,8 +180,8 @@ class API {
                           ascending = true,
                       } = {}) {
         const params = new URLSearchParams();
-        params.set('limit', limit);
-        params.set('offset', offset);
+        params.set('page', page);
+        params.set('size', size);
         params.set('all', all);
         params.set('all_fields', allFields);
         params.set('deletedOnly', deletedOnly);
@@ -250,8 +250,11 @@ class API {
         return this._fetch({url: url,})
     }
 
-    async getPendingChangeRequests() {
-        let url = `${this.base}/changes/pending?all=true`;
+    async getPendingChangeRequests({page = 1, size = 50} = {}) {
+        const params = new URLSearchParams();
+        params.set('page', page);
+        params.set('size', size);
+        let url = `${this.base}/changes/pending?${params.toString()}`;
         return this._fetch({url: url});
     }
 

@@ -1,5 +1,6 @@
 alembic
 fastapi
+fastapi-pagination[sqlalchemy]
 ldap3
 passlib[bcrypt]
 psycopg2-binary

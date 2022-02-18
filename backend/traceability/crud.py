@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi.exceptions import HTTPException
+from fastapi_pagination import Params, Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlalchemy import select, desc
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
@@ -114,13 +116,13 @@ def review_changes(db: Session, change_request_id: int, review: ChangeReviewSche
     return change_request, changed
 
 
-def get_pending_change_requests(db: Session, obj_type: Optional[ContentType] = None,
-                                limit: Optional[int] = 10, offset: Optional[int] = 0,
-                                all: Optional[bool] = False) -> List[ChangeRequest]:
-    q = select(ChangeRequest).where(ChangeRequest.status == ChangeStatus.PENDING).order_by(desc(ChangeRequest.id))
-    if obj_type is not None:
-        q = q.join(Change).where(Change.content_type == obj_type).distinct()
-    if not all:
-        q = q.offset(offset).limit(limit)
-    q = q.order_by(ChangeRequest.created_at.desc())
-    return db.execute(q).scalars().all()
+def get_pending_change_requests(params: Params, db: Session,
+                                obj_type: Optional[EditableObjectType] = None) -> Page[ChangeRequest]:
+    q = db.query(ChangeRequest) \
+        .filter(ChangeRequest.status == ChangeStatus.PENDING) \
+        .order_by(ChangeRequest.created_at.desc())
+
+    if obj_type:
+        q = q.filter(ChangeRequest.object_type == obj_type)
+
+    return paginate(q, params)

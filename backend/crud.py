@@ -2,6 +2,9 @@ from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
 from itertools import groupby
 
+from fastapi_pagination import Params
+from fastapi_pagination.api import create_page
+from fastapi_pagination.ext.sqlalchemy import paginate_query
 from psycopg2.errors import ForeignKeyViolation
 from sqlalchemy import func, distinct, column, asc, desc, or_, select, update
 from sqlalchemy.orm import Session
@@ -432,12 +435,11 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
 
 
 def get_entities(
-        db: Session, 
+        db: Session,
         schema: Schema,
-        limit: int = None,
-        offset: int = None,
-        all: bool = False, 
-        deleted_only: bool = False, 
+        params: Params,
+        all: bool = False,
+        deleted_only: bool = False,
         all_fields: bool = False,
         filters: dict = None,
         order_by: str = 'name',
@@ -481,11 +483,11 @@ def get_entities(
     else:
         direction = 'asc' if ascending else 'desc'
         q = q.order_by(getattr(Entity.name, direction)())
-    q = q.offset(offset).limit(limit)
+    q = paginate_query(q, params)
     entities = db.execute(select(Entity).from_statement(q)).scalars().all()
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key or i.attribute.name == order_by]
     entities = _get_attr_values_batch(db, entities, attr_defs)
-    return EntityListSchema(total=total, entities=entities)
+    return create_page(entities, total, params)
 
 
 def get_entity_by_id(db: Session, entity_id: int) -> Entity:

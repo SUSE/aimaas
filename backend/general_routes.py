@@ -3,6 +3,7 @@ from typing import Optional, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Response
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_pagination import Params, Page
 from sqlalchemy.orm import Session
 
 from .config import settings, VERSION
@@ -198,16 +199,13 @@ def reviewchanges(request_id: int, review: schemas.ChangeReviewSchema, response:
 
 
 @router.get('/changes/pending', tags=["Reviews & Changes"],
-            response_model=List[schemas.ChangeRequestSchema])
+            response_model=Page[schemas.ChangeRequestSchema])
 def get_pending_changerequests(
     obj_type: Optional[ContentType] = Query(None),
-    limit: Optional[int] = Query(10),
-    offset: Optional[int] = Query(0),
-    all: Optional[bool] = Query(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    params: Params = Depends()
 ):
-    return get_pending_change_requests(obj_type=obj_type, limit=limit, offset=offset,
-                                                    all=all, db=db)
+    return get_pending_change_requests(obj_type=obj_type, params=params, db=db)
 
 
 @router.get('/changes/schema/{id_or_slug}', tags=["Reviews & Changes"],
