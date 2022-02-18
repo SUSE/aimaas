@@ -11,9 +11,10 @@ class Group(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(128), unique=True, nullable=False)
-    parent_id = Column(Integer, ForeignKey('groups.id'))
+    parent_id = Column(Integer, ForeignKey('groups.id', ondelete="RESTRICT"))
 
-    parent = relationship('Group', remote_side=[id], backref=backref('subgroups'))
+    parent = relationship('Group', remote_side=[id], back_populates='subgroups')
+    subgroups = relationship('Group', back_populates="parent", passive_deletes='all')
     members = relationship('UserGroup', back_populates="group")
 
     def __str__(self):

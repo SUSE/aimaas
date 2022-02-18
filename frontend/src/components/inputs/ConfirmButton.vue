@@ -7,8 +7,8 @@
     <div :class="hiddenClass" :id="id">
       <div class="card">
         <div class="card-body d-flex p-1 gap-2" :class="cardClass">
-          <button type="button" class="btn btn-sm btn-outline-dark" aria-label="Cancel"
-                  @click="this.hide()">
+          <button type="button" class="btn btn-sm btn-outline-dark" @click="this.hide()"
+                  :class="reverse ? 'order-last' : ''" aria-label="Cancel">
             Cancel
           </button>
           <span class="text-cta flex-grow-1 text-center">
@@ -17,7 +17,7 @@
             </slot>
           </span>
           <button type="button" class="btn btn-sm btn-cta flex-grow-1" @click="callback"
-                  :value="value">
+                  :class="reverse ? 'order-first': ''" :value="value">
             Confirm
           </button>
         </div>
@@ -45,6 +45,10 @@ export default {
       default: `confirm-${randomUUID()}`
     },
     vertical: {
+      type: Boolean,
+      default: false
+    },
+    reverse: {
       type: Boolean,
       default: false
     },
