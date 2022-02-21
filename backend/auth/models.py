@@ -15,7 +15,7 @@ class Group(Base):
 
     parent = relationship('Group', remote_side=[id], back_populates='subgroups')
     subgroups = relationship('Group', back_populates="parent", passive_deletes='all')
-    members = relationship('UserGroup', back_populates="group")
+    members = relationship('UserGroup', back_populates="group", cascade="delete")
 
     def __str__(self):
         return self.name
@@ -32,7 +32,7 @@ class User(Base):
     lastname = Column(String(128), nullable=True)
     is_active = Column(Boolean, default=True)
 
-    groups = relationship('UserGroup', back_populates="user")
+    groups = relationship('UserGroup', back_populates="user", cascade="delete")
 
     def __str__(self):
         return self.username
@@ -95,8 +95,8 @@ class Permission(Base):
 class UserGroup(Base):
     __tablename__ = 'user_groups'
     id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey('groups.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    group_id = Column(Integer, ForeignKey('groups.id', ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
 
     group = relationship('Group', back_populates="members")
     user = relationship('User', back_populates="groups")
