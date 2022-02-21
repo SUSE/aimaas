@@ -1,16 +1,15 @@
 import typing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth.models import User
 from ..crud import get_entity_by_id, get_entity
 from ..exceptions import MissingEntityUpdateRequestException, AttributeNotDefinedException, \
     MissingEntityCreateRequestException
-from ..models import AttributeDefinition, Attribute, AttrType, Entity, Schema
-from ..traceability.entity import get_recent_entity_changes, entity_change_details, \
+from ..models import Attribute, AttrType, Entity, Schema
+from ..traceability.entity import entity_change_details, \
     create_entity_update_request, apply_entity_update_request, create_entity_delete_request, \
     apply_entity_delete_request, create_entity_create_request, apply_entity_create_request
 from ..traceability.enum import EditableObjectType, ChangeType, ContentType, ChangeStatus

@@ -3,11 +3,14 @@ from datetime import datetime, timezone
 from itertools import groupby, chain
 import typing
 
+from fastapi_pagination import Params, Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from ..auth.models import User
+from ..config import DEFAULT_PARAMS
 from ..models import Schema
 from ..schemas.schema import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema, \
     AttributeDefinition, SchemaBaseSchema
@@ -56,17 +59,23 @@ def get_pending_entity_create_requests_for_schema(db: Session, schema_id: int) -
     return db.execute(q).scalars().all()
 
 
-def get_recent_schema_changes(db: Session, schema_id: int, count: int = 5) \
-        -> typing.Tuple[typing.List[ChangeRequest], typing.List[ChangeRequest]]:
-    schema_changes = db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.object_id == schema_id)
-        .where(ChangeRequest.object_type == EditableObjectType.SCHEMA)
-        .order_by(ChangeRequest.created_at.desc()).limit(count)
+def get_recent_schema_changes(db: Session, schema_id: int, params: Params = DEFAULT_PARAMS) \
+        -> Page[ChangeRequest]:
+    pending_entity_creations = db.query(ChangeRequest)\
+        .filter(ChangeRequest.status == ChangeStatus.PENDING,
+                ChangeRequest.change_type == ChangeType.CREATE,
+                ChangeRequest.object_type == EditableObjectType.ENTITY)\
+        .join(Change)\
+        .filter(Change.field_name == 'schema_id')\
+        .join(ChangeValueInt, Change.value_id == ChangeValueInt.id)\
+        .filter(ChangeValueInt.new_value == schema_id)\
         .distinct()
-    ).scalars().all()
-    pending_entity_requests = get_pending_entity_create_requests_for_schema(db=db, schema_id=schema_id)
-    return schema_changes, pending_entity_requests
+    schema_history = db.query(ChangeRequest)\
+        .filter(ChangeRequest.object_id == schema_id,
+                ChangeRequest.object_type == EditableObjectType.SCHEMA)
+    q = pending_entity_creations.union(schema_history)\
+        .order_by(ChangeRequest.created_at.desc(), ChangeRequest.status == ChangeStatus.PENDING)
+    return paginate(q, params)
 
 
 def schema_change_details(db: Session, change_request_id: int) -> SchemaChangeDetailSchema:

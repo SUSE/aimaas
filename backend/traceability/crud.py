@@ -10,6 +10,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_403_FORBIDDEN
 
+from ..config import DEFAULT_PARAMS
 from ..exceptions import MissingChangeException, MissingChangeRequestException
 from ..auth.crud import has_permission
 from ..auth.enum import PermissionType
@@ -116,8 +117,13 @@ def review_changes(db: Session, change_request_id: int, review: ChangeReviewSche
     return change_request, changed
 
 
-def get_pending_change_requests(params: Params, db: Session,
-                                obj_type: Optional[EditableObjectType] = None) -> Page[ChangeRequest]:
+def get_pending_change_request_count(db: Session) -> int:
+    return db.query(ChangeRequest.id).filter(ChangeRequest.status == ChangeStatus.PENDING).count()
+
+
+def get_pending_change_requests(db: Session, params: Params = DEFAULT_PARAMS,
+                                obj_type: Optional[EditableObjectType] = None) \
+        -> Page[ChangeRequest]:
     q = db.query(ChangeRequest) \
         .filter(ChangeRequest.status == ChangeStatus.PENDING) \
         .order_by(ChangeRequest.created_at.desc())

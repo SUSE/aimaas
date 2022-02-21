@@ -1,13 +1,14 @@
 from random import choice
 import random
 
-from ..config import *
+from fastapi_pagination import Params
+
 from ..crud import *
 from ..models import *
 from ..schemas import *
-from ..exceptions import *
 
 from copy import copy
+
 
 def data_for_test(db: Session, count: int):
     random.seed(42)
@@ -65,7 +66,7 @@ def test_stuff(dbsession):
         schema=schema, 
         all_fields=True, 
         order_by='int_field'
-    ).entities
+    ).items
     assert [i['id'] for i in result] == [i['id'] for i in entities]
 
     ### pagination 10, 0
@@ -74,9 +75,8 @@ def test_stuff(dbsession):
         schema=schema, 
         all_fields=True, 
         order_by='int_field',
-        limit=10,
-        offset=0
-    ).entities
+        params=Params(size=10, page=1)
+    ).items
     assert [i['id'] for i in result] == [i['id'] for i in entities][0:10]
 
     ### pagination 10, 20
@@ -85,9 +85,8 @@ def test_stuff(dbsession):
         schema=schema, 
         all_fields=True, 
         order_by='int_field',
-        limit=10,
-        offset=20
-    ).entities
+        params=Params(size=10, page=2)
+    ).items
     assert [i['id'] for i in result] == [i['id'] for i in entities][20:30]
     
     ## descenging
@@ -97,7 +96,7 @@ def test_stuff(dbsession):
         all_fields=True, 
         order_by='int_field',
         ascending=False
-    ).entities
+    ).items
     assert [i['id'] for i in result] == [i['id'] for i in entities][::-1]
 
 
@@ -109,7 +108,7 @@ def test_stuff(dbsession):
         all_fields=True, 
         order_by='int_field',
         filters={'name.contains': 'j'}
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name']]
     a = 5
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
@@ -122,7 +121,7 @@ def test_stuff(dbsession):
         order_by='int_field',
         filters={'name.contains': 'j'},
         ascending=False
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name']][::-1]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
@@ -134,7 +133,7 @@ def test_stuff(dbsession):
         all_fields=True, 
         order_by='int_field',
         filters={'name.contains': 'j', 'string_field.starts': 'a'}
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name'] and i['string_field'].startswith('a')]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
@@ -146,7 +145,7 @@ def test_stuff(dbsession):
         order_by='int_field',
         filters={'name.contains': 'j', 'string_field.starts': 'a'},
         ascending=False
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name'] and i['string_field'].startswith('a')][::-1]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
@@ -163,7 +162,7 @@ def test_stuff(dbsession):
             'int_field.gt': 50,
             'int_field.lt': 550
         }
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name'] 
                 and i['string_field'].startswith('a') 
                 and i['int_field'] > 50
@@ -183,7 +182,7 @@ def test_stuff(dbsession):
             'int_field.lt': 550
         },
         ascending=False
-    ).entities
+    ).items
     filtered = [i for i in entities if 'j' in i['name'] 
                 and i['string_field'].startswith('a') 
                 and i['int_field'] > 50

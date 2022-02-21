@@ -24,9 +24,9 @@ from .schemas.auth import (
     Token
 )
 from .schemas.info import InfoModel, FilterModel
-from .schemas.traceability import ChangeRequestSchema, SchemaChangeRequestSchema
+from .schemas.traceability import ChangeRequestSchema, CountSchema
 from .traceability.crud import review_changes, get_pending_change_requests, \
-    is_user_authorized_to_review
+    is_user_authorized_to_review, get_pending_change_request_count
 from .traceability.entity import get_recent_entity_changes, entity_change_details
 from .traceability.enum import ContentType
 from .traceability.schema import create_schema_create_request, create_schema_update_request, \
@@ -198,6 +198,11 @@ def reviewchanges(request_id: int, review: schemas.ChangeReviewSchema, response:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
+@router.get('/changes/pending/count', tags=["Reviews & Changes"], response_model=CountSchema)
+def get_count_pending_changerequests(db: Session = Depends(get_db)):
+    return CountSchema(count=get_pending_change_request_count(db=db))
+
+
 @router.get('/changes/pending', tags=["Reviews & Changes"],
             response_model=Page[schemas.ChangeRequestSchema])
 def get_pending_changerequests(
@@ -209,13 +214,12 @@ def get_pending_changerequests(
 
 
 @router.get('/changes/schema/{id_or_slug}', tags=["Reviews & Changes"],
-            response_model=schemas.SchemaChangeRequestSchema)
-def get_schema_changes(id_or_slug: Union[int, str], count: Optional[int] = Query(5),
+            response_model=Page[schemas.ChangeRequestSchema])
+def get_schema_changes(id_or_slug: Union[int, str], params: Params = Depends(),
                               db: Session = Depends(get_db)):
     try:
         schema = crud.get_schema(db=db, id_or_slug=id_or_slug)
-        schema_changes, pending_entity_requests = get_recent_schema_changes(db=db, schema_id=schema.id, count=count)
-        return SchemaChangeRequestSchema(schema_changes=schema_changes, pending_entity_requests=pending_entity_requests)
+        return get_recent_schema_changes(db=db, schema_id=schema.id, params=params)
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
@@ -230,15 +234,14 @@ def get_schema_change_details(change_id: int, db: Session = Depends(get_db)):
 
 @router.get(
     '/changes/entity/{schema_id_or_slug}/{entity_id_or_slug}', tags=["Reviews & Changes"],
-    response_model=List[schemas.ChangeRequestSchema]
+    response_model=Page[schemas.ChangeRequestSchema]
 )
-def get_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Union[int, str], count: Optional[int] = Query(5), db: Session = Depends(get_db)):
+def get_entity_changes(schema_id_or_slug: Union[int, str], entity_id_or_slug: Union[int, str],
+                       db: Session = Depends(get_db), params: Params = Depends()):
     try:
         schema = crud.get_schema(db=db, id_or_slug=schema_id_or_slug)
         entity = crud.get_entity_model(db=db, id_or_slug=entity_id_or_slug, schema=schema)
-        if entity is None:
-            raise exceptions.MissingEntityException(obj_id=entity_id_or_slug)
-        return get_recent_entity_changes(db=db, entity_id=entity.id, count=count)
+        return get_recent_entity_changes(db=db, entity_id=entity.id, params=params)
     except exceptions.MissingObjectException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 

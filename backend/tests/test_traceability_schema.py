@@ -1,10 +1,11 @@
+from fastapi_pagination import Params
 from sqlalchemy.orm import Session
 
 from ..auth.models import User
 from ..models import Schema
 from ..schemas.schema import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema
 from ..schemas.traceability import ChangeSchema
-from ..traceability.enum import ChangeType, ChangeStatus
+from ..traceability.enum import ChangeType, ChangeStatus, EditableObjectType
 from ..traceability.models import ChangeRequest, Change
 from ..traceability.schema import get_recent_schema_changes, schema_change_details, \
     create_schema_create_request, apply_schema_create_request, \
@@ -13,9 +14,11 @@ from ..traceability.schema import get_recent_schema_changes, schema_change_detai
 
 
 def test_get_recent_schema_changes(dbsession: Session):
-    changes, entity_requests = get_recent_schema_changes(db=dbsession, schema_id=1, count=50)
-    assert len(changes) == 10
-    assert len(entity_requests) == 1
+    page = get_recent_schema_changes(db=dbsession, schema_id=1, params=Params(size=20, page=1))
+    assert len(page.items) == 11
+    assert sum(1 for i in page.items
+               if i.status == ChangeStatus.PENDING
+               and i.object_type == EditableObjectType.ENTITY) == 1
 
 
 class TestCreateSchema:

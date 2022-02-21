@@ -1,6 +1,7 @@
 from datetime import timedelta, timezone
 from typing import Optional, Union, List
 
+from fastapi_pagination import Params
 from pydantic import BaseSettings
 
 
@@ -42,6 +43,7 @@ class Settings(BaseSettings):
     test_pg_port:  Optional[int] = 5432
     test_pg_db:  Optional[str]
 
+    default_page_size: int = 10
     timezone_offset: Union[str, int] = "utc"
 
     auth_backends: str = "local"
@@ -70,6 +72,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+DEFAULT_PARAMS = Params(page=1, size=settings.default_page_size)
 SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{settings.pg_user}:{settings.pg_password}@" \
                           f"{settings.pg_host}:{settings.pg_port}/{settings.pg_db}"
 VERSION = "0.1.0rc1"

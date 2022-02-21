@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
 
+from .config import DEFAULT_PARAMS
 from .enum import FilterEnum
 from .models import (
     AttrType,
@@ -437,7 +438,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
 def get_entities(
         db: Session,
         schema: Schema,
-        params: Params,
+        params: Params = DEFAULT_PARAMS,
         all: bool = False,
         deleted_only: bool = False,
         all_fields: bool = False,

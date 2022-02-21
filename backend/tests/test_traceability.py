@@ -1,5 +1,7 @@
-from datetime import timedelta, datetime
+from datetime import datetime
+from itertools import chain
 
+from fastapi_pagination import Params
 import pytest
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -125,61 +127,25 @@ def test_review_changes(dbsession: Session):
 
 def test_get_pending_change_requests(dbsession: Session):
     # 10 requests, 9 UPD, 1 CREATE
-    # 10 requests, 9 UPD, 1 CREATE
     schema_requests = dbsession.query(ChangeRequest)\
         .filter(ChangeRequest.object_type == EditableObjectType.SCHEMA)
+    # 10 requests, 9 UPD, 1 CREATE
     entity_requests = dbsession.query(ChangeRequest)\
         .filter(ChangeRequest.object_type == EditableObjectType.ENTITY)
 
-    # limit 10 offset 0
-    requests = get_pending_change_requests(dbsession)
-    assert len(requests) == 10
-    assert {i.id for i in schema_requests} == {i.id for i in requests}
+    requests = get_pending_change_requests(dbsession, params=Params(size=100, page=1))
+    assert len(requests.items) == 20
+    assert {i.id for i in chain(schema_requests, entity_requests)} == {i.id for i in requests.items}
 
-    # limit 10, offset 10
-    requests = get_pending_change_requests(dbsession, offset=10)
-    assert len(requests) == 10
-    assert {i.id for i in entity_requests} == {i.id for i in requests}
+    requests = get_pending_change_requests(dbsession, obj_type=EditableObjectType.SCHEMA)
+    assert {i.id for i in requests.items} == {r.id for r in schema_requests}
 
-    # limit 1, offset 0
-    requests = get_pending_change_requests(dbsession, limit=1)
-    assert requests[0] == schema_requests[-1]
-
-    # limit 1, offset 19
-    requests = get_pending_change_requests(dbsession, limit=1, offset=19)
-    assert requests[0] == entity_requests[0]
-
-    # limit 20, all types
-    requests = get_pending_change_requests(dbsession, limit=20)
-    assert requests == schema_requests[::-1] + entity_requests[::-1]
-
-    # no limit, all types
-    requests = get_pending_change_requests(dbsession, all=True)
-    assert requests == schema_requests[::-1] + entity_requests[::-1]
-
-    # limit 20, offset 20, all types
-    requests = get_pending_change_requests(dbsession, limit=20, offset=20)
-    assert requests == []
-
-    # limit 20, only schemas
-    requests = get_pending_change_requests(dbsession, obj_type=ContentType.SCHEMA, limit=20)
-    assert requests == schema_requests[::-1]
-
-    # limit 1, offset 1, only schemas
-    requests = get_pending_change_requests(dbsession, obj_type=ContentType.SCHEMA, limit=1, offset=1)
-    assert requests == [schema_requests[-2]]
-
-    # limit 20, only entities
-    requests = get_pending_change_requests(dbsession, obj_type=ContentType.ENTITY, limit=20)
-    assert requests == entity_requests[::-1]
-
-    # limit 1, offset 1, only entities
-    requests = get_pending_change_requests(dbsession, obj_type=ContentType.ENTITY, limit=1, offset=1)
-    assert requests == [entity_requests[-2]]
+    requests = get_pending_change_requests(dbsession, obj_type=EditableObjectType.ENTITY)
+    assert {i.id for i in requests.items} == {r.id for r in entity_requests}
 
     dbsession.execute(update(ChangeRequest).values(status=ChangeStatus.APPROVED))
     dbsession.commit()
 
     # no limit, all types
-    requests = get_pending_change_requests(dbsession, all=True)
-    assert requests == []
+    requests = get_pending_change_requests(dbsession)
+    assert requests.total == 0

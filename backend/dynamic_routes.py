@@ -10,7 +10,6 @@ from sqlalchemy.orm.session import Session
 from .auth import authorized_user, authenticated_user
 from .auth.enum import PermissionType
 from .auth.models import User
-from .config import settings
 from .database import get_db
 from .enum import FilterEnum, ModelVariant
 from .models import AttrType, Schema, Entity

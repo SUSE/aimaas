@@ -8,9 +8,9 @@
               <span>&laquo;</span>
             </a>
           </li>
-          <li class="page-item" v-for="page of this.pages" :key="page.value"
-              :class="page.class">
-            <a class="page-link" v-on:click="onUpdate(page.value)">{{ page.value }}</a>
+          <li class="page-item" v-for="pageButton of this.pages" :key="pageButton.value"
+              :class="pageButton.class">
+            <a class="page-link" v-on:click="onUpdate(pageButton.value)">{{ pageButton.value }}</a>
           </li>
           <li class="page-item"  :class="modelValue < pageCount? '': 'disabled'">
             <a class="page-link" v-on:click="tryGoNext">
@@ -21,9 +21,9 @@
       </nav>
     </div>
     <div class="d-flex gap-2">
-      <label for="entitiesLimit" class="me-1"><small>Page size</small></label>
+      <label for="pageSize" class="me-1"><small>Page size</small></label>
       <div>
-        <select v-model="pageSize" id="entitiesLimit" class="form-select form-select-sm"
+        <select v-model.number="pageSize" id="pageSize" class="form-select form-select-sm"
                 style="width: 5.5rem;" @change="$emit('change')">
           <option>2</option>
           <option>10</option>
