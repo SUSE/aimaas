@@ -32,7 +32,7 @@ def get_users(db: Session, user_ids: typing.Optional[typing.List[int]] = None) -
         if missing_user_ids:
             raise exceptions.MissingUserException(obj_id=next(iter(missing_user_ids)))
 
-    return users
+    return list(users)
 
 
 def get_user(db: Session, username: str) -> Optional[User]:
@@ -159,6 +159,15 @@ def update_group(group_id: int, data: BaseGroupSchema, db: Session) -> [Group, b
             raise exceptions.GroupExistsException(name=data.name) from error
 
     return group, has_changed
+
+
+def delete_group(group_id: int, db: Session) -> bool:
+    group = get_group_or_raise(group_id=group_id, db=db)
+    if group.subgroups:
+        raise exceptions.GroupExistsException(group.subgroups[0].name)
+    db.delete(group)
+    db.commit()
+    return True
 
 
 def add_members(group_id: int, user_ids: List[int], db: Session) -> bool:

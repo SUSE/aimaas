@@ -355,6 +355,22 @@ def update_group(group_id: int, data: BaseGroupSchema, response: Response,
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
 
+@router.delete('/groups/{group_id}', response_model=bool, tags=["Auth"], summary="Delete group",
+               responses={
+                   200: {"description": "Group was deleted"},
+                   404: {"description": "Group does not exist"}
+               })
+def delete_group(group_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.USER_MANAGEMENT, target=Group())))):
+    try:
+        return auth_crud.delete_group(group_id=group_id, db=db)
+    except exceptions.MissingGroupException as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.GroupExistsException as e:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"There is at least one subgroup present: {e.name}")
+
+
 @router.post('/users', response_model=UserSchema, tags=["Auth"])
 def create_user(user: UserCreateSchema, db: Session = Depends(get_db)):
     return auth_crud.create_user(db=db, data=user)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..auth.backends.local import Backend
 from ..auth.crud import create_group, update_group, get_user_by_id, add_members, \
-    delete_members, grant_permission, revoke_permissions, get_permissions, has_permission, \
+    delete_members, delete_group, revoke_permissions, get_permissions, has_permission, \
     get_group, get_groups, get_group_or_raise, get_group_details, get_group_members, get_user
 from ..auth.enum import RecipientType, PermissionTargetType, PermissionType
 from ..auth.models import User, Permission
@@ -153,6 +153,20 @@ class TestGroup(CreateMixin):
         test1 = self._create_group(dbsession)
         test2 = self._create_group(dbsession, BaseGroupSchema(name='test2'))
         assert set(get_groups(dbsession)) == {test1, test2}
+
+    def test_delete_group(self, dbsession: Session):
+        group = self._create_group(dbsession)
+        assert delete_group(group.id, dbsession) is True
+
+    def test_delete_group__with_members(self, dbsession: Session):
+        user, group, pgroup = self._create_user_group_with_perm(dbsession)
+        assert delete_group(group.id, dbsession) is True
+        dbsession.refresh(user)
+        assert len(user.groups) == 0
+
+    def test_delete_group__raise_on_doesnt_exist(self, dbsession: Session):
+        with pytest.raises(exceptions.MissingGroupException):
+            delete_group(9999, dbsession)
 
 
 class TestUser(CreateMixin):
