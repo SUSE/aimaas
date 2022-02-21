@@ -1,5 +1,6 @@
+from functools import cache
 import re
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, validator, Field, create_model
 
@@ -55,6 +56,9 @@ class EntityModelFactory:
     """
     Create pydantic models dynamically based on schema definition
     """
+    # Explicit cache dictionary, as caches from functools do not give access to values in time.
+    __cache = {}
+
     @staticmethod
     def clean_fieldname(name: str) -> str:
         """
@@ -86,13 +90,20 @@ class EntityModelFactory:
         return type_, Field(**kwargs)
 
     def __call__(self, schema: Schema, variant: ModelVariant) -> type:
+        key = (schema, variant)
+
+        if key in self.__cache:
+            return self.__cache[key]
+
         if variant is ModelVariant.LIST:
             entity_model = self(schema=schema, variant=ModelVariant.GET)
-            return create_model(
+            model = create_model(
                 self.clean_modelname(schema.slug, variant),
                 total=(int, Field(description='Total number of entities satisfying conditions')),
                 entities=(List[entity_model], Field(description='List of returned entities'))
             )
+            self.__cache[key] = model
+            return model
 
         class Config:
             extra = 'forbid'
@@ -119,7 +130,7 @@ class EntityModelFactory:
         if variant == ModelVariant.UPDATE:
             entity_fields.update()
 
-        return create_model(
+        model = create_model(
             self.clean_modelname(schema.slug, variant),
             **entity_fields,
             **attr_fields,
@@ -128,3 +139,5 @@ class EntityModelFactory:
                 'slug_validator': validator('slug', allow_reuse=True)(validate_slug)
             }
         )
+        self.__cache[key] = model
+        return model
