@@ -17,6 +17,14 @@ from ..traceability.schema import create_schema_create_request, create_schema_de
     create_schema_update_request
 
 
+def test_api_specs(client: TestClient):
+    """
+    Test that API specs get generated correctly with dynamic models
+    """
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+
+
 class TestRouteAttributes:
     def test_get_attributes(self, dbsession: Session, client: TestClient):
         attrs = [
