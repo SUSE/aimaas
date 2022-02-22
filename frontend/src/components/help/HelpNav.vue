@@ -6,6 +6,10 @@
       Help
     </a>
     <div class="dropdown-menu" aria-labelledby="nav-help-dropdown">
+      <a class="dropdown-item" href="/api/docs">
+        <i class="eos-icons me-1">api</i>
+        API Specification
+      </a>
       <div class="dropdown-divider"></div>
       <div class="dropdown-item d-flex justify-content-between">
         <span>Backend version:</span>

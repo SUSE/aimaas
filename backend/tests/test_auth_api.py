@@ -4,15 +4,21 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from ..auth import authenticate_user
 from ..auth.crud import add_members, has_permission
 from ..auth.enum import RecipientType, PermissionTargetType, PermissionType
-from ..auth.models import User, Permission
+from ..auth.models import User, Permission, Group
 from ..config import settings
 from ..models import Schema, Entity
 from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema, PermissionSchema, \
     RequirePermission
 from .conftest import TEST_USER
 from .mixins import CreateMixin
+
+
+def _override_settings():
+    # Make sure that only the local auth. backend is used!
+    settings.auth_backends = "local"
 
 
 class TestRouteGroup(CreateMixin):
@@ -152,6 +158,87 @@ class TestRouteGroup(CreateMixin):
         response = authorized_client.delete(f'/groups/{group.id}/members', json=[user.id])
         assert response.status_code == 404
 
+    def test_delete_group(self, dbsession: Session, authorized_client: TestClient):
+        group = self._create_group(dbsession)
+        response = authorized_client.delete(f"/groups/{group.id}")
+        assert response.status_code == 200
+        assert dbsession.query(Group.id).filter(Group.id == group.id).count() == 0
+
+    def test_delete_group__raise_on_parent_exists(self, dbsession: Session, authorized_client: TestClient):
+        user, group, pgroup = self._create_user_group_with_perm(dbsession)
+        response = authorized_client.delete(f"/groups/{pgroup.id}")
+        dbsession.refresh(group)
+        assert group.parent_id == pgroup.id
+        assert dbsession.query(Group.id).filter(Group.id == group.id).count() == 1
+        assert dbsession.query(Group.id).filter(Group.id == pgroup.id).count() == 1
+        assert response.status_code == 409
+
+    def test_delete_group__with_members(self, dbsession: Session, authorized_client: TestClient):
+        user, group, pgroup = self._create_user_group_with_perm(dbsession)
+        response = authorized_client.delete(f"/groups/{group.id}")
+        assert response.status_code == 200
+        assert dbsession.query(Group.id).filter(Group.id == group.id).count() == 0
+        dbsession.refresh(user)
+        assert len(user.groups) == 0
+
+    def test_delete_group__raise_on_doesnt_exist(self, dbsession: Session, authorized_client: TestClient):
+        response = authorized_client.delete("/groups/9999")
+        assert response.status_code == 404
+
+
+class TestRouteUser(CreateMixin):
+    def test_get_users(self, dbsession: Session, authenticated_client: TestClient):
+        response = authenticated_client.get("/users")
+        assert response.status_code == 200
+        assert {u["username"] for u in response.json()} == {'tester'}
+
+    def test_get_user_membership(self, dbsession: Session, authenticated_client: TestClient):
+        user, group, parent_group = self._create_user_group_with_perm(dbsession)
+        response = authenticated_client.get(f"/users/{user.username}/memberships")
+        assert response.status_code == 200
+        assert {group.name} == {g["name"] for g in response.json()}
+
+    def test_create_user(self, dbsession, client: TestClient):
+        data = {"username": "new-user", "email": "new@example.com", "password": "password"}
+        response = client.post("/users", json=data)
+        assert response.status_code == 200
+
+        _override_settings()
+        assert authenticate_user(dbsession, data["username"], data["password"]) is not None
+
+    def test_deactivate_user(self, dbsession: Session, authorized_client: TestClient):
+        user = self._create_user(dbsession)
+
+        # Deactivate user
+        response = authorized_client.delete(f"/users/{user.username}")
+        assert response.status_code == 200
+        dbsession.refresh(user)
+        assert user.is_active is False
+
+        # Deactivate already deactivated user
+        response = authorized_client.delete(f"/users/{user.username}")
+        assert response.status_code == 208
+        dbsession.refresh(user)
+        assert user.is_active is False
+
+    def test_activate_user(self, dbsession: Session, authorized_client: TestClient):
+        user = self._create_user(dbsession)
+
+        # Activate already active user
+        response = authorized_client.patch(f"/users/{user.username}")
+        assert response.status_code == 208
+        dbsession.refresh(user)
+        assert user.is_active is True
+
+        user.is_active = False
+        dbsession.commit()
+
+        # Activate user
+        response = authorized_client.patch(f"/users/{user.username}")
+        assert response.status_code == 200
+        dbsession.refresh(user)
+        assert user.is_active is True
+
 
 class TestRoutePermission(CreateMixin):
     def test_grant_permission(self, dbsession: Session, authorized_client: TestClient):
@@ -241,18 +328,14 @@ class TestRoutePermission(CreateMixin):
 
 
 class TestRouteLogin:
-    def _override_settings(self):
-        # Make sure that only the local auth. backend is used!
-        settings.auth_backends = "local"
-
     def test_login(self, client: TestClient, testuser: User):
-        self._override_settings()
+        _override_settings()
         response = client.post('/login', data={'username': TEST_USER.username,
                                                'password': TEST_USER.password})
         assert response.json()['access_token']
 
     def test_login__raise_on_invalid_cred(self, client: TestClient, testuser: User):
-        self._override_settings()
+        _override_settings()
         response = client.post('/login', data={'username': TEST_USER.username,
                                                'password': 'this-is-not-my-password'})
         assert response.status_code == 401
@@ -279,7 +362,7 @@ class TestRoutesRequiringAuth:
         ('delete', '/schema/unperson'),
         ('post', '/groups'),
         ('put', '/groups/1'),
-        # ('delete', '/groups/1'), No route for deleting groups
+        ('delete', '/groups/1'),
         ('patch', '/groups/1/members'),
         ('delete', '/groups/1/members'),
         ('patch', '/users/tester'),

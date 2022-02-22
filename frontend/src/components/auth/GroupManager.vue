@@ -15,7 +15,16 @@
         </div>
     </div>
     <div class="col-md-9">
-      <h4 class="ps-5">{{ activeGroup?.name }}</h4>
+      <div class="d-flex justify-content-between" v-if="activeGroup">
+        <h4 class="ps-5">{{ activeGroup.name }}</h4>
+        <ConfirmButton :callback="deleteGroup" btnClass="btn-outline-danger order-last"
+                       :reverse="true">
+          <template v-slot:label>
+            <i class="eos-icons me-1">delete</i>
+              Delete group
+          </template>
+        </ConfirmButton>
+      </div>
       <Tabbing :tabs="tabs" :bind-args="bindArgs" v-show="activeGroup" ref="groupTab"/>
     </div>
   </div>
@@ -23,6 +32,7 @@
 
 <script>
 import {Button, ModalButton} from "@/composables/modals";
+import ConfirmButton from "@/components/inputs/ConfirmButton";
 import GroupMembers from "@/components/auth/GroupMembers";
 import GroupEdit from "@/components/auth/GroupEdit";
 import GroupListItem from "@/components/auth/GroupListItem";
@@ -32,7 +42,7 @@ import PermissionList from "@/components/auth/PermissionList";
 
 export default {
   name: "GroupManager",
-  components: {ModalDialog, Tabbing, GroupListItem, GroupEdit},
+  components: {ModalDialog, Tabbing, GroupListItem, GroupEdit, ConfirmButton},
   inject: ["groups", "tree"],
   data() {
     return {
@@ -81,6 +91,12 @@ export default {
     },
     switchGroup(newGroup) {
       this.activeGroup = newGroup;
+    },
+    async deleteGroup() {
+      const response = await this.$api.deleteGroup({groupId: this.activeGroup.id});
+      if (response) {
+        this.activeGroup = null;
+      }
     }
   },
   computed: {

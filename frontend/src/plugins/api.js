@@ -368,6 +368,17 @@ class API {
         return response;
     }
 
+    async deleteGroup({groupId}) {
+        const response = await this._fetch({
+            url: `${this.base}/groups/${groupId}`,
+            method: 'DELETE'
+        });
+        if (response !== null) {
+            this.alerts.push("success", "Group has been deleted");
+        }
+        return response;
+    }
+
     async addMembers({groupId, userIds}) {
         const response = await this._fetch({
             url: `${this.base}/groups/${groupId}/members`,
