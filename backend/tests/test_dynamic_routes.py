@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 import pytest
 from sqlalchemy import update
 
+from ..config import DEFAULT_PARAMS
 from ..models import *
 from ..dynamic_routes import *
 from .. import load_schemas
@@ -213,19 +214,6 @@ class TestRouteGetEntity:
 
 
 class TestRouteGetEntities:
-    # TODO tests for ordering
-    @pytest.fixture
-    def jack(self):
-        return {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}
-
-    @pytest.fixture
-    def jane(self):
-        return {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
-
-    @pytest.fixture
-    def jack_del(self):
-        return {'age': 10, 'id': 1, 'deleted': True, 'slug': 'Jack', 'name': 'Jack'}
-
     def test_get_entities(self, dbsession, client):
         data = [
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'},
@@ -233,7 +221,7 @@ class TestRouteGetEntities:
         ]
         response = client.get(f'/entity/person/')
         assert response.status_code == 200
-        assert response.json()['entities'] == data
+        assert response.json()['items'] == data
 
     def test_get_deleted_only(self, dbsession, client):
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
@@ -242,26 +230,26 @@ class TestRouteGetEntities:
         data = [{'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}]
         response = client.get(f'/entity/person?deleted_only=True')
         assert response.status_code == 200
-        assert response.json()['entities'] == data
+        assert response.json()['items'] == data
 
     def test_get_all(self, dbsession, client):
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.commit()
 
-        data = {'total': 2, 'entities': [
+        data = [
             {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'},
             {'age': 12, 'id': 2, 'deleted': True, 'slug': 'Jane', 'name': 'Jane'}
-        ]}
+        ]
         response = client.get(f'/entity/person?all=True')
         assert response.status_code == 200
-        assert response.json() == data
+        assert response.json()["items"] == data
 
         response = client.get(f'/entity/person?all=True&deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == data
+        assert response.json()["items"] == data
 
     def test_get_all_fields(self, dbsession, client):
-        data = {'total': 2, 'entities': [
+        data = [
             {
                 'age': 10,
                 'born': None,
@@ -283,104 +271,92 @@ class TestRouteGetEntities:
                 'name': 'Jane',
                 'fav_color': ['red', 'black']
              }
-        ]}
+        ]
         response = client.get(f'/entity/person?all_fields=True')
         assert response.status_code == 200
-        assert response.json() == data
+        assert response.json()["items"] == data
 
-    def test_offset_and_limit(self, dbsession, client):
-        jack = {'age': 10, 'id': 1, 'deleted': False, 'slug': 'Jack', 'name': 'Jack'}
-        jane = {'age': 12, 'id': 2, 'deleted': False, 'slug': 'Jane', 'name': 'Jane'}
-
-        response = client.get(f'/entity/person?limit=1')
-        assert response.status_code == 200
-        assert response.json() ==  {'total': 2, 'entities': [jack]}
-
-        response = client.get(f'/entity/person?limit=1&offset=1')
-        assert response.status_code == 200
-        assert response.json() ==  {'total': 2, 'entities': [jane]}
-
-        response = client.get(f'/entity/person?offset=10')
-        assert response.status_code == 200
-        assert response.json() ==  {'total': 2, 'entities': []}
-
-    @pytest.mark.parametrize(['q', 'resp'], [
-        ('age=10',               ['jack']),
-        ('age.lt=10',            []),
-        ('age.eq=10',            ['jack']),
-        ('age.gt=10',            ['jane']),
-        ('age.le=10',            ['jack']),
-        ('age.ne=10',            ['jane']),
-        ('age.ge=10',            ['jack', 'jane']),
-        ('name=Jane',            ['jane']),
-        ('nickname=jane',        ['jane']),
-        ('nickname.ne=jack',     ['jane']),
-        ('nickname.regexp=^ja',  ['jack', 'jane']),
-        ('nickname.contains=ne', ['jane']),
-        ('fav_color.eq=black',   ['jane']),
-        ('fav_color.ne=black',   ['jack', 'jane'])  # still returns both even though Jane has black fav_color, but also has red
+    @pytest.mark.parametrize(['q', 'slugs'], [
+        ('size=1',        {'Jack'}),
+        ('size=1&page=2', {'Jane'}),
+        ('page=10',       set())
     ])
-    def test_get_with_filter(self, dbsession, client, request, q, resp):
-        ents = [request.getfixturevalue(i) for i in resp]
-        resp =  {'total': len(ents), 'entities': ents}
-        response = client.get(f'/entity/person?{q}')
-        assert response.json() == resp
+    def test_pagination(self, dbsession, client, q, slugs):
+        response = client.get('/entity/person?' + q)
+        data = response.json()
+        assert response.status_code == 200
+        assert data["total"] == 2
+        assert {i["slug"] for i in data["items"]} == slugs
 
-    def test_get_with_multiple_filters_for_same_attr(self, dbsession, client, jane):
+    @pytest.mark.parametrize(['q', 'slugs'], [
+        ('age=10',               {'Jack'}),
+        ('age.lt=10',            set()),
+        ('age.eq=10',            {'Jack'}),
+        ('age.gt=10',            {'Jane'}),
+        ('age.le=10',            {'Jack'}),
+        ('age.ne=10',            {'Jane'}),
+        ('age.ge=10',            {'Jack', 'Jane'}),
+        ('name=Jane',            {'Jane'}),
+        ('nickname=jane',        {'Jane'}),
+        ('nickname.ne=jack',     {'Jane'}),
+        ('nickname.regexp=^ja',  {'Jack', 'Jane'}),
+        ('nickname.contains=ne', {'Jane'}),
+        ('fav_color.eq=black',   {'Jane'}),
+        ('fav_color.ne=black',   {'Jack', 'Jane'})  # still returns both even though Jane has black fav_color, but also has red
+    ])
+    def test_get_with_filter(self, dbsession, client, q, slugs):
+        items = client.get(f'/entity/person?{q}').json()["items"]
+        assert {i["slug"] for i in items} == slugs
+
+    def test_get_with_multiple_filters_for_same_attr(self, dbsession, client):
         response = client.get('/entity/person?age.gt=9&age.ne=10')
-        assert response.json()['entities'] == [jane]
+        assert {i["slug"] for i in response.json()['items']} == {'Jane'}
 
         response = client.get('/entity/person?age.gt=9&age.ne=10&age.lt=12')
-        assert response.json()['entities'] == []
+        assert response.json()['items'] == []
 
-    @pytest.mark.parametrize(['q', 'resp'], [
-        ('age.gt=9&name.ne=Jack',               ['jane']),
-        ('name=Jack&name.ne=Jack',              []),
-        ('nickname.ne=jane&name.ne=Jack',       []),
-        ('age.gt=9&age.ne=10&nickname.ne=jane', [])
+    @pytest.mark.parametrize(['q', 'slugs'], [
+        ('age.gt=9&name.ne=Jack',               {'Jane'}),
+        ('name=Jack&name.ne=Jack',              set()),
+        ('nickname.ne=jane&name.ne=Jack',       set()),
+        ('age.gt=9&age.ne=10&nickname.ne=jane', set())
     ])
-    def test_get_with_multiple_filters(self, dbsession, client, request, q, resp):
-        resp = [request.getfixturevalue(i) for i in resp]
+    def test_get_with_multiple_filters(self, dbsession, client, q, slugs):
         response = client.get(f'/entity/person?{q}')
-        assert response.json()['entities'] == resp
+        assert {i["slug"] for i in response.json()['items']} == slugs
 
-    def test_get_with_filters_and_offset_limit(self, dbsession, client, jack, jane):
-        response = client.get('/entity/person?age.gt=0&age.lt=20&limit=1')
-        assert response.json()['entities'] == [jack]
+    def test_get_with_filters_and_offset_limit(self, dbsession, client):
+        response = client.get('/entity/person?age.gt=0&age.lt=20&size=1')
+        assert {i["slug"] for i in response.json()['items']} == {'Jack'}
 
-        response = client.get('/entity/person?age.gt=0&age.lt=20&limit=1&offset=1')
-        assert response.json()['entities'] == [jane]
+        response = client.get('/entity/person?age.gt=0&age.lt=20&size=1&page=2')
+        assert {i["slug"] for i in response.json()['items']} == {'Jane'}
 
-        response = client.get('/entity/person?age.gt=0&age.lt=20&offset=2')
-        assert response.json()['entities'] == []
+        response = client.get('/entity/person?age.gt=0&age.lt=20&page=2')
+        assert response.json()['items'] == []
 
-    @pytest.mark.parametrize(['q', 'resp'], [
-        ('age.gt=0&age.lt=20',                            ['jane']),
-        ('offset=1&age.gt=0&age.lt=20',                   []),
-        ('all=True&age.gt=0&age.lt=20',                   ['jack_del', 'jane']),
-        ('deleted_only=True&age.gt=0&age.lt=20',          ['jack_del']),
-        ('deleted_only=true&offset=1&age.gt=0&age.lt=20', []),
+    @pytest.mark.parametrize(['q', 'slugs'], [
+        ('age.gt=0&age.lt=20',                            {'Jane'}),
+        ('page=2&age.gt=0&age.lt=20',                     set()),
+        ('all=True&age.gt=0&age.lt=20',                   {'Jack', 'Jane'}),
+        ('deleted_only=True&age.gt=0&age.lt=20',          {'Jack'}),
+        ('deleted_only=true&page=2&age.gt=0&age.lt=20',   set()),
     ])
-    def test_get_with_filters_and_deleted(self, dbsession, client, request, q, resp):
+    def test_get_with_filters_and_deleted(self, dbsession, client, q, slugs):
         dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
         dbsession.commit()
-        resp = [request.getfixturevalue(i) for i in resp]
         response = client.get(f'/entity/person?{q}')
-        assert response.json()['entities'] == resp
+        assert {i["slug"] for i in response.json()['items']} == slugs
 
-    def test_ignore_invalid_filter(self, dbsession, client, jack, jane):
-        response = client.get('/entity/person?age.gt=0&age.lt=20&qwe.rty=123')
-        assert response.json()['entities'] == [jack, jane]
+    def test_ignore_invalid_filter(self, dbsession, client):
+        for query in ('age.gt=0&age.lt=20&qwe.rty=123', 'age.qwe=1234',
+                      'age.gt=0&age.lt=20&friends.lt=1234'):
+            response = client.get('/entity/person?' + query)
+            assert {i["slug"] for i in response.json()['items']} == {'Jack', 'Jane'}
 
-        response = client.get('/entity/person?age.gt=0&age.lt=20&friends.lt=1234')
-        assert response.json()['entities'] == [jack, jane]
-
-        response = client.get('/entity/person?age.qwe=1234')
-        assert response.json()['entities'] == [jack, jane]
-
-    def test_ignore_filters_for_fk(self, dbsession, client, jack, jane):
+    def test_ignore_filters_for_fk(self, dbsession, client):
         response = client.get('/entity/person?friends=1')
-        assert response.json()['entities'] == [jack, jane]
+        assert {i["slug"] for i in response.json()['items']} == {'Jack', 'Jane'}
 
 
 class TestRouteUpdateEntity:

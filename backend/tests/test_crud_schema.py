@@ -695,7 +695,7 @@ class TestSchemaUpdate:
         )
         update_schema(dbsession, id_or_slug='person', data=upd_schema)
 
-        entities = get_entities(dbsession, get_schema(dbsession, 1)).entities
+        entities = get_entities(dbsession, get_schema(dbsession, 1)).items
         assert all(e.get("born", None) is None for e in entities)
 
         with pytest.raises(RequiredFieldException):

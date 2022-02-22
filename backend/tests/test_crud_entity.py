@@ -1,5 +1,6 @@
 from datetime import timezone, timedelta, datetime
 
+from fastapi_pagination import Params
 import pytest
 from sqlalchemy.exc import DataError
 
@@ -273,7 +274,7 @@ class TestEntityRead:
         dbsession.flush()
 
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        ents = get_entities(dbsession, schema=schema).entities
+        ents = get_entities(dbsession, schema=schema).items
         
         assert len(ents) == 2
 
@@ -290,7 +291,7 @@ class TestEntityRead:
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.flush()
 
-        ents = get_entities(dbsession, schema=schema, deleted_only=True).entities
+        ents = get_entities(dbsession, schema=schema, deleted_only=True).items
         assert len(ents) == 1
         assert ents[0]['id'] == 2
     
@@ -299,13 +300,13 @@ class TestEntityRead:
         dbsession.execute(update(Entity).where(Entity.id == 2).values(deleted=True))
         dbsession.flush()
 
-        ents = get_entities(dbsession, schema=schema, all=True).entities
+        ents = get_entities(dbsession, schema=schema, all=True).items
         assert len(ents) == 2
         assert not ents[0]['deleted'] and ents[1]['deleted']
 
     def test_get_all_fields(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
-        ents = get_entities(dbsession, schema=schema, all_fields=True).entities
+        ents = get_entities(dbsession, schema=schema, all_fields=True).items
         assert len(ents) == 2
         
         ent = ents[1]
@@ -321,23 +322,22 @@ class TestEntityRead:
     def test_offset_and_limit(self, dbsession):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         
-        res = get_entities(dbsession, schema=schema, limit=1)
-        total, ents = res.total, res.entities
+        res = get_entities(dbsession, schema=schema, params=Params(size=1, page=1))
+        total, ents = res.total, res.items
         assert len(ents) == 1
         assert ents[0]['id'] == 1
         assert total == 2
 
-        res = get_entities(dbsession, schema=schema, limit=1, offset=1)
-        total, ents = res.total, res.entities
+        res = get_entities(dbsession, schema=schema, params=Params(size=1, page=2))
+        total, ents = res.total, res.items
         assert len(ents) == 1
         assert ents[0]['id'] == 2
         assert total == 2
 
-        res = get_entities(dbsession, schema=schema, offset=10)
-        total, ents = res.total, res.entities
+        res = get_entities(dbsession, schema=schema, params=Params(size=10, page=2))
+        total, ents = res.total, res.items
         assert len(ents) == 0
         assert total == 2
-
 
     @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
         ({'age': 10},                 1, ['Jack']),
@@ -359,7 +359,7 @@ class TestEntityRead:
     def test_get_with_filter(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         res = get_entities(dbsession, schema=schema, filters=filters)
-        total, ents = res.total, res.entities
+        total, ents = res.total, res.items
         assert len(ents) == ent_len == total
         assert [i['slug'] for i in ents] == slugs
 
@@ -367,11 +367,11 @@ class TestEntityRead:
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
         filters = {'age.gt': 9, 'age.ne': 10}
-        ents = get_entities(dbsession, schema=schema, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters).items
         assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
 
         filters = {'age.gt': 9, 'age.ne': 10, 'age.lt': 12}
-        ents = get_entities(dbsession, schema=schema, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters).items
         assert len(ents) == 0
 
     @pytest.mark.parametrize(['filters', 'ent_len', 'slugs'], [
@@ -383,7 +383,7 @@ class TestEntityRead:
     def test_get_with_multiple_filters(self, dbsession, filters, ent_len, slugs):
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
 
-        ents = get_entities(dbsession, schema=schema, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters).items
         assert len(ents) == ent_len
         assert [i['slug'] for i in ents] == slugs
    
@@ -392,27 +392,27 @@ class TestEntityRead:
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         
         filters = {'age.gt': 0, 'age.lt': 20}
-        ents = get_entities(dbsession, schema=schema, limit=1, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters, params=Params(size=1, page=1)).items
         assert len(ents) == 1 and ents[0]['slug'] == 'Jack'
 
-        ents = get_entities(dbsession, schema=schema, limit=1, offset=1, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters, params=Params(size=1, page=2)).items
         assert len(ents) == 1 and ents[0]['slug'] == 'Jane'
 
-        ents = get_entities(dbsession, schema=schema, offset=2, filters=filters).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters, params=Params(size=10, page=2)).items
         assert len(ents) == 0
 
     @pytest.mark.parametrize(['params', 'ent_len', 'slugs'], [
         ({},                                  1, ['Jane']),
         ({'all': True},                       2, ['Jack', 'Jane']),
-        ({'offset': 1},                       0, []),
+        ({'params': Params(size=1, page=2)},  0, []),
         ({'deleted_only': True},              1, ['Jack']),
-        ({'deleted_only': True, 'offset': 1}, 0, [])
+        ({'deleted_only': True, 'params': Params(size=1, page=2)}, 0, [])
     ])
     def test_get_with_filters_and_deleted(self, dbsession, params, ent_len, slugs):
         dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
         schema = dbsession.execute(select(Schema).where(Schema.id == 1)).scalar()
         filters = {'age.gt': 0, 'age.lt': 20}
-        ents = get_entities(dbsession, schema=schema, filters=filters, **params).entities
+        ents = get_entities(dbsession, schema=schema, filters=filters, **params).items
         assert len(ents) == ent_len
         assert [i['slug'] for i in ents] == slugs
 
@@ -421,15 +421,15 @@ class TestEntityRead:
 
         filters = {'age.gt': 0, 'age.lt': 20, 'qwer.qwrt': 2323}
         with pytest.raises(InvalidFilterAttributeException):
-            get_entities(dbsession, schema=schema, filters=filters).entities
+            get_entities(dbsession, schema=schema, filters=filters).items
 
         filters = {'age.gt': 0, 'age.lt': 20, 'age.qwertyu': 3104}
         with pytest.raises(InvalidFilterOperatorException):
-            get_entities(dbsession, schema=schema, filters=filters).entities
+            get_entities(dbsession, schema=schema, filters=filters).items
 
         filters = {'age.gt': 0, 'friends.lt': 20}  # we can't filter friends because it's a listed type
         with pytest.raises(InvalidFilterAttributeException):
-            get_entities(dbsession, schema=schema, filters=filters).entities
+            get_entities(dbsession, schema=schema, filters=filters).items
 
 
 def asserts_after_entities_update(db: Session, born_time: datetime):

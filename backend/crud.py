@@ -2,7 +2,7 @@ from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
 from itertools import groupby
 
-from fastapi_pagination import Params
+from fastapi_pagination import Params, Page
 from fastapi_pagination.api import create_page
 from fastapi_pagination.ext.sqlalchemy import paginate_query
 from psycopg2.errors import ForeignKeyViolation
@@ -24,7 +24,7 @@ from .models import (
 
 from .schemas import (
     AttrDefSchema,
-    EntityListSchema,
+    EntityBaseSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
@@ -162,8 +162,6 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     else:
         db.flush()
     return schema
-
-
 
 
 def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema: Schema):
@@ -445,7 +443,7 @@ def get_entities(
         filters: dict = None,
         order_by: str = 'name',
         ascending: bool = True,
-    ) -> EntityListSchema:
+    ) -> Page[EntityBaseSchema]:
     if order_by != 'name':
         attrs = [i for i in schema.attr_defs if i.attribute.name == order_by]
         if not attrs:
@@ -485,8 +483,10 @@ def get_entities(
         direction = 'asc' if ascending else 'desc'
         q = q.order_by(getattr(Entity.name, direction)())
     q = paginate_query(q, params)
-    entities = db.execute(select(Entity).from_statement(q)).scalars().all()
-    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key or i.attribute.name == order_by]
+    entities = list(db.execute(select(Entity).from_statement(q)).scalars().all())
+    assert len(entities) <= params.size
+    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs
+                                                     if i.key or i.attribute.name == order_by]
     entities = _get_attr_values_batch(db, entities, attr_defs)
     return create_page(entities, total, params)
 

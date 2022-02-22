@@ -3,6 +3,7 @@ import random
 
 from fastapi_pagination import Params
 
+from ..config import DEFAULT_PARAMS
 from ..crud import *
 from ..models import *
 from ..schemas import *
@@ -59,27 +60,23 @@ def data_for_test(db: Session, count: int):
 def test_stuff(dbsession):
     entities, schema = data_for_test(dbsession, 1000)
 
-    # test 1
-    ## ascending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
         all_fields=True, 
         order_by='int_field'
     ).items
-    assert [i['id'] for i in result] == [i['id'] for i in entities]
+    assert [i['id'] for i in result] == [i['id'] for i in entities[:DEFAULT_PARAMS.size]]
 
-    ### pagination 10, 0
     result = get_entities(
         db=dbsession, 
         schema=schema, 
         all_fields=True, 
         order_by='int_field',
-        params=Params(size=10, page=1)
+        params=Params(size=20, page=1)
     ).items
-    assert [i['id'] for i in result] == [i['id'] for i in entities][0:10]
+    assert [i['id'] for i in result] == [i['id'] for i in entities][0:20]
 
-    ### pagination 10, 20
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -87,9 +84,8 @@ def test_stuff(dbsession):
         order_by='int_field',
         params=Params(size=10, page=2)
     ).items
-    assert [i['id'] for i in result] == [i['id'] for i in entities][20:30]
-    
-    ## descenging
+    assert [i['id'] for i in result] == [i['id'] for i in entities][10:20]
+
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -97,11 +93,8 @@ def test_stuff(dbsession):
         order_by='int_field',
         ascending=False
     ).items
-    assert [i['id'] for i in result] == [i['id'] for i in entities][::-1]
+    assert [i['id'] for i in result] == [i['id'] for i in entities[-DEFAULT_PARAMS.size:][::-1]]
 
-
-    # test 2
-    ## ascending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -109,11 +102,10 @@ def test_stuff(dbsession):
         order_by='int_field',
         filters={'name.contains': 'j'}
     ).items
-    filtered = [i for i in entities if 'j' in i['name']]
-    a = 5
+    assert all("j" in i["name"] for i in result)
+    filtered = [i for i in entities if 'j' in i['name']][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
     
-    ## descending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -122,11 +114,9 @@ def test_stuff(dbsession):
         filters={'name.contains': 'j'},
         ascending=False
     ).items
-    filtered = [i for i in entities if 'j' in i['name']][::-1]
+    filtered = [i for i in entities if 'j' in i['name']][::-1][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
-    # test 3
-    ## ascending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -134,10 +124,10 @@ def test_stuff(dbsession):
         order_by='int_field',
         filters={'name.contains': 'j', 'string_field.starts': 'a'}
     ).items
-    filtered = [i for i in entities if 'j' in i['name'] and i['string_field'].startswith('a')]
+    filtered = [i for i in entities
+                if 'j' in i['name'] and i['string_field'].startswith('a')][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
-    ## descending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -146,11 +136,10 @@ def test_stuff(dbsession):
         filters={'name.contains': 'j', 'string_field.starts': 'a'},
         ascending=False
     ).items
-    filtered = [i for i in entities if 'j' in i['name'] and i['string_field'].startswith('a')][::-1]
+    filtered = [i for i in entities
+                if 'j' in i['name'] and i['string_field'].startswith('a')][::-1][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
-    # test 4
-    ## ascending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -163,13 +152,13 @@ def test_stuff(dbsession):
             'int_field.lt': 550
         }
     ).items
-    filtered = [i for i in entities if 'j' in i['name'] 
+    filtered = [i for i in entities
+                if 'j' in i['name']
                 and i['string_field'].startswith('a') 
                 and i['int_field'] > 50
-                and i['int_field'] < 550]
+                and i['int_field'] < 550][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
 
-    ## descending
     result = get_entities(
         db=dbsession, 
         schema=schema, 
@@ -183,8 +172,9 @@ def test_stuff(dbsession):
         },
         ascending=False
     ).items
-    filtered = [i for i in entities if 'j' in i['name'] 
+    filtered = [i for i in entities
+                if 'j' in i['name']
                 and i['string_field'].startswith('a') 
                 and i['int_field'] > 50
-                and i['int_field'] < 550][::-1]
+                and i['int_field'] < 550][::-1][:DEFAULT_PARAMS.size]
     assert [i['id'] for i in result] == [i['id'] for i in filtered]
