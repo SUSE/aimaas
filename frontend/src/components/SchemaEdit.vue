@@ -58,7 +58,7 @@ export default {
       hasChanged: false
     };
   },
-  mounted() {
+  activated() {
     if (this.details === null) {
       this.getDetails();
     }

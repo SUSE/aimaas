@@ -30,7 +30,10 @@ export default {
       checked: null,
     };
   },
-  created() {
+  activated() {
+    this.checked = this.modelValue;
+  },
+  mounted() {
     this.checked = this.modelValue;
   },
   methods: {

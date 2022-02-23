@@ -1,6 +1,6 @@
 <template>
   <li class="nav-item" data-bs-toggle="tooltip" title="User Management">
-    <router-link :to="{name: 'auth-manager'}" class="nav-link">
+    <router-link :to="{name: 'auth-manager'}" class="nav-link text-nowrap">
       <i class="eos-icons me-1">groups</i>
       User Mgmt.
     </router-link>

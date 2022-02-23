@@ -1,7 +1,7 @@
 <template>
   <template v-if="asDropdown">
     <li class="nav-item dropdown">
-      <a class="nav-link dropdown-toggle" href="#" id="nav-schema-dropdown" role="button"
+      <a class="nav-link dropdown-toggle text-nowrap" href="#" id="nav-schema-dropdown" role="button"
          data-bs-toggle="dropdown" aria-expanded="false">
         <i class='eos-icons me-1'>namespace</i>
         Schema
@@ -116,6 +116,9 @@ export default {
     }
   },
   async created () {
+    await this.load();
+  },
+  async activated () {
     await this.load();
   },
   computed: {
