@@ -484,7 +484,6 @@ def get_entities(
         q = q.order_by(getattr(Entity.name, direction)())
     q = paginate_query(q, params)
     entities = list(db.execute(select(Entity).from_statement(q)).scalars().all())
-    assert len(entities) <= params.size
     attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs
                                                      if i.key or i.attribute.name == order_by]
     entities = _get_attr_values_batch(db, entities, attr_defs)
