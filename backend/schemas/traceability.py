@@ -8,6 +8,10 @@ from .schema import SchemaBaseSchema
 from ..traceability.enum import EditableObjectType, ChangeStatus, ChangeType, ReviewResult
 
 
+class CountSchema(BaseModel):
+    count: int
+
+
 class ChangeRequestSchema(BaseModel):
     id: Optional[int]
     created_at: datetime
@@ -27,11 +31,6 @@ class ChangeRequestSchema(BaseModel):
         if isinstance(v, User):
             return v.username
         return v
-
-
-class SchemaChangeRequestSchema(BaseModel):
-    schema_changes: List[ChangeRequestSchema]
-    pending_entity_requests: List[ChangeRequestSchema]
 
 
 class ChangeReviewSchema(BaseModel):

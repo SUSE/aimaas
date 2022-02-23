@@ -3,13 +3,13 @@ from dataclasses import make_dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.applications import FastAPI
+from fastapi_pagination import Page, Params
 from sqlalchemy.exc import DataError
 from sqlalchemy.orm.session import Session
 
 from .auth import authorized_user, authenticated_user
 from .auth.enum import PermissionType
 from .auth.models import User
-from .config import settings
 from .database import get_db
 from .enum import FilterEnum, ModelVariant
 from .models import AttrType, Schema, Entity
@@ -121,22 +121,21 @@ def route_get_entities(router: APIRouter, schema: Schema):
 
     @router.get(
         f'/{schema.slug}',
-        response_model=factory(schema=schema, variant=ModelVariant.LIST),
+        response_model=Page[factory(schema=schema, variant=ModelVariant.GET)],
         tags=[schema.name],
         summary=f'List {schema.name} entities',
         description=description,
         response_model_exclude_unset=True
     )
     def get_entities(
-        limit: int = Query(settings.query_limit, min=0, description='Limit results to `limit` entities'),
-        offset: int = Query(None, min=0, description='Take an offset of `offset` when retreiving entities'), 
         all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
         deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
         all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'),
         filters: filter_model = Depends(),
         order_by: str = Query('name', description='Ordering field'),
         ascending: bool = Query(True, description='Direction of ordering'),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        params: Params = Depends()
     ):
         filters = {k: v for k, v in filters.__dict__.items() if v is not None}
         new_filters = {}
@@ -149,8 +148,7 @@ def route_get_entities(router: APIRouter, schema: Schema):
             return crud.get_entities(
                 db=db, 
                 schema=schema,
-                limit=limit,
-                offset=offset,
+                params=params,
                 all=all,
                 deleted_only=deleted_only,
                 all_fields=all_fields,

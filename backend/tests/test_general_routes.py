@@ -637,9 +637,9 @@ class TestRouteGetEntityChanges:
     }
 
     def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
-        response = client.get('/changes/entity/person/Jack?count=1')
+        response = client.get('/changes/entity/person/Jack?size=1')
         changes = response.json()
-        parsed_timestamp = parser.parse(changes[0]['created_at'])
+        parsed_timestamp = parser.parse(changes["items"][0]['created_at'])
         assert parsed_timestamp.tzinfo is not None
 
     def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
@@ -719,17 +719,14 @@ class TestRouteGetEntityChanges:
 
 class TestRouteGetSchemaChanges:
     def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
-        response = client.get('/changes/schema/person?count=1')
+        response = client.get('/changes/schema/person?size=1')
         changes = response.json()
-        assert changes['schema_changes'][0]['created_at'] is not None
-        entity_requests = changes['pending_entity_requests']
-        assert len(entity_requests) == 1
+        assert changes["items"][0]['created_at'] is not None
 
         response = client.get('/changes/schema/person')
         changes = response.json()
-        entity_requests = changes['pending_entity_requests']
-        assert len(entity_requests) == 1
-        assert all(change['created_at'] is not None for change in changes['schema_changes'])
+        assert sum(1 for i in changes["items"] if i["object_type"] == "ENTITY") == 1
+        assert all(change['created_at'] is not None for change in changes['items'])
 
     def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
         change_request = create_schema_update_request(

@@ -2,6 +2,9 @@ from typing import Callable, Dict, Tuple
 from collections import defaultdict, Counter
 from itertools import groupby
 
+from fastapi_pagination import Params, Page
+from fastapi_pagination.api import create_page
+from fastapi_pagination.ext.sqlalchemy import paginate_query
 from psycopg2.errors import ForeignKeyViolation
 from sqlalchemy import func, distinct, column, asc, desc, or_, select, update
 from sqlalchemy.orm import Session
@@ -9,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
 
+from .config import DEFAULT_PARAMS
 from .enum import FilterEnum
 from .models import (
     AttrType,
@@ -20,7 +24,7 @@ from .models import (
 
 from .schemas import (
     AttrDefSchema,
-    EntityListSchema,
+    EntityBaseSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
     AttributeCreateSchema
@@ -158,8 +162,6 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     else:
         db.flush()
     return schema
-
-
 
 
 def _delete_attr_from_schema(db: Session, attr_def: AttributeDefinition, schema: Schema):
@@ -432,17 +434,16 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
 
 
 def get_entities(
-        db: Session, 
+        db: Session,
         schema: Schema,
-        limit: int = None,
-        offset: int = None,
-        all: bool = False, 
-        deleted_only: bool = False, 
+        params: Params = DEFAULT_PARAMS,
+        all: bool = False,
+        deleted_only: bool = False,
         all_fields: bool = False,
         filters: dict = None,
         order_by: str = 'name',
         ascending: bool = True,
-    ) -> EntityListSchema:
+    ) -> Page[EntityBaseSchema]:
     if order_by != 'name':
         attrs = [i for i in schema.attr_defs if i.attribute.name == order_by]
         if not attrs:
@@ -481,11 +482,12 @@ def get_entities(
     else:
         direction = 'asc' if ascending else 'desc'
         q = q.order_by(getattr(Entity.name, direction)())
-    q = q.offset(offset).limit(limit)
-    entities = db.execute(select(Entity).from_statement(q)).scalars().all()
-    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs if i.key or i.attribute.name == order_by]
+    q = paginate_query(q, params)
+    entities = list(db.execute(select(Entity).from_statement(q)).scalars().all())
+    attr_defs = schema.attr_defs if all_fields else [i for i in schema.attr_defs
+                                                     if i.key or i.attribute.name == order_by]
     entities = _get_attr_values_batch(db, entities, attr_defs)
-    return EntityListSchema(total=total, entities=entities)
+    return create_page(entities, total, params)
 
 
 def get_entity_by_id(db: Session, entity_id: int) -> Entity:

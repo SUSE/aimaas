@@ -170,8 +170,8 @@ class API {
 
     async getEntities({
                           schemaSlug,
-                          limit = 10,
-                          offset = 0,
+                          page = 1,
+                          size = 10,
                           all = false,
                           deletedOnly = false,
                           allFields = false,
@@ -180,8 +180,8 @@ class API {
                           ascending = true,
                       } = {}) {
         const params = new URLSearchParams();
-        params.set('limit', limit);
-        params.set('offset', offset);
+        params.set('page', page);
+        params.set('size', size);
         params.set('all', all);
         params.set('all_fields', allFields);
         params.set('deletedOnly', deletedOnly);
@@ -237,12 +237,15 @@ class API {
         return response;
     }
 
-    async getChangeRequests({schemaSlug, entityIdOrSlug} = {}) {
+    async getChangeRequests({page = 1, size = 10, schemaSlug, entityIdOrSlug} = {}) {
+        const params = new URLSearchParams();
+        params.set('page', page);
+        params.set('size', size);
         let url = `${this.base}/changes/schema/${schemaSlug}`;
         if (entityIdOrSlug) {
             url = `${this.base}/changes/entity/${schemaSlug}/${entityIdOrSlug}`;
         }
-        return this._fetch({url: url});
+        return this._fetch({url: `${url}?${params.toString()}`});
     }
 
     async getChangeRequestDetails({objectType, changeId} = {}) {
@@ -250,9 +253,16 @@ class API {
         return this._fetch({url: url,})
     }
 
-    async getPendingChangeRequests() {
-        let url = `${this.base}/changes/pending?all=true`;
+    async getPendingChangeRequests({page = 1, size = 50} = {}) {
+        const params = new URLSearchParams();
+        params.set('page', page);
+        params.set('size', size);
+        let url = `${this.base}/changes/pending?${params.toString()}`;
         return this._fetch({url: url});
+    }
+
+    async getCountOfPendingChangeRequests() {
+        return this._fetch({url: `${this.base}/changes/pending/count`,});
     }
 
     async reviewChanges({changeId, verdict, comment=null} = {}) {

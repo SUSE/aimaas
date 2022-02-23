@@ -3,12 +3,15 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import List, Tuple, Optional, Dict, Any, Union
 
+from fastapi_pagination import Params, Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from .. import crud
 from ..auth.models import User
+from ..config import DEFAULT_PARAMS
 from ..enum import ModelVariant
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
     AttributeNotDefinedException, MissingEntityUpdateRequestException, \
@@ -22,14 +25,13 @@ from .models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, Chang
     ChangeValueStr
 
 
-def get_recent_entity_changes(db: Session, entity_id: int, count: int = 5) -> List[ChangeRequest]:
-    return db.execute(
-        select(ChangeRequest)
-        .where(ChangeRequest.object_id == entity_id)
-        .where(ChangeRequest.object_type == EditableObjectType.ENTITY)
-        .order_by(ChangeRequest.created_at.desc()).limit(count)
-        .distinct()
-    ).scalars().all()
+def get_recent_entity_changes(db: Session, entity_id: int, params: Params = DEFAULT_PARAMS) \
+        -> Page[ChangeRequest]:
+    q = db.query(ChangeRequest)\
+        .filter(ChangeRequest.object_id == entity_id,
+                ChangeRequest.object_type == EditableObjectType.ENTITY)\
+        .order_by(ChangeRequest.created_at.desc())
+    return paginate(q, params)
 
 
 def _fill_in_change_request_info(change: dict, change_request: ChangeRequest, entity: Entity):

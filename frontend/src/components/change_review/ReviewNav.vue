@@ -3,8 +3,8 @@
     <router-link class="nav-link" :to="{name: 'review-list'}">
         <i class='eos-icons me-1'>thumbs_up_down</i>
         Reviews
-        <sup class="badge rounded-pill bg-danger text-light smal" v-if="numberOfOpenReviews > 0">
-          {{ numberOfOpenReviews}}
+        <sup class="badge rounded-pill bg-danger text-light smal" v-if="count > 0">
+          {{ count }}
         </sup>
     </router-link>
   </li>
@@ -15,16 +15,13 @@ export default {
   name: "ReviewNav",
   data() {
     return {
-      changes: []
+      count: 0
     };
   },
   computed: {
-    numberOfOpenReviews() {
-      return this.changes?.length || 0;
-    },
     toolTip() {
-      if (this.numberOfOpenReviews) {
-        return `Change requests awaiting review: ${this.numberOfOpenReviews}`;
+      if (this.count) {
+        return `Change requests awaiting review: ${this.count}`;
       }
       return "";
     }
@@ -34,7 +31,8 @@ export default {
   },
   methods: {
     async load() {
-      this.changes = await this.$api.getPendingChangeRequests();
+      const response = await this.$api.getCountOfPendingChangeRequests();
+      this.count = response?.count || 0;
     }
   }
 }

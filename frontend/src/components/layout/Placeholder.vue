@@ -15,7 +15,9 @@
       <span v-else class="placeholder col-8"></span>
     </slot>
   </div>
-  <slot v-else name="content"></slot>
+  <slot v-else name="content">
+    <p class="alert alert-warning">TODO: Add your content into this slot</p>
+  </slot>
 </template>
 
 <script>

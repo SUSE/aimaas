@@ -63,7 +63,6 @@ export default {
     return {
       activeSchema: computed(() => this.activeSchema),
       availableSchemas: computed(() => this.$refs.schemalist.schemas),
-      pendingRequests: computed(() => this.$refs.pendingrequests.changes),
       updatePendingRequests: this.onPendingReviews,
       apiInfo: computed(() => this.apiInfo)
     }

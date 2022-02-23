@@ -40,7 +40,6 @@ import SearchPanel from "./SearchPanel.vue";
 export default {
   components: {EntityListTable, Pagination, SearchPanel, ConfirmButton},
   name: "EntityList",
-  inject: ["apiInfo"],
   props: {
     schema: Object,
     selectType: {
@@ -57,9 +56,6 @@ export default {
   },
   computed: {
     pages: computed(() => this.$refs.paginator.pageCount),
-    offset() {
-      return (this.currentPage - 1) * this.$refs.paginator.pageSize;
-    },
     numSelected() {
       return this.selected.length;
     }
@@ -88,13 +84,13 @@ export default {
       }
       const response = await this.$api.getEntities({
         schemaSlug: this.schema.slug,
-        limit: this.$refs.paginator.pageSize,
-        offset: this.offset,
+        size: this.$refs.paginator.pageSize,
+        page: this.currentPage,
         filters: this.filters,
         orderBy: this.orderBy,
         ascending: this.ascending,
       });
-      this.entities = response.entities;
+      this.entities = response.items;
       this.totalEntities = response.total;
       this.loading = false;
     },
