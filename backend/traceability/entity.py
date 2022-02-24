@@ -133,7 +133,6 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
         ValueModel = _changes[0].data_type.value.model
         attr_name = attr_defs[attr_id].attribute.name
         if attr_defs[attr_id].list:
-            change_["changes"][attr_name] = []
             values = db.query(ValueModel).filter(ValueModel.id.in_([c.value_id for c in _changes]))
             change_["changes"][attr_name] = {
                 "new": [v.new_value for v in values if v.new_value],
@@ -143,7 +142,6 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
         else:
             value = db.query(ValueModel).filter(ValueModel.id == _changes[0].value_id).one()
             current = get_old_value(db, entity, attr_name)
-            # print("===DEBUG===", attr_name, value.new_value, value.old_value, current)
             change_["changes"][attr_name] = {"new": value.new_value, "old": value.old_value,
                                              "current": current[0] if current else None}
     return EntityChangeDetailSchema(**change_)
