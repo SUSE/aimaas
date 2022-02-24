@@ -20,7 +20,7 @@ def asserts_after_entities_create(db: Session):
     assert persons[-2].get('age', db).value == 10
     assert persons[-2].get('born', db).value == born
     assert isinstance(persons[-2].get('age', db), ValueInt)
-    assert [i.value for i in persons[-2].get('friends', db)] == [persons[-3].id, 1]
+    assert {i.value for i in persons[-2].get('friends', db)} == {1, persons[-3].id}
     assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(timezone.utc)
 
 
