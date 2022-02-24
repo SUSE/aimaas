@@ -1,6 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import zip_longest, groupby
 from typing import List, Tuple, Optional, Dict, Any, Union
 
 from fastapi_pagination import Params, Page
@@ -45,6 +46,7 @@ def _fill_in_change_request_info(change: dict, change_request: ChangeRequest, en
     change['reviewed_by'] = change_request.reviewed_by.username if change_request.reviewed_by else None
     change['entity'] = {'slug': entity.slug, 'name': entity.name, 'schema': entity.schema.slug}
 
+
 def _fill_in_entity_change(change: dict, entity_change: Change, entity: Entity, db: Session):
     field = entity_change.field_name
     ValueModel = entity_change.data_type.value.model
@@ -53,7 +55,10 @@ def _fill_in_entity_change(change: dict, entity_change: Change, entity: Entity, 
                                 'old': v.old_value,
                                 'current': getattr(entity, field, None) if entity.id else None}
 
-def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, listed_changes: dict[int, List[Change]], checked_listed: List[int], db: Session):
+
+def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity,
+                          listed_changes: dict[int, List[Change]], checked_listed: List[int],
+                          db: Session):
     attr = entity_change.attribute
     ValueModel = entity_change.data_type.value.model
     if attr.id not in listed_changes:
@@ -78,18 +83,15 @@ def _fill_in_field_change(change: dict, entity_change: Change, entity: Entity, l
 
 def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDetailSchema:
     try:
-        change_request = db.query(ChangeRequest).filter(ChangeRequest.id == change_request_id).one()
+        change_request = db.query(ChangeRequest)\
+            .filter(ChangeRequest.id == change_request_id,
+                    ChangeRequest.object_type == EditableObjectType.ENTITY).one()
     except NoResultFound:
         raise MissingChangeRequestException(obj_id=change_request_id)
 
     changes_query = (select(Change)
         .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ENTITY))
-    
-    if change_request.change_type == ChangeType.CREATE and change_request.status != ChangeStatus.APPROVED:
-        changes_query = changes_query.where(Change.object_id == None)
-    else:
-        changes_query = changes_query.where(Change.object_id != None)
 
     entity_changes = db.execute(changes_query.where(Change.field_name != None)).scalars().all()
     fields_changes = db.execute(changes_query.where(Change.attribute_id != None)).scalars().all()
@@ -110,11 +112,8 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
         schema = crud.get_schema(db=db, id_or_slug=schema_id.new_value)
         entity.schema = schema
         entity.schema_id = schema_id.new_value
-    elif entity_changes:
-        entity = crud.get_entity_by_id(db=db, entity_id=entity_changes[0].object_id)
     else:
-        entity = crud.get_entity_by_id(db=db, entity_id=fields_changes[0].object_id)
-
+        entity = crud.get_entity_by_id(db=db, entity_id=change_request.object_id)
     change_ = {'changes': {}}
     _fill_in_change_request_info(change=change_, change_request=change_request, entity=entity)
 
@@ -128,29 +127,64 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
     for change in entity_changes:
         _fill_in_entity_change(change=change_, entity_change=change, entity=entity, db=db)
 
-    attr_defs = db.execute(
-        select(AttributeDefinition)
-        .where(AttributeDefinition.schema_id == entity.schema_id)
-        .where(AttributeDefinition.attribute_id.in_([i.attribute_id for i in fields_changes]))
-    ).scalars().all()
-    listed_ids = {i.attribute_id for i in attr_defs if i.list}
-    listed_changes = {i: [j for j in fields_changes if j.attribute_id == i] for i in listed_ids}
-    checked_listed = []
-    
-    for change in fields_changes:
-        _fill_in_field_change(change=change_, entity_change=change, entity=entity, listed_changes=listed_changes, checked_listed=checked_listed, db=db)
-    db.expunge_all()
+    attr_defs = {attr_def.attribute_id: attr_def for attr_def in entity.schema.attr_defs}
+    for attr_id, changes in groupby(fields_changes, key=lambda x: x.attribute_id):
+        _changes = list(changes)
+        ValueModel = _changes[0].data_type.value.model
+        attr_name = attr_defs[attr_id].attribute.name
+        if attr_defs[attr_id].list:
+            change_["changes"][attr_name] = []
+            values = db.query(ValueModel).filter(ValueModel.id.in_([c.value_id for c in _changes]))
+            change_["changes"][attr_name] = {
+                "new": [v.new_value for v in values if v.new_value],
+                "old": [v.old_value for v in values if v.old_value],
+                "current": get_old_value(db, entity, attr_name)
+            }
+        else:
+            value = db.query(ValueModel).filter(ValueModel.id == _changes[0].value_id).one()
+            current = get_old_value(db, entity, attr_name)
+            # print("===DEBUG===", attr_name, value.new_value, value.old_value, current)
+            change_["changes"][attr_name] = {"new": value.new_value, "old": value.old_value,
+                                             "current": current[0] if current else None}
     return EntityChangeDetailSchema(**change_)
 
 
-def get_old_value(db: Session, entity: Entity, attr_name: str) -> Any:
+def get_old_value(db: Session, entity: Entity, attr_name: str) -> List[Any]:
     val = entity.get(attr_name, db)
     if isinstance(val, list):
-        return None
-    return val.value if val is not None else None
+        return [v.value for v in val]
+    return [val.value] if val is not None else []
 
 
-def create_entity_create_request(db: Session, data: dict, schema_id: int, created_by: User, commit: bool = True) -> ChangeRequest:
+def _create_value_changes(db: Session, change_request: ChangeRequest, schema: Schema, data: dict,
+                          entity: Optional[Entity] = None, new: bool = False):
+    attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
+    for field, value in data.items():
+        attr_def = attr_defs.get(field)
+        attr: Attribute = attr_def.attribute
+        model, caster, _ = attr.type.value
+        model = ChangeAttrType[attr.type.name].value.model
+        new_values = crud._convert_values(attr_def=attr_def, value=value, caster=caster) or []
+        old_values = [] if new else get_old_value(db=db, entity=entity, attr_name=attr.name)
+        for new_val, old_val in zip_longest(sorted(new_values), sorted(old_values), fillvalue=None):
+            v = model(new_value=new_val, old_value=old_val)
+            db.add(v)
+            db.flush()
+            change = Change(
+                change_request=change_request,
+                value_id=v.id,
+                attribute=attr,
+                data_type=ChangeAttrType[attr.type.name],
+                content_type=ContentType.ENTITY,
+                change_type=ChangeType.CREATE if new else ChangeType.UPDATE,
+                object_id=None if new else entity.id
+            )
+            db.add(change)
+            db.flush()
+
+
+def create_entity_create_request(db: Session, data: dict, schema_id: int, created_by: User,
+                                 commit: bool = True) -> ChangeRequest:
     crud.create_entity(db=db, schema_id=schema_id, data=deepcopy(data), commit=False)
     db.rollback()
     
@@ -158,7 +192,6 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
         select(Schema).where(Schema.id == schema_id).where(Schema.deleted == False)
     ).scalar()
 
-    attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in sch.attr_defs}
     change_request = ChangeRequest(
         created_by=created_by, 
         created_at=datetime.now(timezone.utc),
@@ -203,26 +236,8 @@ def create_entity_create_request(db: Session, data: dict, schema_id: int, create
     )
 
     db.add_all([change_request, name_change, slug_change, schema_change])
-    
-    for field, value in data.items():
-        attr_def = attr_defs.get(field)
-        attr: Attribute = attr_def.attribute
-        model, caster, _ = attr.type.value
-        model = ChangeAttrType[attr.type.name].value.model
-        values = crud._convert_values(attr_def=attr_def, value=value, caster=caster) or [None]
-        for val in values:
-            v = model(new_value=val)
-            db.add(v)
-            db.flush()
-            change = Change(
-                change_request=change_request, 
-                value_id=v.id, 
-                attribute=attr,
-                data_type=ChangeAttrType[attr.type.name], 
-                content_type=ContentType.ENTITY,
-                change_type=ChangeType.CREATE
-            )
-            db.add_all([v, change])
+
+    _create_value_changes(db=db, change_request=change_request, schema=sch, data=data, new=True)
 
     if commit:
         db.commit()
@@ -330,8 +345,11 @@ def apply_entity_create_request(db: Session, change_request: ChangeRequest, revi
     return True, e
 
 
-def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schema_id: int, data: dict, created_by: User, commit: bool = True) -> ChangeRequest:
-    crud.update_entity(db=db, id_or_slug=id_or_slug, schema_id=schema_id, data=deepcopy(data), commit=False)
+def create_entity_update_request(
+        db: Session, id_or_slug: Union[int, str], schema_id: int, data: dict, created_by: User,
+        commit: bool = True) -> ChangeRequest:
+    crud.update_entity(db=db, id_or_slug=id_or_slug, schema_id=schema_id, data=deepcopy(data),
+                       commit=False)
     db.rollback()
     if isinstance(id_or_slug, int):
         q = select(Entity).where(Entity.id == id_or_slug)
@@ -365,46 +383,9 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
         )
         db.add(change)
 
-    attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in entity.schema.attr_defs}
-    for field, value in data.items():
-        attr_def = attr_defs.get(field)
-        attr: Attribute = attr_def.attribute
-        model, caster, _ = attr.type.value
-        model = ChangeAttrType[attr.type.name].value.model
-        
-        if value is None:
-            old_value = get_old_value(db=db, entity=entity, attr_name=attr.name)
-            v = model(old_value=old_value, new_value=None)
-            db.add(v)
-            db.flush()
-            change = Change(
-                change_request=change_request, 
-                object_id=entity.id, 
-                attribute_id=attr.id, 
-                value_id=v.id,
-                data_type=ChangeAttrType[attr.type.name], 
-                content_type=ContentType.ENTITY, 
-                change_type=ChangeType.UPDATE
-            )
-            db.add(change)
-            continue
-
-        values = crud._convert_values(attr_def=attr_def, value=value, caster=caster)
-        for val in values:
-            old_value = get_old_value(db=db, entity=entity, attr_name=attr.name)
-            v = model(old_value=old_value, new_value=val)
-            db.add(v)
-            db.flush()
-            change = Change(
-                change_request=change_request, 
-                object_id=entity.id, 
-                attribute_id=attr.id, 
-                value_id=v.id,
-                data_type=ChangeAttrType[attr.type.name], 
-                content_type=ContentType.ENTITY, 
-                change_type=ChangeType.UPDATE
-            )
-            db.add(change)
+    schema = db.query(Schema).get(schema_id)
+    _create_value_changes(db=db, change_request=change_request, schema=schema, data=data, new=False,
+                          entity=entity)
     if commit:
         db.commit()
     else:
@@ -412,7 +393,8 @@ def create_entity_update_request(db: Session, id_or_slug: Union[int, str], schem
     return change_request
 
 
-def apply_entity_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str] = None) -> Tuple[bool, Entity]:
+def apply_entity_update_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: Optional[str] = None) -> Tuple[bool, Entity]:
     changes_query = (select(Change)
         .where(Change.change_request_id == change_request.id)
         .where(Change.content_type == ContentType.ENTITY)
@@ -424,22 +406,17 @@ def apply_entity_update_request(db: Session, change_request: ChangeRequest, revi
         changes_query.where(Change.attribute_id != None)
     ).scalars().all()
 
-    if not entity_fields_changes and not other_fields_changes:
+    if not entity_fields_changes and not other_fields_changes \
+            or change_request.object_type != EditableObjectType.ENTITY:
         raise MissingEntityUpdateRequestException(obj_id=change_request.id)
 
-    if entity_fields_changes:
-        entity = crud.get_entity_by_id(db=db, entity_id=entity_fields_changes[0].object_id)
-    else:
-        entity = crud.get_entity_by_id(db=db, entity_id=other_fields_changes[0].object_id)
+    entity = crud.get_entity_by_id(db=db, entity_id=change_request.object_id)
+    attr_defs = {attr_def.attribute_id: attr_def for attr_def in entity.schema.attr_defs}
 
     single_changes = []
     listed_changes = defaultdict(list)
     for change in other_fields_changes:
-        attr_def = db.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == entity.schema_id)
-            .where(AttributeDefinition.attribute_id == change.attribute_id)
-        ).scalar()
+        attr_def = attr_defs.get(change.attribute_id, None)
         if attr_def is None:
             raise AttributeNotDefinedException(attr_id=change.attribute_id, schema_id=entity.schema_id)
 
@@ -452,14 +429,12 @@ def apply_entity_update_request(db: Session, change_request: ChangeRequest, revi
     for change in entity_fields_changes:
         ValueModel = change.data_type.value.model
         value = db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
-        value.old_value = getattr(entity, change.field_name)
         data[change.field_name] = value.new_value
 
     for change in single_changes:
         ValueModel = change.data_type.value.model
         v = db.execute(select(ValueModel).where(ValueModel.id == change.value_id)).scalar()
         data[change.attribute.name] = v.new_value
-        v.old_value = get_old_value(db=db, entity=entity, attr_name=change.attribute.name)
 
     for attr_name, changes in listed_changes.items():
         ValueModel = changes[0].data_type.value.model
@@ -484,7 +459,8 @@ def apply_entity_update_request(db: Session, change_request: ChangeRequest, revi
     return True, entity
 
 
-def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schema_id: int, created_by: User, commit: bool = True) -> ChangeRequest:
+def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schema_id: int,
+                                 created_by: User, commit: bool = True) -> ChangeRequest:
     crud.delete_entity(db=db, id_or_slug=id_or_slug, schema_id=schema_id, commit=False)
     db.rollback()
     schema = crud.get_schema(db=db, id_or_slug=schema_id)
@@ -518,7 +494,9 @@ def create_entity_delete_request(db: Session, id_or_slug: Union[int, str], schem
         db.flush()
     return change_request
 
-def apply_entity_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User, comment: Optional[str]) -> Tuple[bool, Entity]:
+
+def apply_entity_delete_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                comment: Optional[str]) -> Tuple[bool, Entity]:
     change = db.execute(
         select(Change)
         .where(Change.change_request_id == change_request.id)
