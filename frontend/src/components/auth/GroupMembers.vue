@@ -108,7 +108,7 @@ export default {
       await this.getMembers();
     }
   },
-  async mounted() {
+  async activated() {
     await this.getMembers();
   },
   methods: {

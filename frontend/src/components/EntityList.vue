@@ -120,7 +120,7 @@ export default {
       Promise.all(promises).then(() => this.getEntities({resetPage: true}));
     }
   },
-  async mounted() {
+  async activated() {
     await this.getEntities({resetPage: true}).then(() => null);
   },
   created() {

@@ -36,7 +36,7 @@ export default {
       entity: null
     }
   },
-  async mounted() {
+  async activated() {
     if (this.entityId) {
       this.loading = true;
       const params = {schemaSlug: this.schemaSlug, entityIdOrSlug: this.entityId};

@@ -48,7 +48,7 @@ export default {
       tree: computed(() => this.tree)
     }
   },
-  async created() {
+  async activated() {
     await this.loadData();
   },
   methods: {

@@ -90,7 +90,7 @@ export default {
   props: ["schema", "entity"],
   inject: ["updatePendingRequests"],
   emits: ["update"],
-  created() {
+  activated() {
     this.updateSchemaMeta();
   },
   watch: {

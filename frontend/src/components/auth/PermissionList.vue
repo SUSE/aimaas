@@ -286,7 +286,7 @@ export default {
       this.resetNewPermData();
     }
   },
-  async mounted() {
+  async activated() {
     let response;
     if (this.groups) {
       this.availableGroups = this.groups;
@@ -311,6 +311,7 @@ export default {
         objType: this.objectType,
         objId: this.objectId
       }
+      this.updateRecipientNameOptions();
     },
     updateRecipientNameOptions() {
       if (this.newPermData.recipientType == "Group") {

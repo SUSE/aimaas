@@ -75,7 +75,7 @@ export default {
   },
   methods: {
     async updateEntity() {
-      if (this.$route.params.entitySlug) {
+      if (this.$route.params.entitySlug && this.activeSchema) {
         const params = {
           schemaSlug: this.activeSchema.slug,
           entityIdOrSlug: this.$route.params.entitySlug
@@ -88,6 +88,9 @@ export default {
     async onUpdate() {
       await this.updateEntity();
     }
+  },
+  async activated() {
+    await this.updateEntity();
   },
   watch: {
     async "$route.params.entitySlug"() {

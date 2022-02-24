@@ -60,7 +60,7 @@ export default {
       ]
     }
   },
-  created() {
+  activated() {
     this.getSelected();
   },
   computed: {

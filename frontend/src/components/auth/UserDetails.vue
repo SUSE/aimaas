@@ -62,7 +62,7 @@ export default {
       memberships: []
     }
   },
-  async created() {
+  async activated() {
     if (this.user) {
       await this.loadMembership();
     }

@@ -35,7 +35,7 @@ export default {
       myGroup: {name: '', parent_id: null, id: null}
     }
   },
-  created() {
+  activated() {
     if (this.group) {
       this.myGroup = this.group;
     }

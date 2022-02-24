@@ -84,8 +84,11 @@ export default {
       ATTR_TYPES_NAMES,
     };
   },
-  async mounted() {
-    await this.cloneAttrs();
+  activated() {
+    this.cloneAttrs();
+  },
+  mounted() {
+    this.cloneAttrs();
   },
   methods: {
     onChange() {
