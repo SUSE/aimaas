@@ -311,6 +311,7 @@ export default {
         objType: this.objectType,
         objId: this.objectId
       }
+      this.updateRecipientNameOptions();
     },
     updateRecipientNameOptions() {
       if (this.newPermData.recipientType == "Group") {
