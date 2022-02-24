@@ -128,6 +128,16 @@ class TestUpdateEntityTraceability:
         with pytest.raises(AttributeNotDefinedException):
             apply_entity_update_request(db=dbsession, change_request=r, reviewed_by=testuser)
 
+    def test_list_change(self, dbsession: Session, testuser: User):
+        change_request = create_entity_update_request(dbsession, 2, 1, {"friends": [1, 2]},
+                                                      testuser)
+
+        details = entity_change_details(dbsession, change_request_id=change_request.id)
+        assert details.changes["friends"].dict() == {'new': [1, 2], 'old': [1], 'current': [1]}
+
+        apply_entity_update_request(dbsession, change_request=change_request, reviewed_by=testuser,
+                                    comment="Test")
+
 
 class TestDeleteEntityTraceability:
     def _create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
@@ -322,7 +332,7 @@ class TestCreateEntityTraceability:
         data = {
             "name": "Jackson",
             "slug": "jackson",
-            "fav_color": ["violet", "cyan"],
+            "fav_color": ["cyan", "violet"],
             "age": 42,
             "friends": [1]
         }
