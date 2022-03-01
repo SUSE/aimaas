@@ -6,11 +6,6 @@ from sqlalchemy import update
 from ..models import *
 from ..dynamic_routes import *
 from .. import load_schemas
-from .test_crud_entity import (
-    asserts_after_entities_create,
-    asserts_after_entities_update,
-    asserts_after_entity_delete
-)
 
 from .mixins import DefaultMixin
 
@@ -82,8 +77,6 @@ class TestRouteCreateEntity(DefaultMixin):
         json = response.json()
         del json['id']
         assert json == {'slug': 'pumpkin-jack', 'name': 'Pumpkin Jack', 'deleted': False}
-
-        asserts_after_entities_create(dbsession)
 
     def test_raise_on_non_unique_slug(self, dbsession, authorized_client):
         p1 = {
@@ -391,7 +384,6 @@ class TestRouteUpdateEntity(DefaultMixin):
         entity = self.get_default_entities(dbsession)["test2"]
         assert response.status_code == 200
         assert response.json() == {'id': entity.id, 'slug': 'test2', 'name': 'Jane', 'deleted': False}
-        asserts_after_entities_update(dbsession, born_time=born_utc)
 
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client):
         response = authorized_client.put('/entity/person/99999999999', json={})
@@ -498,7 +490,8 @@ class TestRouteDeleteEntity(DefaultMixin):
         assert response.status_code == 200
         assert response.json() == {'id': entity.id, 'slug': 'Jack', 'name': 'Jack', 'deleted': True}
 
-        asserts_after_entity_delete(db=dbsession)
+        dbsession.refresh(entity)
+        assert entity.deleted
 
     @pytest.mark.parametrize('entity', [1234567, 'qwertyu'])
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client, entity):
