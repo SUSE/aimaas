@@ -1,6 +1,5 @@
 import pytest
 
-from ..config import *
 from ..crud import *
 from ..models import *
 from ..schemas import *
@@ -9,7 +8,7 @@ from ..schemas import *
 class TestAttributeCreate:
     def test_create(self, dbsession):
         attr = AttributeCreateSchema(name='test', type=AttrTypeMapping.STR)
-        attr = create_attribute(dbsession, data=attr)
+        create_attribute(dbsession, data=attr)
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'test')).scalar()
         assert attr is not None
         assert attr.type == AttrType.STR
@@ -27,22 +26,18 @@ class TestAttributeCreate:
         assert attr.id == nickname.id
 
     def test_no_commit(self, dbsession):
-        attrs = dbsession.execute(select(Attribute).where(Attribute.name == 'test')).scalars().all()
-        assert not len(attrs)
+        def count():
+            return dbsession.query(Attribute.id).filter(Attribute.name == 'test').count()
 
+        assert 0 == count()
         sch = AttributeCreateSchema(name='test', type=AttrTypeMapping.STR)
         attr1 = create_attribute(dbsession, data=sch, commit=False)
         dbsession.flush()
-        
-        attrs = dbsession.execute(select(Attribute).where(Attribute.name == 'test')).scalars().all()
-        assert len(attrs) == 1
+        assert count() == 1
 
-        dbsession.rollback()
-        
         attr2 = create_attribute(dbsession, data=sch)
-        attrs = dbsession.execute(select(Attribute).where(Attribute.name == 'test')).scalars().all()
-        assert len(attrs) == 1
-        assert attr1.id != attr2.id
+        assert count() == 1
+        assert attr1.id == attr2.id
 
     def test_raise_on_reserved_attr_name(self, dbsession):
         for name in RESERVED_ATTR_NAMES:

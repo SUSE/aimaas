@@ -36,12 +36,6 @@ class Settings(BaseSettings):
     pg_host: str
     pg_port: int = 5432
     pg_db: str
-    
-    test_pg_user: Optional[str]
-    test_pg_password:  Optional[str]
-    test_pg_host:  Optional[str]
-    test_pg_port:  Optional[int] = 5432
-    test_pg_db:  Optional[str]
 
     default_page_size: int = 10
     timezone_offset: Union[str, int] = "utc"

@@ -1,20 +1,22 @@
-from datetime import timedelta, timezone, datetime
+from datetime import timezone, datetime
 
 from fastapi.testclient import TestClient
 from dateutil import parser
-from sqlalchemy import update, select
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 import pytest
 
 from ..auth.models import User
 from ..models import Schema
-from ..schemas import AttrDefSchema, SchemaCreateSchema, SchemaUpdateSchema
+from ..schemas import SchemaCreateSchema, SchemaUpdateSchema
 from ..traceability.entity import create_entity_update_request, create_entity_create_request, \
     create_entity_delete_request
 from ..traceability.enum import ChangeStatus
-from ..traceability.models import ChangeRequest, Change
+from ..traceability.models import ChangeRequest
 from ..traceability.schema import create_schema_create_request, create_schema_delete_request, \
     create_schema_update_request
+
+from .mixins import DefaultMixin
 
 
 def test_api_specs(client: TestClient):
@@ -25,24 +27,27 @@ def test_api_specs(client: TestClient):
     assert response.status_code == 200
 
 
-class TestRouteAttributes:
+class TestRouteAttributes(DefaultMixin):
     def test_get_attributes(self, dbsession: Session, client: TestClient):
         attrs = [
-            {'id': 1, 'name': 'age', 'type': 'FLOAT'},
-            {'id': 2, 'name': 'age', 'type': 'INT'},
-            {'id': 3, 'name': 'age', 'type': 'STR'},
-            {'id': 4, 'name': 'born', 'type': 'DT'},
-            {'id': 5, 'name': 'friends', 'type': 'FK'},
-            {'id': 6, 'name': 'address', 'type': 'FK'},
-            {'id': 7, 'name': 'nickname', 'type': 'STR'},
-            {'id': 8, 'name': 'fav_color', 'type': 'STR'}
+            {'name': 'age', 'type': 'FLOAT'},
+            {'name': 'age', 'type': 'INT'},
+            {'name': 'age', 'type': 'STR'},
+            {'name': 'born', 'type': 'DT'},
+            {'name': 'friends', 'type': 'FK'},
+            {'name': 'address', 'type': 'FK'},
+            {'name': 'nickname', 'type': 'STR'},
+            {'name': 'fav_color', 'type': 'STR'}
         ]
         response = client.get('/attributes')
-        assert response.json() == attrs
+        assert [self.strip_ids(j) for j in response.json()] == attrs
 
     def test_get_attribute(self, dbsession: Session, client: TestClient):
-        response = client.get('/attributes/1')
-        assert response.json() == {'id': 1, 'name': 'age', 'type': 'FLOAT'}
+        schema = self.get_default_schema(dbsession)
+        age_attrs = [a.attribute for a in schema.attr_defs if a.attribute.name == "age"]
+        for attr in age_attrs:
+            response = client.get(f'/attributes/{attr.id}').json()
+            assert response["type"] == attr.type.name
 
     def test_raise_on_attribute_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/attributes/123456789')
@@ -50,7 +55,7 @@ class TestRouteAttributes:
         assert "doesn't exist or was deleted" in response.json()['detail']
 
 
-class TestRouteSchemasGet:
+class TestRouteSchemasGet(DefaultMixin):
     def test_get_schemas(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
         dbsession.add(test)
@@ -58,9 +63,10 @@ class TestRouteSchemasGet:
 
         response = client.get('/schema')
         assert response.status_code == 200
-        assert response.json() == [
-            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
-            {'id': 2, 'name': 'UnPerson', 'slug': 'unperson', 'deleted': False}
+
+        assert [self.strip_ids(j) for j in response.json()] == [
+            {'name': 'Person', 'slug': 'person', 'deleted': False},
+            {'name': 'UnPerson', 'slug': 'unperson', 'deleted': False}
         ]
 
     def test_get_all(self, dbsession: Session, client: TestClient):
@@ -69,18 +75,18 @@ class TestRouteSchemasGet:
         dbsession.commit()
 
         expected = [
-            {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': False},
-            {'id': 2, 'name': 'UnPerson', 'slug': 'unperson', 'deleted': False},
-            {'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}
+            {'name': 'Person', 'slug': 'person', 'deleted': False},
+            {'name': 'UnPerson', 'slug': 'unperson', 'deleted': False},
+            {'name': 'Test', 'slug': 'test', 'deleted': True}
         ]
 
-        response = client.get('/schema?all=True')
-        assert response.status_code == 200
-        assert response.json() == expected
+        def _test(_url):
+            response = client.get(_url)
+            assert response.status_code == 200
+            assert [self.strip_ids(j) for j in response.json()] == expected
 
-        response = client.get('/schema?all=True&deleted_only=True')
-        assert response.status_code == 200
-        assert response.json() == expected
+        for url in ('/schema?all=True', '/schema?all=True&deleted_only=True'):
+            _test(url)
 
     def test_get_deleted_only(self, dbsession: Session, client: TestClient):
         test = Schema(name='Test', slug='test', deleted=True)
@@ -89,9 +95,11 @@ class TestRouteSchemasGet:
 
         response = client.get('/schema?deleted_only=True')
         assert response.status_code == 200
-        assert response.json() == [{'id': 3, 'name': 'Test', 'slug': 'test', 'deleted': True}]
+        assert [self.strip_ids(j) for j in response.json()] == [{'name': 'Test', 'slug': 'test',
+                                                                 'deleted': True}]
 
     def test_get_schema(self, dbsession: Session, client: TestClient):
+        person = self.get_default_schema(dbsession)
         attrs = [
             {
                 'bound_schema_id': None,
@@ -114,7 +122,7 @@ class TestRouteSchemasGet:
                 'unique': False
             },
             {
-                'bound_schema_id': 1,
+                'bound_schema_id': person.id,
                 'description': None,
                 'key': False,
                 'list': True,
@@ -146,14 +154,14 @@ class TestRouteSchemasGet:
         ]       
         schema = {
             'deleted': False,
-            'id': 1,
+            'id': person.id,
             'name': 'Person',
             'slug': 'person',
             'reviewable': False
         }
         attrs = sorted(attrs, key=lambda x: x['name'])
 
-        for id_or_slug in ('1', 'person'):
+        for id_or_slug in (person.id, person.slug):
             response = client.get(f'/schema/{id_or_slug}')
             json = response.json()
             assert {a["name"] for a in json['attributes']} == {a["name"] for a in attrs}
@@ -170,8 +178,9 @@ class TestRouteSchemasGet:
         assert "doesn't exist or was deleted" in response.json()['detail']
 
 
-class TestRouteSchemaCreate:
+class TestRouteSchemaCreate(DefaultMixin):
     def test_create(self, dbsession: Session, authorized_client: TestClient):
+        person = self.get_default_schema(dbsession)
         data = {
             'name': 'Car',
             'slug': 'car',
@@ -208,15 +217,13 @@ class TestRouteSchemaCreate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bound_schema_id': 1
+                    'bound_schema_id': person.id
                 }
             ]
         }
         response = authorized_client.post('/schema', json=data)
         assert response.status_code == 200
-        json = response.json()
-        del json['id']
-        assert json == {'name': 'Car', 'slug': 'car', 'deleted': False}
+        assert self.strip_ids(response.json()) == {'name': 'Car', 'slug': 'car', 'deleted': False}
         assert '/entity/car' in [i.path for i in authorized_client.app.routes]
 
         response = authorized_client.get('/entity/car')
@@ -283,7 +290,8 @@ class TestRouteSchemaCreate:
         assert "doesn't exist or was deleted" in response.json()['detail']
 
     def test_raise_on_passed_deleted_schema_for_binding(self, dbsession: Session, authorized_client: TestClient):
-        dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
+        schema = self.get_default_schema(dbsession)
+        schema.deleted = True
         dbsession.commit()
         data = {
             'name': 'Test',
@@ -296,7 +304,7 @@ class TestRouteSchemaCreate:
                     'unique': False,
                     'list': False,
                     'key': False,
-                    'bound_schema_id': 1
+                    'bound_schema_id': schema.id
                 }
             ]
         } 
@@ -354,73 +362,17 @@ class TestRouteSchemaCreate:
         assert dbsession.query(Schema).filter(Schema.slug == "test").count() == 0
 
 
-class TestRouteSchemaUpdate:
-    default_attributes = [
-        {
-            "id": 1,
-            "name": 'age',
-            "type": "INT",
-            "required": True,
-            "unique": False,
-            "list": False,
-            "key": True,
-            "description": 'Age of this person'
-        },
-        {
-            "id": 2,
-            "name": 'born',
-            "type": 'DT',
-            "required": False,
-            "unique": False,
-            "list": False,
-            "key": False
-        },
-        {
-            "id": 3,
-            "name": 'friends',
-            "type": 'FK',
-            "required": True,
-            "unique": False,
-            "list": True,
-            "key": False,
-            "bound_schema_id": -1
-        },
-        {
-            "id": 4,
-            "name": 'nickname',
-            "type": 'STR',
-            "required": False,
-            "unique": True,
-            "list": False,
-            "key": False
-        },
-        {
-            "id": 5,
-            "name": 'fav_color',
-            "type": 'STR',
-            "required": False,
-            "unique": False,
-            "list": True,
-            "key": False
-        }
-    ]
-
+class TestRouteSchemaUpdate(DefaultMixin):
     def test_update(self, dbsession: Session, authorized_client: TestClient):
-        attributes = [a for a in self.default_attributes if a["id"] != 1]
+        attrs = {a["name"]: a for a in self.get_default_attr_def_dicts(dbsession)}
+        attributes = [a for a in attrs.values() if a["name"] != "age"]
+        age = attrs["age"]
+        age.update({"required": False, "key": False})
         data = {
             'slug': 'test',
             'reviewable': True,
             'attributes': attributes + [
-                {
-                    'id': 1,
-                    'name': 'age',
-                    'type': 'INT',
-                    'required': False,
-                    'unique': False,
-                    'list': False,
-                    'key': False,
-                    'description': 'Age of this person'
-                },
+                age,
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -430,15 +382,13 @@ class TestRouteSchemaUpdate:
                     'key': True,
                     'bound_schema_id': -1
                 }
-            ],
-            'delete_attributes': ['friends']
+            ]
         }
         result = {'name': 'Person', 'slug': 'test', 'deleted': False}
-        response = authorized_client.put('/schema/1', json=data)
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 200
-        json = response.json()
-        del json['id']
-        assert json == result
+        assert self.strip_ids(response.json()) == result
 
         routes = [i.path for i in authorized_client.app.routes]
         assert '/entity/test' in routes
@@ -463,7 +413,8 @@ class TestRouteSchemaUpdate:
             'name': 'Test',
             'slug': 'person'
         }
-        response = authorized_client.put('/schema/1', json=data)
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
@@ -472,7 +423,7 @@ class TestRouteSchemaUpdate:
             'slug': 'test',
             'attributes': []
         }
-        response = authorized_client.put('/schema/person', json=data)
+        response = authorized_client.put(f'/schema/{schema.slug}', json=data)
         assert response.status_code == 409
         assert 'already exists' in response.json()['detail']
 
@@ -480,7 +431,7 @@ class TestRouteSchemaUpdate:
         data = {
             'name': 'Test',
             'slug': 'test',
-            'attributes': self.default_attributes + [
+            'attributes': self.get_default_attr_def_dicts(dbsession) + [
                 {
                     'id': 56789,
                     'name': 'address',
@@ -491,29 +442,22 @@ class TestRouteSchemaUpdate:
                     'key': True
                 }
             ]
-        } 
-        response = authorized_client.put('/schema/1', json=data)
-        print("===DEBUG===", response.json())
+        }
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 404
         assert "is not defined on schema" in response.json()['detail']
 
     def test_raise_on_convert_list_to_single(self, dbsession: Session, authorized_client: TestClient):
+        attrs = {a["name"]: a for a in self.get_default_attr_def_dicts(dbsession)}
+        attrs["friends"].update({"required": True, "key": True, "list": False})
         data = {
             'name': 'Test',
             'slug': 'test',
-            'attributes': [a for a in self.default_attributes if a["id"] != 3] + [
-                {
-                    'id': 3,
-                    'name': 'friends',
-                    'type': 'STR',
-                    'required': True,
-                    'unique': True,
-                    'list': False,
-                    'key': True
-                }
-            ]
-        } 
-        response = authorized_client.put('/schema/1', json=data)
+            'attributes': list(attrs.values())
+        }
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 409
         assert "is listed, can't make unlisted" in response.text
 
@@ -521,7 +465,7 @@ class TestRouteSchemaUpdate:
         data = {
             'name': 'Test',
             'slug': 'test',
-            'attributes': self.default_attributes + [
+            'attributes': self.get_default_attr_def_dicts(dbsession) + [
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -532,8 +476,9 @@ class TestRouteSchemaUpdate:
                     'bound_schema_id': 123456789
                 }
             ]
-        } 
-        response = authorized_client.put('/schema/1', json=data)
+        }
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
@@ -541,7 +486,7 @@ class TestRouteSchemaUpdate:
         data = {
             'name': 'Test',
             'slug': 'test',
-            'attributes': self.default_attributes + [
+            'attributes': self.get_default_attr_def_dicts(dbsession) + [
                 {
                     'name': 'address',
                     'type': 'FK',
@@ -551,8 +496,9 @@ class TestRouteSchemaUpdate:
                     'key': False,
                 }
             ]
-        } 
-        response = authorized_client.put('/schema/1', json=data)
+        }
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 422
         assert "Attribute type FK must be bound to a specific schema" in response.text
 
@@ -560,7 +506,7 @@ class TestRouteSchemaUpdate:
         data = {
             'name': 'Test',
             'slug': 'test',
-            'attributes': self.default_attributes + [
+            'attributes': self.get_default_attr_def_dicts(dbsession) + [
                 {
                     'name': 'address',
                     'type': 'STR',
@@ -580,8 +526,9 @@ class TestRouteSchemaUpdate:
                     'bound_schema_id': -1
                 }
             ]
-        } 
-        response = authorized_client.put('/schema/1', json=data)
+        }
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 409
         assert "Found multiple occurrences of attribute" in response.json()['detail']
 
@@ -590,7 +537,7 @@ class TestRouteSchemaUpdate:
         data = {
             "name": "Test",
             "slug": "test",
-            "attributes": self.default_attributes + [{
+            "attributes": self.get_default_attr_def_dicts(dbsession) + [{
                 "name": '403',
                 "type": "INT",
                 "required": True,
@@ -600,27 +547,28 @@ class TestRouteSchemaUpdate:
                 "description": 'Age of this person'
             }]
         }
-
-        response = authorized_client.put('/schema/1', json=data)
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 422
 
-        schema = dbsession.query(Schema).get(1)
+        dbsession.refresh(schema)
         assert schema.name == "Person"
         assert schema.slug == "person"
 
 
-class TestRouteSchemaDelete:
-    @pytest.mark.parametrize('id_or_slug', [1, 'person'])
-    def test_delete(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
-        response = authorized_client.delete(f'/schema/{id_or_slug}')
+class TestRouteSchemaDelete(DefaultMixin):
+    def test_delete(self, dbsession: Session, authorized_client: TestClient):
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.delete(f'/schema/{schema.slug}')
         assert response.status_code == 200
-        assert response.json() == {'id': 1, 'name': 'Person', 'slug': 'person', 'deleted': True, 'reviewable': False}
+        assert response.json() == {'id': schema.id, 'name': schema.name, 'slug': schema.slug,
+                                   'deleted': True, 'reviewable': False}
 
-    @pytest.mark.parametrize('id_or_slug', [1, 'person'])
-    def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient, id_or_slug):
-        dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
+    def test_raise_on_already_deleted(self, dbsession: Session, authorized_client: TestClient):
+        schema = self.get_default_schema(dbsession)
+        schema.deleted = True
         dbsession.commit()
-        response = authorized_client.delete(f'/schema/{id_or_slug}')
+        response = authorized_client.delete(f'/schema/{schema.id}')
         assert response.status_code == 404
 
     @pytest.mark.parametrize('id_or_slug', [1234567, 'qwerty'])
@@ -629,11 +577,11 @@ class TestRouteSchemaDelete:
         assert response.status_code == 404
 
 
-class TestRouteGetEntityChanges:
+class TestRouteGetEntityChanges(DefaultMixin):
     default_request_data = {
         "name": "Jackson",
         "age": 42,
-        "fav_color": ['violet', 'cyan']
+        "fav_color": ['cyan', 'violet']
     }
 
     def test_get_recent_changes(self, dbsession: Session, client: TestClient, testuser: User):
@@ -643,11 +591,10 @@ class TestRouteGetEntityChanges:
         assert parsed_timestamp.tzinfo is not None
 
     def test_get_update_details(self, dbsession: Session, client: TestClient, testuser: User):
-        user = dbsession.execute(select(User)).scalar()
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        entity = self.get_default_entity(dbsession)
         change_request = create_entity_update_request(
-            db=dbsession, id_or_slug=1, schema_id=1, data=self.default_request_data.copy(),
-            created_by=testuser
+            db=dbsession, id_or_slug=entity.id, schema_id=entity.schema_id,
+            data=self.default_request_data.copy(), created_by=testuser
         )
 
         url = f'/changes/detail/entity/{change_request.id}'
@@ -670,10 +617,12 @@ class TestRouteGetEntityChanges:
         assert change['status'] == 'DECLINED'
 
     def test_get_create_details(self, dbsession: Session, client: TestClient, testuser: User):
+        schema = self.get_default_schema(dbsession)
         data = self.default_request_data.copy()
-        data.update({"slug": "jackson", "age": 42, "friends": [2]})
+        data.update({"slug": "jackson", "age": 42,
+                     "friends": [self.get_default_entities(dbsession)["Jane"].id]})
         change_request = create_entity_create_request(
-            db=dbsession, schema_id=1, data=data.copy(),
+            db=dbsession, schema_id=schema.id, data=data.copy(),
             created_by=testuser)
 
         url = f'/changes/detail/entity/{change_request.id}'
@@ -695,8 +644,10 @@ class TestRouteGetEntityChanges:
         assert change['entity']['schema'] == 'person'
 
     def test_get_delete_details(self, dbsession: Session, client: TestClient, testuser: User):
+        entity = self.get_default_entity(dbsession)
         now = datetime.now(timezone.utc)
-        change_request = create_entity_delete_request(db=dbsession, id_or_slug=1, schema_id=1,
+        change_request = create_entity_delete_request(db=dbsession, id_or_slug=entity.id,
+                                                      schema_id=entity.schema_id,
                                                       created_by=testuser)
 
         response = client.get(f'/changes/detail/entity/{change_request.id}')
@@ -781,12 +732,14 @@ class TestRouteGetSchemaChanges:
         assert response.status_code == 404
 
 
-class TestTraceabilityRoutes:
+class TestTraceabilityRoutes(DefaultMixin):
     def test_review_changes(self, dbsession: Session, authorized_client: TestClient,
                             testuser: User):
+        entity = self.get_default_entity(dbsession)
         data = {"name": "Føø Bar"}
         change_request = create_entity_update_request(
-            db=dbsession, id_or_slug=1, schema_id=1, data=data.copy(), created_by=testuser
+            db=dbsession, id_or_slug=entity.id, schema_id=entity.schema_id, data=data.copy(),
+            created_by=testuser
         )
 
         # APPROVE

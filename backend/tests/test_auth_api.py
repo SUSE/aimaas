@@ -243,11 +243,12 @@ class TestRouteUser(CreateMixin):
 class TestRoutePermission(CreateMixin):
     def test_grant_permission(self, dbsession: Session, authorized_client: TestClient):
         user = self._create_user(dbsession)
+        schema = self.get_default_schema(dbsession)
         data = PermissionSchema(
             recipient_type=RecipientType.USER,
             recipient_name=user.username,
             obj_type=PermissionTargetType.SCHEMA,
-            obj_id=1,
+            obj_id=schema.id,
             permission=PermissionType.CREATE_ENTITY
         )
 
@@ -255,17 +256,18 @@ class TestRoutePermission(CreateMixin):
         assert response.status_code == 200
         assert has_permission(user,
                               RequirePermission(permission=PermissionType.CREATE_ENTITY,
-                                                target=Schema(id=1)),
+                                                target=Schema(id=schema.id)),
                               dbsession) is True
 
     def test_grant_permission__riase_on_already_exists(self, dbsession: Session,
                                                        authorized_client: TestClient):
         user = self._create_user(dbsession)
+        schema = self.get_default_schema(dbsession)
         data = PermissionSchema(
             recipient_type=RecipientType.USER,
             recipient_name=user.username,
             obj_type=PermissionTargetType.SCHEMA,
-            obj_id=1,
+            obj_id=schema.id,
             permission=PermissionType.CREATE_ENTITY
         )
         self._grant_permission(dbsession, data)
@@ -274,16 +276,17 @@ class TestRoutePermission(CreateMixin):
         assert response.status_code == 208
         assert has_permission(user,
                               RequirePermission(permission=PermissionType.CREATE_ENTITY,
-                                                target=Schema(id=1)),
+                                                target=Schema(id=schema.id)),
                               dbsession) is True
 
     def test_grant_permission__raise_on_invalid_recipient(self, dbsession: Session,
                                                           authorized_client: TestClient):
+        schema = self.get_default_schema(dbsession)
         data = PermissionSchema(
             recipient_type=RecipientType.USER,
             recipient_name='no-such-username',
             obj_type=PermissionTargetType.SCHEMA,
-            obj_id=1,
+            obj_id=schema.id,
             permission=PermissionType.CREATE_ENTITY
         )
 
@@ -306,6 +309,7 @@ class TestRoutePermission(CreateMixin):
 
     def test_revoke_permission(self, dbsession: Session, authorized_client: TestClient):
         user, group, pgroup = self._create_user_group_with_perm(dbsession)
+        entity = self.get_default_entity(dbsession)
 
         permisison_id = dbsession\
             .query(Permission.id)\
@@ -318,7 +322,7 @@ class TestRoutePermission(CreateMixin):
 
         assert has_permission(user,
                               RequirePermission(permission=PermissionType.READ_ENTITY,
-                                                target=Entity(id=1)),
+                                                target=Entity(id=entity.id)),
                               dbsession) is False
 
     def test_revoke_permission__raise_on_missing(self, dbsession: Session,

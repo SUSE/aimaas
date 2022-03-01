@@ -1,5 +1,3 @@
-import typing
-
 import pytest
 from sqlalchemy.orm import Session
 
@@ -205,14 +203,16 @@ class TestPermission(CreateMixin):
         assert r == 1
 
     def test_grant_permission__raise_on_invalid_user(self, dbsession: Session):
+        e = self.get_default_entity(dbsession)
         with pytest.raises(exceptions.MissingUserException):
             self._grant_permission(dbsession, PermissionSchema(
                 recipient_type=RecipientType.USER, recipient_name="does-not-exist",
-                obj_type=PermissionTargetType.ENTITY, obj_id=1,
+                obj_type=PermissionTargetType.ENTITY, obj_id=e.id,
                 permission=PermissionType.UPDATE_ENTITY
             ))
 
     def test_grant_permisison__raise_on_invalid_object(self, dbsession: Session, testuser: User):
+        e = self.get_default_entity(dbsession)
         with pytest.raises(exceptions.MissingObjectException):
             self._grant_permission(dbsession, PermissionSchema(
                 recipient_type=RecipientType.USER, recipient_name=testuser.username,
@@ -230,7 +230,7 @@ class TestPermission(CreateMixin):
         with pytest.raises(ValueError):
              self._grant_permission(dbsession, PermissionSchema(
                 recipient_type=RecipientType.USER, recipient_name=testuser.username,
-                obj_type=None, obj_id=1,
+                obj_type=None, obj_id=e.id,
                 permission=PermissionType.UPDATE_ENTITY
             ))
 
@@ -254,10 +254,11 @@ class TestPermission(CreateMixin):
         other_user = self._create_user(dbsession, UserCreateSchema(username="nemo",
                                                                    password="secure",
                                                                    email="nemo@example.com"))
+        entity = self.get_default_entity(dbsession)
 
         for perm in (PermissionType.READ_ENTITY, PermissionType.UPDATE_ENTITY):
-            req_perm_schema = RequirePermission(permission=perm, target=models.Schema(id=1))
-            req_perm_entity = RequirePermission(permission=perm, target=models.Entity(id=1))
+            req_perm_schema = RequirePermission(permission=perm, target=models.Schema(id=entity.schema_id))
+            req_perm_entity = RequirePermission(permission=perm, target=models.Entity(id=entity.id))
             assert has_permission(user, req_perm_schema, dbsession) is True
             assert has_permission(user, req_perm_entity, dbsession) is True
             assert has_permission(other_user, req_perm_schema, dbsession) is False
@@ -265,13 +266,13 @@ class TestPermission(CreateMixin):
             assert has_permission(testuser, req_perm_entity, dbsession) is True
 
         req_perm = RequirePermission(permission=PermissionType.DELETE_ENTITY,
-                                     target=models.Schema(id=1))
+                                     target=models.Schema(id=entity.schema_id))
         assert has_permission(user, req_perm, dbsession) is False
         assert has_permission(other_user, req_perm, dbsession) is False
         assert has_permission(testuser, req_perm, dbsession) is True
 
         req_perm = RequirePermission(permission=PermissionType.DELETE_ENTITY,
-                                     target=models.Entity(id=1))
+                                     target=models.Entity(id=entity.id))
         assert has_permission(user, req_perm, dbsession) is True
         assert has_permission(other_user, req_perm, dbsession) is False
         assert has_permission(testuser, req_perm, dbsession) is True

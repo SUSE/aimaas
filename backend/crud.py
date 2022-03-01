@@ -51,18 +51,17 @@ def create_attribute(db: Session, data: AttributeCreateSchema, commit: bool = Tr
     if data.name in RESERVED_ATTR_NAMES:
         raise ReservedAttributeException(attr_name=data.name, reserved=RESERVED_ATTR_NAMES)
 
-    attr = db.execute(
-        select(Attribute)
-        .where(Attribute.name == data.name)
-        .where(Attribute.type == AttrType[data.type.value])
-    ).scalar()
-    if attr:
+    try:
+        attr = db.query(Attribute).filter(Attribute.name == data.name,
+                                          Attribute.type == AttrType[data.type.value]).one()
+    except NoResultFound:
+        pass
+    else:
         return attr
 
     a = Attribute(name=data.name, type=AttrType[data.type.value])
     db.add(a)
-    if commit:
-        db.commit()  # This may raise IntegrityError if other session commits same data
+    db.commit() if commit else db.flush([a])
     return a
 
 
@@ -319,7 +318,10 @@ def _get_entity_data(db: Session, entity: Entity, attr_names: List[str]) -> Dict
     for attr in attr_names:
         val_obj = entity.get(attr, db)
         try:
-            data[attr] = val_obj.value if not isinstance(val_obj, list) else [i.value for i in val_obj]   
+            if isinstance(val_obj, list):
+                data[attr] = [i.value for i in val_obj]
+            else:
+                data[attr] = val_obj.value
         except AttributeError:
             data[attr] = None
     return data
@@ -369,6 +371,11 @@ def _get_attr_values_batch(db: Session, entities: List[Entity], attrs_to_include
                 ent[attr].append(r.value)
             else:
                 ent[attr] = r.value
+
+    for entity in results_map.values():
+        for attr in entity:
+            if isinstance(entity[attr], list):
+                entity[attr].sort()
     
     results = list(results_map.values())  
     return results
