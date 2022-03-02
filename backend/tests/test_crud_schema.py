@@ -1,6 +1,7 @@
 from pydantic.error_wrappers import ValidationError
 import pytest
 from sqlalchemy import select, update
+from sqlalchemy.orm import Session
 
 from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema, \
     get_entities, update_entity
@@ -12,9 +13,9 @@ from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, Schem
 from .mixins import DefaultMixin
 
 
-class TestSchemaCreate:
-    @staticmethod
-    def data_for_test() -> dict:
+class TestSchemaCreate(DefaultMixin):
+    def data_for_test(self, dbsession: Session) -> dict:
+        schema = self.get_default_schema(dbsession)
         color_ = AttrDefSchema(
             name='color',
             type='STR',
@@ -47,7 +48,7 @@ class TestSchemaCreate:
             unique=False,
             list=False,
             key=False,
-            bound_schema_id=1
+            bound_schema_id=schema.id
         )
         return {
             'attr_defs': {
@@ -135,7 +136,9 @@ class TestSchemaCreate:
             create_schema(dbsession, data=sch)
 
     def test_raise_on_passed_deleted_schema_for_binding(self, dbsession):
-        dbsession.execute(update(Schema).where(Schema.id == 1).values(deleted=True))
+        schema = self.get_default_schema(dbsession)
+        schema.deleted = True
+        dbsession.flush()
         attr_def = AttrDefSchema(
             name='owner',
             type='FK',
@@ -143,7 +146,7 @@ class TestSchemaCreate:
             unique=True,
             list=False,
             key=True,
-            bound_schema_id=1
+            bound_schema_id=schema.id
         )
        
         sch = SchemaCreateSchema(name='Test', slug='test', attributes=[attr_def])

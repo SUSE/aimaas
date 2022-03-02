@@ -15,8 +15,9 @@ class TestEntityCreate(DefaultMixin):
     def asserts_after_entities_create(self, db: Session):
         born = datetime(1990, 6, 30, tzinfo=timezone.utc)
         tz_born = datetime(1983, 10, 31, tzinfo=timezone(timedelta(hours=2)))
-        schema = self.get_default_schema(db)
-        persons = db.execute(select(Entity).where(Entity.schema_id == schema.id)).scalars().all()
+        jack = self.get_default_entity(db)
+
+        persons = db.execute(select(Entity).where(Entity.schema_id == jack.schema_id)).scalars().all()
         assert len(persons) == 5
         assert persons[-2].name == 'John'
         assert persons[-2].slug == 'John'
@@ -24,7 +25,7 @@ class TestEntityCreate(DefaultMixin):
         assert persons[-2].get('age', db).value == 10
         assert persons[-2].get('born', db).value == born
         assert isinstance(persons[-2].get('age', db), ValueInt)
-        assert {i.value for i in persons[-2].get('friends', db)} == {1, persons[-3].id}
+        assert {i.value for i in persons[-2].get('friends', db)} == {jack.id, persons[-3].id}
         assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(
             timezone.utc)
 
