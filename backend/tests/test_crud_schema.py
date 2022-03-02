@@ -60,7 +60,7 @@ class TestSchemaCreate(DefaultMixin):
         }
 
     def test_create(self, dbsession):
-        data = self.data_for_test()
+        data = self.data_for_test(dbsession)
         car = create_schema(dbsession, data=SchemaCreateSchema(
             name='Car', slug='car', attributes=list(data['attr_defs'].values())
         ))
@@ -154,7 +154,7 @@ class TestSchemaCreate(DefaultMixin):
             create_schema(dbsession, data=sch)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
-        data = self.data_for_test()
+        data = self.data_for_test(dbsession)
 
         test = SchemaCreateSchema(
             name='Test',

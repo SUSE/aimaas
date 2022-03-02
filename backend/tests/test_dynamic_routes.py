@@ -172,10 +172,11 @@ class TestRouteCreateEntity(DefaultMixin):
         assert 'got instead entity' in response.json()['detail']
 
 
-class TestRouteGetEntity:
+class TestRouteGetEntity(DefaultMixin):
     def test_get_entity(self, dbsession, client):
+        entity = self.get_default_entity(dbsession)
         data = {
-            'id': 1,
+            'id': entity.id,
             'slug': 'Jack',
             'name': 'Jack',
             'deleted': False,
@@ -185,7 +186,7 @@ class TestRouteGetEntity:
             'nickname': 'jack',
             'fav_color': ['blue', 'red']
         }
-        response = client.get('/entity/person/1')
+        response = client.get(f'/entity/person/{entity.id}')
         assert response.status_code == 200
         assert response.json() == data
 
