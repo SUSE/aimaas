@@ -1,12 +1,13 @@
 from pydantic.error_wrappers import ValidationError
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema, \
-    get_entities, update_entity
+    get_entities, update_entity, get_entity
 from ..exceptions import SchemaExistsException, MissingSchemaException, RequiredFieldException, \
-    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
+    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException, \
+    InvalidAttributeChange
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
 
@@ -302,26 +303,35 @@ class TestSchemaUpdate(DefaultMixin):
         attrs = {a.name: a for a in self.get_default_attr_def_schemas(dbsession)}
         nickname = attrs["nickname"]
         nickname.name = "nick"
-        nickname.unique = False
-        nickname.description = "updated"
         upd_schema = SchemaUpdateSchema(
-            name='Test', 
-            slug='test', 
             attributes=list(attrs.values()),
         )
-        schema = self.get_default_schema(dbsession)
-        update_schema(dbsession, id_or_slug=schema.id, data=upd_schema)
-        nickname = dbsession.execute(select(Attribute).where(Attribute.name == 'nickname')).scalar()
-        assert nickname is not None, 'nickname must be still present in DB'
-        attr_def = dbsession.execute(
-            select(AttributeDefinition)
-            .where(AttributeDefinition.schema_id == schema.id)
-            .join(Attribute)
-            .where(Attribute.name == 'nick')
-        ).scalar()
-        assert attr_def is not None
-        assert not any([attr_def.required, attr_def.unique, attr_def.list, attr_def.key])
-        assert attr_def.description == 'updated'
+        entity = self.get_default_entity(dbsession)
+        update_schema(dbsession, id_or_slug=entity.schema_id, data=upd_schema)
+
+        # Assert changes to schema
+        dbsession.refresh(entity.schema)
+        attr_names = {attr_def.attribute.name for attr_def in entity.schema.attr_defs}
+        assert "nickname" not in attr_names
+        assert "nick" in attr_names
+
+        # Assert changes to entities
+        value = entity.get("nick", dbsession)
+        assert value is not None
+        assert value.value == "jack"
+
+        entity_data = get_entity(dbsession, entity.slug, entity.schema)
+        assert entity_data == {
+            "id": entity.id,
+            "deleted": False,
+            "age": 10,
+            "name": "Jack",
+            "slug": "Jack",
+            "born": None,
+            "friends": [],
+            "nick": "jack",
+            "fav_color": ["blue", "red"]
+        }
 
     def test_update_with_renaming_and_adding_new_with_old_name(self, dbsession):
         schema = self.get_default_schema(dbsession)
