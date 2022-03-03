@@ -185,11 +185,18 @@ def _update_attr_in_schema(db: Session, attr_upd: AttrDefSchema, attr_def: Attri
     attr_def.description = attr_upd.description
 
     if attr_upd.name != attr_def.attribute.name:
-        attr_def.attribute = create_attribute(
+        new_attr = create_attribute(
             db=db,
             data=AttributeCreateSchema(name=attr_upd.name, type=attr_def.attribute.type.name),
             commit=False
         )
+        ValueModel = new_attr.type.value.model
+        entity_ids = db.query(Entity.id).filter(Entity.schema_id == attr_def.schema_id).subquery()
+        db.query(ValueModel)\
+            .filter(ValueModel.entity_id.in_(entity_ids),
+                    ValueModel.attribute_id == attr_def.attribute_id)\
+            .update({"attribute_id": new_attr.id}, synchronize_session=False)
+        attr_def.attribute = new_attr
 
 
 def _add_attr_to_schema(db: Session, attr_schema: AttrDefSchema, schema: Schema):
