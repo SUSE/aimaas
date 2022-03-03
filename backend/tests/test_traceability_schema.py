@@ -1,3 +1,5 @@
+import typing
+
 from fastapi_pagination import Params
 from sqlalchemy.orm import Session
 
@@ -12,20 +14,29 @@ from ..traceability.schema import get_recent_schema_changes, schema_change_detai
     create_schema_update_request, apply_schema_update_request, create_schema_delete_request, \
     apply_schema_delete_request
 
-
-def test_get_recent_schema_changes(dbsession: Session):
-    page = get_recent_schema_changes(db=dbsession, schema_id=1, params=Params(size=20, page=1))
-    assert len(page.items) == 11
-    assert sum(1 for i in page.items
-               if i.status == ChangeStatus.PENDING
-               and i.object_type == EditableObjectType.ENTITY) == 1
+from .mixins import DefaultMixin
 
 
-class TestCreateSchema:
+class TestGetChanges(DefaultMixin):
+    def test_get_recent_schema_changes(self, dbsession: Session):
+        schema = self.get_default_schema(dbsession)
+        page = get_recent_schema_changes(db=dbsession, schema_id=schema.id,
+                                         params=Params(size=20, page=1))
+        assert len(page.items) == 11
+        assert sum(1 for i in page.items
+                   if i.status == ChangeStatus.PENDING
+                   and i.object_type == EditableObjectType.ENTITY) == 1
+
+
+class TestCreateSchema(DefaultMixin):
     default_data = {
         "name": "Car",
         "slug": "car",
-        "attributes": [
+        "attributes": None
+    }
+
+    def _default_attributes(self, dbsession: Session) -> typing.List[AttrDefSchema]:
+        attrs = [
             AttrDefSchema(
                 name='color',
                 type='STR',
@@ -52,15 +63,6 @@ class TestCreateSchema:
                 key=False
             ),
             AttrDefSchema(
-                name='owner',
-                type='FK',
-                required=True,
-                unique=False,
-                list=False,
-                key=False,
-                bound_schema_id=1
-            ),
-            AttrDefSchema(
                 name="extras",
                 type="STR",
                 required=False,
@@ -70,10 +72,24 @@ class TestCreateSchema:
                 description='Special extras of car'
             )
         ]
-    }
+
+        person = self.get_default_schema(dbsession)
+        owner = AttrDefSchema(
+                name='owner',
+                type='FK',
+                required=True,
+                unique=False,
+                list=False,
+                key=False,
+                bound_schema_id=person.id
+            )
+        attrs.append(owner)
+        return attrs
 
     def create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
-        return create_schema_create_request(dbsession, SchemaCreateSchema(**self.default_data),
+        data = self.default_data.copy()
+        data["attributes"] = self._default_attributes(dbsession)
+        return create_schema_create_request(dbsession, SchemaCreateSchema(**data),
                                             testuser)
 
     def test_create_request(self, dbsession: Session, testuser: User):
@@ -86,6 +102,7 @@ class TestCreateSchema:
         assert change_request.object_id is None
 
         changes = schema_change_details(db=dbsession, change_request_id=change_request.id)
+        person = self.get_default_schema(dbsession)
         expected_schema_new = {
             'name': 'Car',
             'slug': 'car',
@@ -119,7 +136,7 @@ class TestCreateSchema:
             'owner.list': False,
             'owner.key': False,
             'owner.description': None,
-            'owner.bound_schema_id': 1,
+            'owner.bound_schema_id': person.id,
             'owner.name': 'owner',
             'owner.type': 'FK',
             'extras.required': False,
@@ -145,23 +162,16 @@ class TestCreateSchema:
         assert change_request.reviewed_at >= change_request.created_at
 
 
-class TestUpdateSchema:
+class TestUpdateSchema(DefaultMixin):
     default_data = {
         "slug": "test",
         "reviewable": True,
-        "attributes": [
-            # changed
-            AttrDefSchema(
-                id=1,
-                name='age',
-                type="INT",
-                required=False,
-                unique=False,
-                list=False,
-                key=False,
-                description='Age of this person'
-            ),
-            # added
+        "attributes": None
+    }
+
+    def _default_attributes(self, dbsession: Session) -> typing.List[AttrDefSchema]:
+        attr_defs = {a.name: a for a in self.get_default_attr_def_schemas(dbsession)}
+        new_changed = [
             AttrDefSchema(
                 name='address2',
                 type='FK',
@@ -171,42 +181,17 @@ class TestUpdateSchema:
                 key=True,
                 bound_schema_id=-1
             ),
-            # unchanged
-            AttrDefSchema(
-                id=3,
-                name='friends',
-                type='FK',
-                required=False,
-                unique=False,
-                list=True,
-                key=False,
-                bound_schema_id=-1
-            ),
-            AttrDefSchema(
-                id=4,
-                name='nickname',
-                type='STR',
-                required=False,
-                unique=True,
-                list=False,
-                key=False
-            ),
-            AttrDefSchema(
-                id=5,
-                name='fav_color',
-                type='STR',
-                required=False,
-                unique=False,
-                list=True,
-                key=False
-            )
-            # deleted: born
         ]
-    }
+        attr_defs["age"].required = False
+        attr_defs["age"].key = False
+        new_changed.append(attr_defs["age"])
+        return new_changed + [a for a in attr_defs.values() if a.name in ('friends', 'nickname', 'fav_color')]
 
     def create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
-        return create_schema_update_request(db=dbsession, id_or_slug=1, created_by=testuser,
-                                            data=SchemaUpdateSchema(**self.default_data))
+        data = self.default_data.copy()
+        data["attributes"] = self._default_attributes(dbsession)
+        return create_schema_update_request(db=dbsession, id_or_slug='person', created_by=testuser,
+                                            data=SchemaUpdateSchema(**data))
 
     def test_create_request(self, dbsession: Session, testuser: User):
         change_request = self.create_request(dbsession=dbsession, testuser=testuser)
@@ -264,7 +249,7 @@ class TestUpdateSchema:
         assert change_request.comment == "test"
         assert change_request.status == ChangeStatus.APPROVED
 
-        schema = dbsession.query(Schema).filter(Schema.id == 1).one()
+        schema = dbsession.query(Schema).filter(Schema.id == change_request.object_id).one()
         attr_names = {d.attribute.name for d in schema.attr_defs}
         assert "born" not in attr_names
         assert "address2" in attr_names
@@ -280,7 +265,7 @@ class TestUpdateSchema:
             'address2.list': ChangeSchema(new=True, old=None, current=True),
             'address2.key': ChangeSchema(new=True, old=None, current=True),
             'address2.description': ChangeSchema(new=None, old=None, current=None),
-            'address2.bound_schema_id': ChangeSchema(new=-1, old=None, current=1),
+            'address2.bound_schema_id': ChangeSchema(new=-1, old=None, current=schema.id),
             'address2.name': ChangeSchema(new='address2', old=None, current='address2'),
             'address2.type': ChangeSchema(new='FK', old=None, current='FK'),
             'address2.required': ChangeSchema(new=True, old=None, current=True)
@@ -290,7 +275,7 @@ class TestUpdateSchema:
 
 class TestDeleteSchema:
     def create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
-        return create_schema_delete_request(db=dbsession, id_or_slug=1, created_by=testuser)
+        return create_schema_delete_request(db=dbsession, id_or_slug='person', created_by=testuser)
 
     def test_create_request(self, dbsession: Session, testuser: User):
         change_request = self.create_request(dbsession=dbsession, testuser=testuser)

@@ -113,7 +113,10 @@ class Entity(Base):
 
         attr: Attribute = attr_def.attribute
         val_model = attr.type.value.model
-        q = select(val_model).where(val_model.attribute_id == attr.id).where(val_model.entity_id == self.id)
+        q = select(val_model)\
+            .where(val_model.attribute_id == attr.id)\
+            .where(val_model.entity_id == self.id)\
+            .order_by(val_model.value.asc())
         if attr_def.list:
             return db.execute(q).scalars().all()
         else:

@@ -9,6 +9,7 @@ jobs:
       postgres:
         image: postgres:latest
         env:
+          POSTGRES_DB: test_aimaas
           POSTGRES_USER: aimaas
           POSTGRES_PASSWORD: password
         ports:
@@ -42,11 +43,6 @@ jobs:
           PG_HOST: localhost
           PG_PORT: 5432
           PG_DB: aimaas
-          TEST_PG_USER: aimaas
-          TEST_PG_PASSWORD: password
-          TEST_PG_HOST: localhost
-          TEST_PG_PORT: 5432
-          TEST_PG_DB: aimaas
   lint:
     runs-on: ubuntu-latest
     steps:

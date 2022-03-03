@@ -1,4 +1,7 @@
 from datetime import datetime, timezone, timedelta
+
+from alembic import command
+from alembic.config import Config
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -10,11 +13,10 @@ from ..auth.enum import RecipientType, PermissionType
 from ..auth.models import User
 from ..database import get_db
 from ..models import *
-from ..config import settings as s
 from ..schemas.auth import UserCreateSchema, PermissionSchema
 from ..traceability.enum import EditableObjectType, ChangeType, ContentType
 from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt
-from .. import create_app
+from .. import create_app, config
 
 
 TEST_USER = UserCreateSchema(
@@ -95,6 +97,7 @@ def populate_db(db: Session):
     person = Schema(name='Person', slug='person')
     db.add(person)
     db.flush()
+    db.refresh(person)
     
     age_ = AttributeDefinition(
         schema_id=person.id,
@@ -139,11 +142,11 @@ def populate_db(db: Session):
         key=False
     )
     db.add_all([age_, born_, friends_, nickname_, fav_color_])
-    db.flush()
 
     p1 = Entity(schema_id=person.id, slug='Jack', name='Jack')
     db.add(p1)
     db.flush()
+    db.refresh(p1)
     p1_nickname = ValueStr(entity_id=p1.id, attribute_id=nickname.id, value='jack')
     p1_age = ValueInt(entity_id=p1.id, attribute_id=age_int.id, value=10)
     p1_fav_color_1 = ValueStr(value='red', entity_id=p1.id, attribute_id=fav_color.id)
@@ -158,7 +161,8 @@ def populate_db(db: Session):
     p2_fav_color_1 = ValueStr(value='red', entity_id=p2.id, attribute_id=fav_color.id)
     p2_fav_color_2 = ValueStr(value='black', entity_id=p2.id, attribute_id=fav_color.id)
 
-    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2, p2_fav_color_1, p2_fav_color_2])
+    db.add_all([p1_nickname, p1_age, p2_nickname, p2_age, p2_friend,p1_fav_color_1, p1_fav_color_2,
+                p2_fav_color_1, p2_fav_color_2])
 
     unperson = Schema(name="UnPerson", slug="unperson", reviewable=True)
     db.add(unperson)
@@ -171,12 +175,12 @@ def populate_db(db: Session):
             created_at=time+timedelta(hours=i),
             created_by=user,
             object_type=EditableObjectType.ENTITY,
-            object_id=1,
+            object_id=p1.id,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
             change_request=change_request,
-            object_id=1,
+            object_id=p1.id,
             change_type=ChangeType.UPDATE,
             content_type=ContentType.ENTITY,
             field_name='name',
@@ -185,7 +189,7 @@ def populate_db(db: Session):
         )
         change_2 = Change(
             change_request=change_request,
-            object_id=1,
+            object_id=p1.id,
             change_type=ChangeType.UPDATE,
             content_type=ContentType.ENTITY,
             field_name='slug',
@@ -198,12 +202,12 @@ def populate_db(db: Session):
             created_at=time+timedelta(hours=-9),
             created_by=user,
             object_type=EditableObjectType.ENTITY,
-            object_id=1,
+            object_id=p1.id,
             change_type=ChangeType.CREATE
     )
     change_1 = Change(
         change_request=change_request,
-        object_id=1,
+        object_id=p1.id,
         change_type=ChangeType.CREATE,
         content_type=ContentType.ENTITY,
         field_name='deleted',
@@ -212,19 +216,19 @@ def populate_db(db: Session):
     )
     change_2 = Change(
         change_request=change_request,
-        object_id=1,
+        object_id=p1.id,
         change_type=ChangeType.CREATE,
         content_type=ContentType.ENTITY,
         field_name='deleted',
         data_type=ChangeAttrType.STR,
         value_id=999
     )
-    schema_value = ChangeValueInt(new_value=1)
+    schema_value = ChangeValueInt(new_value=person.id)
     db.add(schema_value)
-    db.flush()
+    db.flush([schema_value])
     change_3 = Change(
         change_request=change_request,
-        object_id=1,
+        object_id=p1.id,
         change_type=ChangeType.CREATE,
         content_type=ContentType.ENTITY,
         field_name='schema_id',
@@ -239,12 +243,12 @@ def populate_db(db: Session):
             created_at=time+timedelta(hours=i),
             created_by=user,
             object_type=EditableObjectType.SCHEMA,
-            object_id=1,
+            object_id=person.id,
             change_type=ChangeType.UPDATE
         )
         change_1 = Change(
             change_request=change_request,
-            object_id=1,
+            object_id=person.id,
             change_type=ChangeType.UPDATE,
             content_type=ContentType.SCHEMA,
             field_name='name',
@@ -253,7 +257,7 @@ def populate_db(db: Session):
         )
         change_2 = Change(
             change_request=change_request,
-            object_id=1,
+            object_id=person.id,
             change_type=ChangeType.UPDATE,
             content_type=ContentType.SCHEMA,
             field_name='slug',
@@ -266,12 +270,12 @@ def populate_db(db: Session):
         created_at=time+timedelta(hours=9),
         created_by=user,
         object_type=EditableObjectType.SCHEMA,
-        object_id=1,
+        object_id=person.id,
         change_type=ChangeType.CREATE,
     )
     change_1 = Change(
         change_request=change_request,
-        object_id=1,
+        object_id=person.id,
         change_type=ChangeType.CREATE,
         content_type=ContentType.SCHEMA,
         field_name='deleted',
@@ -280,7 +284,7 @@ def populate_db(db: Session):
     )
     change_2 = Change(
         change_request=change_request,
-        object_id=1,
+        object_id=person.id,
         change_type=ChangeType.CREATE,
         content_type=ContentType.SCHEMA,
         field_name='deleted',
@@ -293,30 +297,35 @@ def populate_db(db: Session):
 
 @pytest.fixture(scope="session")
 def engine():
-    url = f"postgresql+psycopg2://{s.test_pg_user}:{s.test_pg_password}@{s.test_pg_host}:{s.test_pg_port}/{s.test_pg_db}"
-    return create_engine(url)
-
-
-@pytest.fixture
-def tables(engine):
+    s = config.settings
+    config.SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{s.pg_user}:{s.pg_password}@{s.pg_host}:{s.pg_port}/test_{s.pg_db}"
+    engine = create_engine(config.SQLALCHEMY_DATABASE_URL, max_overflow=0, pool_size=1,
+                           pool_timeout=5)
     Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
+    with engine.connect() as conn:
+        conn.execute("drop table if exists alembic_version")
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "head")
+
+    yield engine
+    Base.metadata.drop_all(engine)
+    with engine.connect() as conn:
+        conn.execute("drop table if exists alembic_version")
+    engine.dispose()
+
+
+@pytest.fixture(scope="function")
+def dbsession(engine) -> Session:
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = Session()
+
+    for table in reversed(Base.metadata.sorted_tables):
+        session.execute(table.delete())
+
+    session.commit()
     populate_db(session)
+    yield session
     session.close()
-    yield
-    Base.metadata.drop_all(engine)
-
-
-@pytest.fixture
-def dbsession(engine, tables) -> Session:
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 @pytest.fixture

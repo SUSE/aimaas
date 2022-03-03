@@ -8,7 +8,7 @@ from ..auth.models import User
 from ..crud import get_entity_by_id, get_entity
 from ..exceptions import MissingEntityUpdateRequestException, AttributeNotDefinedException, \
     MissingEntityCreateRequestException
-from ..models import Attribute, AttrType, Entity, Schema
+from ..models import Attribute, AttrType, Entity
 from ..traceability.entity import entity_change_details, \
     create_entity_update_request, apply_entity_update_request, create_entity_delete_request, \
     apply_entity_delete_request, create_entity_create_request, apply_entity_create_request
@@ -16,22 +16,32 @@ from ..traceability.enum import EditableObjectType, ChangeType, ContentType, Cha
 from ..traceability.models import ChangeRequest, Change, ChangeAttrType, ChangeValueInt, \
     ChangeValueStr
 
+from .mixins import DefaultMixin
 
-class TestUpdateEntityTraceability:
+
+class TestUpdateEntityTraceability(DefaultMixin):
     default_data = {
             'slug': 'test',
             'nickname': None,
             'born': datetime(1983, 10, 31, tzinfo=timezone.utc),
-            'friends': [1, 2],
+            'friends': None,
         }
+
+    def _default_friends(self, dbsession: Session) -> typing.List[int]:
+        return sorted(e.id for e in self.get_default_entities(dbsession).values())
 
     def _create_request(self, dbsession: Session, testuser: User,
                         data: typing.Optional[dict] = None) -> ChangeRequest:
-        return create_entity_update_request(dbsession, 1, 1, (data or self.default_data).copy(),
-                                            testuser)
+        _data = (data or self.default_data).copy()
+        if data is None:
+            _data["friends"] = self._default_friends(dbsession)
+        entity = self.get_default_entity(dbsession)
+        return create_entity_update_request(dbsession, entity.id,
+                                            entity.schema_id, _data, testuser)
 
     def test_create_request(self, dbsession: Session, testuser: User):
         change_request = self._create_request(dbsession, testuser)
+        entity = change_request.entity
 
         assert change_request.created_by == testuser
         assert change_request.created_at is not None
@@ -39,16 +49,19 @@ class TestUpdateEntityTraceability:
         assert change_request.reviewed_by is None
         assert change_request.reviewed_at is None
         assert change_request.object_type == EditableObjectType.ENTITY
-        assert change_request.object_id == 1
+        assert change_request.object_id == entity.id
         assert change_request.change_type == ChangeType.UPDATE
 
-        schema = dbsession.query(Schema).filter(Schema.id == 1).one()
+        schema = self.get_default_schema(dbsession)
         old_data = {key: value
-                    for key, value in get_entity(db=dbsession, id_or_slug=1, schema=schema).items()
+                    for key, value in get_entity(db=dbsession, id_or_slug=entity.id,
+                                                 schema=schema).items()
                     if key in self.default_data}
         details = entity_change_details(db=dbsession, change_request_id=change_request.id)
 
-        assert self.default_data == {key: value.new for key, value in details.changes.items()}
+        data = self.default_data.copy()
+        data["friends"] = self._default_friends(dbsession)
+        assert data == {key: value.new for key, value in details.changes.items()}
         assert old_data == {key: value.old for key, value in details.changes.items()}
         assert old_data == {key: value.current for key, value in details.changes.items()}
 
@@ -62,19 +75,20 @@ class TestUpdateEntityTraceability:
         assert change_request.reviewed_by == testuser
         assert change_request.comment == 'Autosubmit'
 
-        schema = dbsession.query(Schema).filter(Schema.id == 1).one()
-        entity = get_entity(db=dbsession, id_or_slug=1, schema=schema)
+        entity = change_request.entity
+        schema = entity.schema
+        entity_data = get_entity(db=dbsession, id_or_slug=entity.slug, schema=schema)
 
-        assert entity == {
-            'id': 1,
+        assert entity_data == {
+            'id': entity.id,
             'slug': 'test',
             'deleted': False,
             'name': 'Jack',
             'age': 10,
             'born': datetime(1983, 10, 31, tzinfo=timezone.utc),
-            'friends': [1, 2],
+            'friends': self._default_friends(dbsession),
             'nickname': None,
-            'fav_color': ['red', 'blue']
+            'fav_color': ['blue', 'red']
         }
 
     def test_raise_on_missing_change(self, dbsession: Session, testuser: User):
@@ -94,11 +108,12 @@ class TestUpdateEntityTraceability:
                                         reviewed_by=testuser)
 
     def test_raise_on_attribute_not_defined(self, dbsession: Session, testuser: User):
+        entity = self.get_default_entity(dbsession)
         r = ChangeRequest(
             created_by=testuser,
             created_at=datetime.now(timezone.utc),
             object_type=EditableObjectType.ENTITY,
-            object_id=1,
+            object_id=entity.id,
             change_type=ChangeType.UPDATE
         )
         name_val = ChangeValueStr(new_value='test', old_value="Jack")
@@ -111,7 +126,7 @@ class TestUpdateEntityTraceability:
             data_type=ChangeAttrType.STR, 
             content_type=ContentType.ENTITY, 
             change_type=ChangeType.UPDATE,
-            object_id=1
+            object_id=entity.id
         )
 
         a = Attribute(name='test', type=AttrType.STR)
@@ -120,7 +135,7 @@ class TestUpdateEntityTraceability:
             data_type=ChangeAttrType.STR, 
             content_type=ContentType.ENTITY, 
             change_type=ChangeType.UPDATE,
-            object_id=1
+            object_id=entity.id
         )
         dbsession.add_all([r, name, a, attr])
         dbsession.flush()
@@ -129,22 +144,30 @@ class TestUpdateEntityTraceability:
             apply_entity_update_request(db=dbsession, change_request=r, reviewed_by=testuser)
 
     def test_list_change(self, dbsession: Session, testuser: User):
-        change_request = create_entity_update_request(dbsession, 2, 1, {"friends": [1, 2]},
+        entity = self.get_default_entities(dbsession)["Jane"]
+        change_request = create_entity_update_request(dbsession, entity.id, entity.schema_id,
+                                                      {"friends": self._default_friends(dbsession)},
                                                       testuser)
 
         details = entity_change_details(dbsession, change_request_id=change_request.id)
-        assert details.changes["friends"].dict() == {'new': [1, 2], 'old': [1], 'current': [1]}
+        friends = self._default_friends(dbsession)
+        assert details.changes["friends"].dict() == {
+            'new': friends,
+            'old': friends[:1],
+            'current': friends[:1]}
 
         apply_entity_update_request(dbsession, change_request=change_request, reviewed_by=testuser,
                                     comment="Test")
 
 
-class TestDeleteEntityTraceability:
+class TestDeleteEntityTraceability(DefaultMixin):
     def _create_request(self, dbsession: Session, testuser: User) -> ChangeRequest:
-        return create_entity_delete_request(dbsession, id_or_slug=1, schema_id=1,
-                                            created_by=testuser)
+        entity = self.get_default_entity(dbsession)
+        return create_entity_delete_request(dbsession, id_or_slug=entity.slug,
+                                            schema_id=entity.schema_id, created_by=testuser)
 
     def test_create_request(self, dbsession: Session, testuser: User):
+        entity = self.get_default_entity(dbsession)
         change_request = self._create_request(dbsession, testuser)
 
         assert change_request.created_by == testuser
@@ -153,7 +176,7 @@ class TestDeleteEntityTraceability:
         assert change_request.reviewed_by is None
         assert change_request.reviewed_at is None
         assert change_request.object_type == EditableObjectType.ENTITY
-        assert change_request.object_id == 1
+        assert change_request.object_id == entity.id
         assert change_request.change_type == ChangeType.DELETE
 
         changes = entity_change_details(db=dbsession, change_request_id=change_request.id)
@@ -170,15 +193,16 @@ class TestDeleteEntityTraceability:
         assert change_request.status == ChangeStatus.APPROVED
         assert change_request.comment == "test"
 
-        entity = get_entity_by_id(db=dbsession, entity_id=1)
+        entity = self.get_default_entity(dbsession)
         assert entity.deleted
 
     def test_raise_on_missing_change(self, dbsession: Session, testuser: User):
+        entity = self.get_default_entity(dbsession)
         schema_change = ChangeRequest(
             created_by=testuser,
             created_at=datetime.now(timezone.utc),
             object_type=EditableObjectType.SCHEMA,
-            object_id=1,
+            object_id=entity.id,
             change_type=ChangeType.DELETE
         )
         dbsession.add(schema_change)
@@ -190,20 +214,27 @@ class TestDeleteEntityTraceability:
                                         reviewed_by=testuser, comment=None)
 
 
-class TestCreateEntityTraceability:
+class TestCreateEntityTraceability(DefaultMixin):
     default_data = {
             'name': 'John',
             'slug': 'John',
             'nickname': 'john',
             'age': 10,
-            'friends': [1],
+            'friends': None,
             'born': datetime(1990, 6, 30, tzinfo=timezone.utc)
         }
 
+    def _default_friends(self, dbsession: Session) -> typing.List[int]:
+        return [self.get_default_entities(dbsession)["Jack"].id]
+
     def _create_request(self, dbsession: Session, user: User, data: typing.Optional[dict] = None) \
             -> ChangeRequest:
-        return create_entity_create_request(db=dbsession, data=(data or self.default_data).copy(),
-                                            schema_id=1, created_by=user)
+        _data = (data or self.default_data).copy()
+        if data is None:
+            _data["friends"] = self._default_friends(dbsession)
+        schema = self.get_default_schema(dbsession)
+        return create_entity_create_request(db=dbsession, data=_data, schema_id=schema.id,
+                                            created_by=user)
 
     def test_create_request(self, dbsession: Session, testuser: User):
         start_time = datetime.now(timezone.utc)
@@ -223,6 +254,9 @@ class TestCreateEntityTraceability:
         changes = dbsession.query(Change).filter(Change.change_request_id == change_request.id)
         assert 7 == changes.count()
         changed_values = {}
+        schema = self.get_default_schema(dbsession)
+        data = self.default_data.copy()
+        data["friends"] = self._default_friends(dbsession)
         for c in changes:
             key = c.field_name or c.attribute.name
             Model = c.data_type.value.model
@@ -231,15 +265,15 @@ class TestCreateEntityTraceability:
             if isinstance(value.new_value, datetime):
                 changed_values[key] = value.new_value.astimezone(timezone.utc)
             elif key == "schema_id":
-                assert 1 == value.new_value
-            elif isinstance(self.default_data.get(key, None), list):
+                assert schema.id == value.new_value
+            elif isinstance(data.get(key, None), list):
                 if key not in changed_values:
                     changed_values[key] = []
                 changed_values[key].append(value.new_value)
             else:
                 changed_values[key] = value.new_value
 
-        assert self.default_data == changed_values
+        assert data == changed_values
 
     def test_approve_request(self, dbsession: Session, testuser: User):
         change_request = self._create_request(dbsession=dbsession, user=testuser)
@@ -289,9 +323,10 @@ class TestCreateEntityTraceability:
             object_type=EditableObjectType.ENTITY,
             change_type=ChangeType.CREATE
         )
+        schema = self.get_default_schema(dbsession)
         name_val = ChangeValueStr(new_value='test')
         slug_val = ChangeValueStr(new_value='test')
-        schema_val = ChangeValueInt(new_value=1)
+        schema_val = ChangeValueInt(new_value=schema.id)
         attr_val = ChangeValueStr(new_value='test')
         dbsession.add_all([name_val, slug_val, schema_val, attr_val])
         dbsession.flush()
@@ -334,11 +369,12 @@ class TestCreateEntityTraceability:
             "slug": "jackson",
             "fav_color": ["cyan", "violet"],
             "age": 42,
-            "friends": [1]
+            "friends": self._default_friends(dbsession)
         }
         change_request = self._create_request(dbsession=dbsession, user=testuser, data=data)
 
         change = entity_change_details(db=dbsession, change_request_id=change_request.id)
+        print("===DEBUG===", change.entity, *change.changes.items(), sep="\n - ")
         assert all(value.old is None
                    for key, value in change.changes.items()
                    if key != "schema_id" and not isinstance(data[key], list))
