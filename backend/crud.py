@@ -24,7 +24,6 @@ from .models import (
 
 from .schemas import (
     AttrDefSchema,
-    AttrTypeMapping,
     EntityBaseSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
@@ -194,7 +193,8 @@ def _update_attr_in_schema(db: Session, attr_upd: AttrDefSchema, attr_def: Attri
         ValueModel = new_attr.type.value.model
         entity_ids = db.query(Entity.id).filter(Entity.schema_id == attr_def.schema_id).subquery()
         db.query(ValueModel)\
-            .filter(Entity.id.in_(entity_ids), ValueModel.attribute_id == attr_def.attribute_id)\
+            .filter(ValueModel.entity_id.in_(entity_ids),
+                    ValueModel.attribute_id == attr_def.attribute_id)\
             .update({"attribute_id": new_attr.id}, synchronize_session=False)
         attr_def.attribute = new_attr
 
