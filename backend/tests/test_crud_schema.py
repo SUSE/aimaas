@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session
 from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema, \
     get_entities, update_entity, get_entity
 from ..exceptions import SchemaExistsException, MissingSchemaException, RequiredFieldException, \
-    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException, \
-    InvalidAttributeChange
+    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
 
