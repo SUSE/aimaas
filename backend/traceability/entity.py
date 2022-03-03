@@ -135,8 +135,8 @@ def entity_change_details(db: Session, change_request_id: int) -> EntityChangeDe
         if attr_defs[attr_id].list:
             values = db.query(ValueModel).filter(ValueModel.id.in_([c.value_id for c in _changes]))
             change_["changes"][attr_name] = {
-                "new": [v.new_value for v in values if v.new_value],
-                "old": [v.old_value for v in values if v.old_value],
+                "new": sorted(v.new_value for v in values if v.new_value),
+                "old": sorted(v.old_value for v in values if v.old_value),
                 "current": get_old_value(db, entity, attr_name)
             }
         else:

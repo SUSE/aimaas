@@ -374,7 +374,6 @@ class TestCreateEntityTraceability(DefaultMixin):
         change_request = self._create_request(dbsession=dbsession, user=testuser, data=data)
 
         change = entity_change_details(db=dbsession, change_request_id=change_request.id)
-        print("===DEBUG===", change.entity, *change.changes.items(), sep="\n - ")
         assert all(value.old is None
                    for key, value in change.changes.items()
                    if key != "schema_id" and not isinstance(data[key], list))
