@@ -24,6 +24,7 @@ from .models import (
 
 from .schemas import (
     AttrDefSchema,
+    AttrTypeMapping,
     EntityBaseSchema,
     SchemaCreateSchema,
     SchemaUpdateSchema,
@@ -234,6 +235,7 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
             raise AttributeNotDefinedException(attr_id=attr_def.id, schema_id=schema.id)
         if existing.attribute.name != attr_def.name:
             updated.append(attr_def)
+            continue
         bound_schema_id = attr_def.bound_schema_id if attr_def.bound_schema_id != -1 else existing.bound_schema_id
         if bound_schema_id != existing.bound_schema_id:
             updated.append(attr_def)
@@ -243,6 +245,19 @@ def sort_attribute_definitions(schema: Schema, definitions: List[AttrDefSchema])
                if field not in skipped_fields):
             updated.append(attr_def)
             continue
+        for field in skipped_fields:
+            if field in ["name", "type"]:
+                old_value = getattr(existing.attribute, field)
+            else:
+                old_value = getattr(existing, field)
+            new_value = getattr(attr_def, field, None)
+            if isinstance(new_value, (AttrType, AttrTypeMapping)):
+                new_value = new_value.name
+            if isinstance(old_value, (AttrType, AttrTypeMapping)):
+                old_value = old_value.name
+            if new_value is not None and new_value != old_value:
+                raise InvalidAttributeChange(attr_id=existing.attribute_id, schema_id=schema.id,
+                                             field=field)
 
     submitted_ids = {a.id for a in definitions}
     deleted = [a for a in existing_defs.values() if a.id not in submitted_ids]

@@ -144,24 +144,16 @@ def update_schema(
         db.commit()
         create_dynamic_router(schema=schema, old_slug=old_slug, app=request.app)
         return schema
-    except exceptions.NoOpChangeException as e:
+    except (exceptions.NoOpChangeException, exceptions.NoSchemaToBindException) as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-    except exceptions.MissingAttributeException as e:
+    except (exceptions.MissingAttributeException, exceptions.MissingSchemaException,
+            exceptions.AttributeNotDefinedException) as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.MissingSchemaException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.SchemaExistsException as e:
+    except (exceptions.SchemaExistsException, exceptions.ListedToUnlistedException,
+             exceptions.MultipleAttributeOccurencesException,
+            exceptions.AttributeAlreadyDefinedException,
+            exceptions.InvalidAttributeChange) as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except exceptions.AttributeNotDefinedException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-    except exceptions.ListedToUnlistedException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except exceptions.MultipleAttributeOccurencesException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except exceptions.AttributeAlreadyDefinedException as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except exceptions.NoSchemaToBindException as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
 
 
 @router.delete(

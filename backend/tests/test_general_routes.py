@@ -394,6 +394,15 @@ class TestRouteSchemaUpdate(DefaultMixin):
         assert '/entity/test' in routes
         assert '/entity/person' not in routes
 
+    def test_raise_on_attr_type_change(self, dbsession: Session, authorized_client: TestClient):
+        attrs = {a["name"]: a for a in self.get_default_attr_def_dicts(dbsession)}
+        attrs["nickname"]["type"] = "INT"
+
+        schema = self.get_default_schema(dbsession)
+        response = authorized_client.put(f'/schema/{schema.id}',
+                                         json={"attributes": list(attrs.values())})
+        assert response.status_code == 409
+
     def test_raise_on_schema_doesnt_exist(self, dbsession, authorized_client):
         data = {
             'name': 'Test',
