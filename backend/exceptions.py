@@ -134,21 +134,30 @@ class WrongSchemaToBindException(Exception):
     def __str__(self) -> str:
         return f'Attribute `{self.attr_name}` defined on schema ({self.schema_id}) is bound to schema ({self.bound_schema_id}); got instead entity ({self.passed_entity.id}) from schema ({self.passed_entity.schema_id})'
 
-class AttributeAlreadyDefinedException(Exception):
+
+class BaseAttributeException(Exception):
     def __init__(self, attr_id: int, schema_id: int):
         self.attr_id = attr_id
         self.schema_id = schema_id
 
+class AttributeAlreadyDefinedException(BaseAttributeException):
     def __str__(self) -> str:
-        return f'Attribute ({self.attr_id}) is already defined on schema ({self.schema_id})'
+        return f'Attribute ({self.attr_id}) is already defined on schema ({self.schema_id}).'
 
-class AttributeNotDefinedException(Exception):
-    def __init__(self, attr_id: int, schema_id: int):
-        self.attr_id = attr_id
-        self.schema_id = schema_id
+class AttributeNotDefinedException(BaseAttributeException):
+    def __str__(self) -> str:
+        return f'Attribute ({self.attr_id}) is not defined on schema ({self.schema_id}).'
+
+
+class InvalidAttributeChange(BaseAttributeException):
+    def __init__(self, attr_id: int, schema_id: int, field: str):
+        super().__init__(attr_id=attr_id, schema_id=schema_id)
+        self.field = field
 
     def __str__(self) -> str:
-        return f'Attribute with id {self.attr_id} is not defined on schema with id {self.schema_id}'
+        return f"Changing the field '{self.field}' of attribute ({self.attr_id}) on schema " \
+               f"({self.schema_id}) is not allowed."
+
 
 class ListedToUnlistedException(Exception):
     def __init__(self, attr_def_id: int):

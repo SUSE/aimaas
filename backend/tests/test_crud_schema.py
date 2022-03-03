@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from ..crud import create_schema, get_schema, get_schemas, update_schema, delete_schema, \
     get_entities, update_entity, get_entity
 from ..exceptions import SchemaExistsException, MissingSchemaException, RequiredFieldException, \
-    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException
+    NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException, \
+    InvalidAttributeChange
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
 
@@ -378,6 +379,17 @@ class TestSchemaUpdate(DefaultMixin):
         ).scalar()
         assert nickname.attribute.type == AttrType.DT
         assert all([nickname.required, nickname.list, nickname.key])
+
+    def test_raise_on_attr_type_change(self, dbsession):
+        attrs = {a.name: a for a in self.get_default_attr_def_schemas(dbsession)}
+        nickname = attrs["nickname"]
+        nickname.type = "INT"
+
+        schema = self.get_default_schema(dbsession)
+        with pytest.raises(InvalidAttributeChange):
+            update_schema(dbsession, id_or_slug=schema.id, data=SchemaUpdateSchema(
+                attributes=list(attrs.values())
+            ))
 
     def test_raise_on_renaming_to_already_present_attr(self, dbsession):
         schema = self.get_default_schema(dbsession)
