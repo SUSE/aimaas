@@ -131,7 +131,7 @@ export default {
     },
     fieldTypes() {
       const t = {};
-      for (let a of this.schema?.attributes) {
+      for (let a of (this.schema?.attributes || [])) {
         t[a.name] = a.type;
       }
       return t;

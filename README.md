@@ -32,7 +32,7 @@ In a nutshell, these are the steps to set up a development environment:
    3. Install Python dependencies with `pip`.
    4. Run database migrations: `alembic upgrade head`.
 4. Frontend
-   1. Install `npm` (and `nodejs`).
+   1. Install `npm` (and `nodejs`, our suggestion: v16).
    2. Install JS dependencies with `npm install`.
 
 ## Running development servers
