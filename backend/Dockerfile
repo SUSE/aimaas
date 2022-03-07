@@ -11,4 +11,4 @@ ENV ROOT_PATH=/
 
 EXPOSE 8000
 
-ENTRYPOINT ["/bin/bash", "-c", "uvicorn aimaas.main:app --port 8000 --host localhost --workers ${WORKERS} --root-path ${ROOT_PATH}"]
+ENTRYPOINT ["/bin/bash", "-c", "uvicorn aimaas.main:app --port 8000 --host 0.0.0.0 --workers ${WORKERS} --root-path ${ROOT_PATH}"]
