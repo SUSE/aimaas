@@ -5,14 +5,7 @@ from pydantic import BaseModel, validator, Field, create_model
 
 from ..enum import ModelVariant
 from ..models import Schema, AttributeDefinition
-
-
-def validate_slug(cls, slug: str):
-    if slug is None:
-        return slug
-    if re.match('^[a-zA-Z]+[0-9]*(-[a-zA-Z0-9]+)*$', slug) is None:
-        raise ValueError(f'`{slug}` is invalid value for slug field')
-    return slug
+from .validators import validate_slug
 
 
 class EntityBaseSchema(BaseModel):
