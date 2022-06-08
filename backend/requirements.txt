@@ -4,7 +4,8 @@ fastapi-pagination[sqlalchemy]
 ldap3
 passlib[bcrypt]
 psycopg2-binary
-pydantic
+# See: https://github.com/samuelcolvin/pydantic/issues/4131
+pydantic<1.9.1
 python-dotenv
 python-jose[cryptography]
 python-multipart
