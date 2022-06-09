@@ -17,7 +17,8 @@ slugs = [
     ('hello-456-wWorld', True),
     ('456-hello', False),
     ('456-World', False),
-    ('456', False)
+    ('456', False),
+    ('a2ps', True)
 ]
 
 
@@ -28,4 +29,3 @@ def test_validate_slug(test_input, is_valid):
     else:
         with pytest.raises(ValueError):
             validate_slug(None, test_input)
- 
