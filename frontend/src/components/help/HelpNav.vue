@@ -29,7 +29,7 @@ export default {
   inject: ["apiInfo"],
   data() {
     return {
-      frontendVersion: "0.1.0rc2"
+      frontendVersion: "0.1.0rc3"
     };
   }
 }
