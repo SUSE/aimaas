@@ -3,6 +3,12 @@
     <template v-slot:additional_breadcrumbs>
       <li class="breadcrumb-item active">{{ title }}</li>
     </template>
+    <template v-slot:actions>
+      <div v-if="activeSchema?.deleted" class="alert alert-danger p-2">
+        <i class="eos-icons me-2">delete</i>
+        This schema is deleted.
+    </div>
+    </template>
   </BaseLayout>
 
   <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="schematabbing"/>
