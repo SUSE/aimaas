@@ -159,6 +159,7 @@ class TestUpdateEntityTraceability(DefaultMixin):
 
     def test_list_change(self, dbsession: Session, testuser: User):
         entity = self.get_default_entities(dbsession)["Jane"]
+        entity_data = get_entity(dbsession, "Jane", self.get_default_schema(dbsession))
         change_request = create_entity_update_request(dbsession, entity.id, entity.schema_id,
                                                       {"friends": self._default_friends(dbsession)},
                                                       testuser)
@@ -167,8 +168,8 @@ class TestUpdateEntityTraceability(DefaultMixin):
         friends = self._default_friends(dbsession)
         assert details.changes["friends"].dict() == {
             'new': friends,
-            'old': friends[:1],
-            'current': friends[:1]}
+            'old': entity_data["friends"],
+            'current': entity_data["friends"]}
 
         apply_entity_update_request(dbsession, change_request=change_request, reviewed_by=testuser,
                                     comment="Test")
