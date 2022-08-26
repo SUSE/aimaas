@@ -483,6 +483,10 @@ class TestRouteUpdateEntity(DefaultMixin):
         response = authorized_client.put('/entity/person/Jack', json={"age": 2147483648})
         assert response.status_code == 422
 
+    def test_raise_on_noop(self, dbsession, authorized_client):
+        response = authorized_client.put('/entity/person/Jack', json={})
+        assert response.status_code == 208
+
 
 class TestRouteDeleteEntity(DefaultMixin):
     def test_delete(self, dbsession, authorized_client):

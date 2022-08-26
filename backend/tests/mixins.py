@@ -11,23 +11,28 @@ from ..schemas.schema import AttrDefSchema
 
 
 class DefaultMixin:
+    _default_entity_slug = "Jack"
+    _default_schema_slug = "person"
+
     def get_default_schema(self, db: Session) -> Schema:
-        return db.query(Schema).filter(Schema.slug == "person").one()
+        return db.query(Schema).filter(Schema.slug == self._default_schema_slug).one()
 
     def get_default_entities(self, db: Session) -> typing.Dict[str, Entity]:
         return {e.slug: e
-                for e in db.query(Entity).join(Schema).filter(Schema.slug == "person").all()}
+                for e in db.query(Entity).join(Schema)
+                .filter(Schema.slug == self._default_schema_slug).all()}
 
     def get_default_entity(self, db: Session) -> Entity:
         return db.query(Entity)\
             .join(Schema)\
-            .filter(Schema.slug == "person", Entity.slug == "Jack")\
+            .filter(Schema.slug == self._default_schema_slug,
+                    Entity.slug == self._default_entity_slug)\
             .one()
 
     def get_default_attr_defs(self, db: Session) -> typing.List[AttributeDefinition]:
         return db.query(AttributeDefinition)\
             .join(Schema, Schema.id == AttributeDefinition.schema_id)\
-            .filter(Schema.slug == "person")\
+            .filter(Schema.slug == self._default_schema_slug)\
             .all()
 
     def get_default_attr_def_schemas(self, db: Session) -> typing.List[AttrDefSchema]:
