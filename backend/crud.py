@@ -427,7 +427,6 @@ def _parse_filters(filters: dict, attrs: List[str]) \
         else:
             attr_filters[attr][filter] = v
 
-    print("===DEBUG=== FILTERS", attr_filters, entity_filters)
     return attr_filters, entity_filters
 
 
