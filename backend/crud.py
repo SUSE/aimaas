@@ -438,7 +438,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
     '''
     attrs = {i.attribute.name: i.attribute
              for i in schema.attr_defs if i.attribute.type.value.filters}
-    attrs_filters, entity_filters = _parse_filters(filters=filters, attrs=attrs.keys())
+    attr_filters, entity_filters = _parse_filters(filters=filters, attrs=attrs.keys())
     selects = []
 
     # Add filters for entity model
@@ -456,7 +456,7 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
         selects.append(q)
 
     # Add filters for attribute values
-    for attr_name, filters in attrs_filters.items():
+    for attr_name, filters in attr_filters.items():
         attr = attrs[attr_name]
         value_model = attr.type.value.model
         q = select(Entity).where(Entity.schema_id == schema.id).join(value_model)
