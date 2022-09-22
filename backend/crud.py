@@ -410,23 +410,25 @@ def _parse_filters(filters: dict, attrs: List[str]) \
     First `dict` is for attribute filters, second is for `Entity.name` filters
     '''
     filter_map = {f.value.name: f for f in FilterEnum}
-    attrs_filters = defaultdict(dict)
-    name_filters = {}
+    entity_fields = ('name', 'slug')
+    attr_filters = defaultdict(dict)
+    entity_filters = defaultdict(dict)
     for f, v in filters.items():
         split = f.rsplit('.', maxsplit=1)
         attr = split[0]
         filter = FilterEnum.EQ if len(split) == 1 else filter_map.get(split[-1], None)
-        if attr != "name" and attr not in attrs:
+        if attr not in entity_fields and attr not in attrs:
             raise InvalidFilterAttributeException(attr=attr, allowed_attrs=attrs)
         if not filter:
             raise InvalidFilterOperatorException(attr=attr, filter=split[-1])
 
-        if attr == 'name':
-            name_filters[filter] = v
-            continue
-        attrs_filters[attr][filter] = v
+        if attr in entity_fields:
+            entity_filters[attr][filter] = v
+        else:
+            attr_filters[attr][filter] = v
 
-    return attrs_filters, name_filters
+    print("===DEBUG=== FILTERS", attr_filters, entity_filters)
+    return attr_filters, entity_filters
 
 
 def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
@@ -437,18 +439,24 @@ def _query_entity_with_filters(filters: dict, schema: Schema, all: bool = False,
     '''
     attrs = {i.attribute.name: i.attribute
              for i in schema.attr_defs if i.attribute.type.value.filters}
-    attrs_filters, name_filters = _parse_filters(filters=filters, attrs=attrs.keys())
+    attrs_filters, entity_filters = _parse_filters(filters=filters, attrs=attrs.keys())
     selects = []
 
-    # since `name` is defined in `Entity`, not in `Value` tables, we need to query it separately
-    if name_filters:
+    # Add filters for entity model
+    if entity_filters:
         q = select(Entity).where(Entity.schema_id == schema.id)
         if not all:
             q = q.where(Entity.deleted == deleted_only)
-        for f, v in name_filters.items():
-            q = q.where(getattr(Entity.name, f.value.op)(v))
+        for field_name, filters in entity_filters.items():
+            for f, v in filters.items():
+                field = getattr(Entity, field_name, None)
+                if field is None:
+                    raise AttributeError(f"Entity has no field {field_name}")
+
+                q = q.where(getattr(Entity.name, f.value.op)(v))
         selects.append(q)
 
+    # Add filters for attribute values
     for attr_name, filters in attrs_filters.items():
         attr = attrs[attr_name]
         value_model = attr.type.value.model
@@ -568,6 +576,7 @@ def _check_fk_value(db: Session, attr_def: AttributeDefinition, entity_ids: List
                 bound_schema_id=attr_def.bound_schema_id,
                 passed_entity=entity
             )
+
 
 def _check_unique_value(db: Session, attr_def: AttributeDefinition, model: Value, value: Any):
     existing = db.execute(

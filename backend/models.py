@@ -1,18 +1,49 @@
 import enum
+from operator import eq
 from typing import List, Union, Optional
 
 from sqlalchemy import (
-    select, Enum, DateTime, Date,
+    func, select, Enum, DateTime, Date,
     Boolean, Column, ForeignKey,
     Integer, String, Float)
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
+from sqlalchemy.sql.operators import startswith_op, endswith_op, contains_op, regexp_match_op
 from sqlalchemy.sql.schema import UniqueConstraint
 
 from .base_models import Value, Mapping
 from .database import Base
 from .enum import FilterEnum
 from .utils import make_aware_datetime
+
+
+class CaseInsensitiveComparator(String.Comparator):
+    def ioperate(self, op, *other, **kwargs):
+        return op(
+            func.lower(self.__clause_element__()),
+            *[func.lower(o) for o in other],
+            **kwargs
+        )
+
+    def istartswith(self, other, **kwargs):
+        return self.ioperate(startswith_op, other, **kwargs)
+
+    def iendswith(self, other, **kwargs):
+        return self.ioperate(endswith_op, other, **kwargs)
+
+    def icontains(self, other, **kwargs):
+        return self.ioperate(contains_op, other, **kwargs)
+
+    def iregexp_match(self, other, **kwargs):
+        return self.ioperate(regexp_match_op, other, **kwargs)
+
+    def ieq(self, other, **kwargs):
+        return self.ioperate(eq, other, **kwargs)
+
+
+class CaseInsensitiveString(String):
+    Comparator = CaseInsensitiveComparator
+    comparator_factory = CaseInsensitiveComparator
 
 
 class ValueBool(Value):
@@ -37,12 +68,13 @@ class ValueForeignKey(Value):
 
 class ValueStr(Value):
     __tablename__ = 'values_str'
-    value = Column(String)
+    value = Column(CaseInsensitiveString)
 
 
 class ValueDatetime(Value):
     __tablename__ = 'values_datetime'
     value = Column(DateTime(timezone=True))
+
 
 class ValueDate(Value):
     __tablename__ = 'values_date'
@@ -51,7 +83,7 @@ class ValueDate(Value):
 
 class AttrType(enum.Enum):
     STR = Mapping(ValueStr, str, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT, FilterEnum.LE,
-                                  FilterEnum.GE, FilterEnum.NE, FilterEnum.CONTAINS,
+                                  FilterEnum.GE, FilterEnum.NE, FilterEnum.CONTAINS, FilterEnum.IEQ,
                                   FilterEnum.REGEXP, FilterEnum.STARTS])
     BOOL = Mapping(ValueBool, bool, [FilterEnum.EQ, FilterEnum.NE])
     INT = Mapping(ValueInt, int, [FilterEnum.EQ, FilterEnum.LT, FilterEnum.GT, FilterEnum.LE,
@@ -86,8 +118,8 @@ class Entity(Base):
     __tablename__ = 'entities'
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(128), nullable=False)
-    slug = Column(String(128), nullable=False)
+    name = Column(CaseInsensitiveString(128), nullable=False)
+    slug = Column(CaseInsensitiveString(128), nullable=False)
     schema_id = Column(Integer, ForeignKey('schemas.id'))
     deleted = Column(Boolean, default=False)
 

@@ -345,7 +345,8 @@ class TestRouteGetEntities(DefaultMixin):
         ('deleted_only=true&page=2&age.gt=0&age.lt=20',   set()),
     ])
     def test_get_with_filters_and_deleted(self, dbsession, client, q, slugs):
-        dbsession.execute(update(Entity).where(Entity.slug == 'Jack').values(deleted=True))
+        jack = dbsession.scalars(select(Entity).where(Entity.slug == 'Jack')).one()
+        jack.deleted = True
         dbsession.commit()
         response = client.get(f'/entity/person?{q}')
         assert {i["slug"] for i in response.json()['items']} == slugs
@@ -359,6 +360,28 @@ class TestRouteGetEntities(DefaultMixin):
     def test_ignore_filters_for_fk(self, dbsession, client):
         response = client.get('/entity/person?friends=1')
         assert {i["slug"] for i in response.json()['items']} == {'Jack', 'Jane'}
+
+    @pytest.mark.parametrize(['q', 'slugs'], [
+        ('name=Jack', {'Jack'}),
+        ('name=jack', set()),
+        ('name.starts=Ja', {'Jack', 'Jane'}),
+        ('name.starts=ja', {'Jack', 'Jane'}),
+        ('name.regexp=^Jac', {'Jack'}),
+        ('name.regexp=^jac', {'Jack'}),
+        ('name.ieq=Jack', {'Jack'}),
+        ('name.ieq=jack', {'Jack'}),
+        ('nickname=Jack', set()),
+        ('nickname=jack', {'Jack'}),
+        ('nickname.starts=Ja', {'Jack', 'Jane'}),
+        ('nickname.starts=ja', {'Jack', 'Jane'}),
+        ('nickname.regexp=^Jac', {'Jack'}),
+        ('nickname.regexp=^jac', {'Jack'}),
+        ('nickname.ieq=Jack', {'Jack'}),
+        ('nickname.ieq=jack', {'Jack'})
+    ])
+    def test_get_with_caseinsensitive_filter(self, dbsession, client, q, slugs):
+        response = client.get(f'/entity/person?{q}')
+        assert {i["slug"] for i in response.json()['items']} == slugs
 
 
 class TestRouteUpdateEntity(DefaultMixin):

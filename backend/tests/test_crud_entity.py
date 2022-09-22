@@ -369,6 +369,8 @@ class TestEntityRead(DefaultMixin):
         ({'age.le': 10},              1, ['Jack']),
         ({'age.lt': 10},              0, []),
         ({'age.ne': 10},              1, ['Jane']),
+        ({'slug.starts': 'Ja'},       2, ['Jack', 'Jane']),
+        ({'slug.contains': 'ck'},     1, ['Jack']),
         ({'name': 'Jane'},            1, ['Jane']),
         ({'nickname': 'jane'},        1, ['Jane']),
         ({'nickname.ne': 'jack'},     1, ['Jane']),
@@ -641,4 +643,3 @@ class TestEntityDelete(DefaultMixin):
         dbsession.flush()
         with pytest.raises(MissingEntityException):
             delete_entity(dbsession, id_or_slug=entity.id, schema_id=entity.schema_id)
-        

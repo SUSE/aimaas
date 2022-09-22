@@ -15,9 +15,10 @@ class FilterEnum(Enum):
     LE = Filter('le', '__le__', 'less than of equal to')
     GE = Filter('ge', '__ge__', 'greater than or equal to')
     NE = Filter('ne', '__ne__', 'not equal to')
-    CONTAINS = Filter('contains', 'contains', 'contains substring')
-    REGEXP = Filter('regexp', 'regexp_match', 'matches regular expression')
-    STARTS = Filter('starts', 'startswith', 'starts with substring')
+    CONTAINS = Filter('contains', 'icontains', 'contains substring')
+    REGEXP = Filter('regexp', 'iregexp_match', 'matches regular expression')
+    STARTS = Filter('starts', 'istartswith', 'starts with substring')
+    IEQ = Filter('ieq', 'ieq', 'equal to (case insensitive)')
 
 
 class ModelVariant(Enum):
