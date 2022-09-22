@@ -51,8 +51,8 @@
                 {{ schema.name }}
               </router-link>
             </div>
-            <div>
-              <i v-if="schema.deleted" class="eos-icons" data-bs-toggle="tooltip"
+            <div v-if="schema.deleted">
+              <i class="eos-icons" data-bs-toggle="tooltip"
                  title="This schema is deleted">
                 delete
               </i>
