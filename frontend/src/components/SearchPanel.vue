@@ -123,14 +123,12 @@ export default {
       return params;
     },
     fieldOptions() {
-      let r = this.schema?.attributes.map(x => {
-        return {value: x.name}
-      });
-      r.unshift({value: '', text: '-- select one --'})
+      let r = Object.keys(this.fieldTypes).map(x => ({value: x}));
+      r.unshift({value: '', text: '-- select one --'});
       return r;
     },
     fieldTypes() {
-      const t = {};
+      const t = {'name': 'STR', 'slug': 'STR'};
       for (let a of (this.schema?.attributes || [])) {
         t[a.name] = a.type;
       }
