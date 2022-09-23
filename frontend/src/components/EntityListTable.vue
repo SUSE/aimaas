@@ -18,7 +18,7 @@
       </tr>
       </thead>
       <tbody>
-      <tr v-for="e in entities" :key="e.id">
+      <tr v-for="e in entities" :key="e.id" :class="{'table-light': e.deleted}">
         <td v-if="showSelectors">
           <input :type="inputType" class="form-check-input" name="EntitySelection" :value="e.id"
                  @change="$emit('select')" :checked="selected.includes(e.id)"
@@ -30,6 +30,10 @@
                 :to="{name: 'entity-view', params: {schemaSlug: schema.slug, entitySlug: e.slug }}">
               {{ e[field] }}
             </RouterLink>
+            <i class="eos-icons float-end text-muted" v-if="e.deleted" data-bs-toggle="tooltip"
+               title="Entity is deleted">
+              delete
+            </i>
           </template>
           <template v-else-if="field in fkFields">
             <RefEntityList v-if="listFields.includes(field)" :entity-ids="e[field]"

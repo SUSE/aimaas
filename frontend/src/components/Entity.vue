@@ -8,6 +8,12 @@
       </li>
       <li class="breadcrumb-item active">{{ title }}</li>
     </template>
+    <template v-slot:actions>
+      <div v-if="entity?.deleted" class="alert alert-danger p-2">
+        <i class="eos-icons me-2">delete</i>
+        This entity is deleted.
+    </div>
+    </template>
   </BaseLayout>
   <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="entitytabbing"
            :tabEvents="{update: onUpdate}"/>

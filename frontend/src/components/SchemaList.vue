@@ -39,7 +39,8 @@
                    :args="{id: 'mode'}"/>
       <template v-if="schemas && schemas.length > 0">
         <div class="list-group">
-          <div class="list-group-item d-flex" v-for="schema in schemas" :key="schema.id">
+          <div class="list-group-item d-flex" v-for="schema in schemas" :key="schema.id"
+               :class="{'text-muted bg-light': schema.deleted}">
             <div class="me-3">
               <input :disabled="schema.deleted" type="checkbox" :data-slug="schema.slug"
                      class="form-check-input" name="SchemaSelection"
@@ -49,6 +50,12 @@
               <router-link :to="{name: 'schema-view', params: {schemaSlug: schema.slug}}">
                 {{ schema.name }}
               </router-link>
+            </div>
+            <div v-if="schema.deleted">
+              <i class="eos-icons" data-bs-toggle="tooltip"
+                 title="This schema is deleted">
+                delete
+              </i>
             </div>
           </div>
         </div>
