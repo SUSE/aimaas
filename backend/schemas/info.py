@@ -12,3 +12,4 @@ class InfoModel(BaseModel):
     version: str
     filters: typing.List[FilterModel]
     filters_per_type: typing.Dict[str, typing.List[str]]
+    help: typing.Dict[str, typing.Optional[str]]

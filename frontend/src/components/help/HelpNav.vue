@@ -10,6 +10,21 @@
         <i class="eos-icons me-1">api</i>
         API Specification
       </a>
+      <router-link :to="{name: 'help-about'}" class="dropdown-item">
+        <i class="eos-icons me-1">help</i>
+        About
+      </router-link>
+      <div class="dropdown-divider"></div>
+      <div class="d-flex justify-content-between text-center">
+        <a :href="`mailto:${apiInfo?.help.email}`" v-if="apiInfo?.help.email"
+           title="Write your admins" class="dropdown-item">
+          <i class="eos-icons me-1">email</i>
+        </a>
+        <a :href="apiInfo?.help.chat_url" v-if="apiInfo?.help.chat_url"
+           title="Chat with your admins" class="dropdown-item">
+          <i class="eos-icons me-1">chat</i>
+        </a>
+      </div>
       <div class="dropdown-divider"></div>
       <div class="dropdown-item d-flex justify-content-between">
         <span>Backend version:</span>

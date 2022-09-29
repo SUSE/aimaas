@@ -44,7 +44,8 @@ def get_info():
         "filters": [FilterModel(name=f.value.name, description=f.value.description)
                     for f in FilterEnum],
         "filters_per_type": {atype.name: [filter.value.name for filter in atype.value.filters]
-                             for atype in AttrType}
+                             for atype in AttrType},
+        "help": settings.help
     }
 
 
