@@ -30,6 +30,17 @@ class LdapSettings(BaseSettings):
         env_prefix = 'LDAP_'
 
 
+class HelpSettings(BaseSettings):
+    source_url: str = "https://github.com/SUSE/aimaas"
+    chat_url: Optional[str] = None
+    tracker_url: str = "https://github.com/SUSE/aimaas/issues"
+    email: Optional[str] = None
+
+    class Config:
+        env_file = '.env'
+        env_prefix = 'HELP_'
+
+
 class Settings(BaseSettings):
     pg_user: str
     pg_password: str
@@ -47,6 +58,7 @@ class Settings(BaseSettings):
     token_exp_minutes: int = 120
 
     ldap: LdapSettings = LdapSettings()
+    help: HelpSettings = HelpSettings()
 
     class Config:
         env_file = '.env'

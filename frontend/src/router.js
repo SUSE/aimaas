@@ -5,6 +5,7 @@ import Entity from "@/components/Entity.vue"
 import Schema from "@/components/Schema";
 import SchemaList from "@/components/SchemaList";
 import AuthManager from "@/components/auth/AuthManager";
+import About from "@/components/help/About";
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -39,5 +40,10 @@ export const router = createRouter({
             component: SchemaList,
             name: 'schema-list'
         },
+        {
+            path: '/help/about',
+            component: About,
+            name: 'help-about'
+        }
     ],
 });
