@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..auth.models import User
 from ..crud import get_entity_by_id, get_entity
 from ..exceptions import MissingEntityUpdateRequestException, AttributeNotDefinedException, \
-    MissingEntityCreateRequestException
+    MissingEntityCreateRequestException, NoOpChangeException
 from ..models import Attribute, AttrType, Entity
 from ..traceability.entity import entity_change_details, \
     create_entity_update_request, apply_entity_update_request, create_entity_delete_request, \
@@ -91,7 +91,21 @@ class TestUpdateEntityTraceability(DefaultMixin):
             'fav_color': ['blue', 'red']
         }
 
-    def test_raise_on_missing_change(self, dbsession: Session, testuser: User):
+    def test_create__raise_on_missing_change(self, dbsession: Session, testuser: User):
+        schema = self.get_default_schema(dbsession)
+        entity = get_entity(dbsession, self._default_entity_slug, schema)
+
+        with pytest.raises(NoOpChangeException):
+            create_entity_update_request(
+                db=dbsession, id_or_slug=entity["slug"], schema_id=schema.id,
+                created_by=testuser, data={
+                    "age": entity["age"],
+                    "born": entity["born"],
+                    "slug": entity["slug"]
+                }
+            )
+
+    def test_apply__raise_on_missing_change(self, dbsession: Session, testuser: User):
         schema_change = ChangeRequest(
             created_by=testuser,
             created_at=datetime.now(timezone.utc),
@@ -145,6 +159,7 @@ class TestUpdateEntityTraceability(DefaultMixin):
 
     def test_list_change(self, dbsession: Session, testuser: User):
         entity = self.get_default_entities(dbsession)["Jane"]
+        entity_data = get_entity(dbsession, "Jane", self.get_default_schema(dbsession))
         change_request = create_entity_update_request(dbsession, entity.id, entity.schema_id,
                                                       {"friends": self._default_friends(dbsession)},
                                                       testuser)
@@ -153,8 +168,8 @@ class TestUpdateEntityTraceability(DefaultMixin):
         friends = self._default_friends(dbsession)
         assert details.changes["friends"].dict() == {
             'new': friends,
-            'old': friends[:1],
-            'current': friends[:1]}
+            'old': entity_data["friends"],
+            'current': entity_data["friends"]}
 
         apply_entity_update_request(dbsession, change_request=change_request, reviewed_by=testuser,
                                     comment="Test")

@@ -445,7 +445,7 @@ class TestRouteUpdateEntity(DefaultMixin):
         data = {'slug': 'Jack'}
         entity = self.get_default_entity(dbsession)
         response = authorized_client.put(f'/entity/person/{entity.id}', json=data)
-        assert response.status_code == 200
+        assert response.status_code == 208
 
     def test_raise_on_invalid_slug(self, dbsession, authorized_client):
         p1 = {
@@ -505,6 +505,10 @@ class TestRouteUpdateEntity(DefaultMixin):
     def test_raise_on_value_out_of_range(self, dbsession, authorized_client):
         response = authorized_client.put('/entity/person/Jack', json={"age": 2147483648})
         assert response.status_code == 422
+
+    def test_no_raise_on_missing_data(self, dbsession, authorized_client):
+        response = authorized_client.put('/entity/person/Jack', json={})
+        assert response.status_code == 208
 
 
 class TestRouteDeleteEntity(DefaultMixin):

@@ -504,6 +504,24 @@ class TestEntityUpdate(DefaultMixin):
         update_entity(dbsession, id_or_slug='Jane', schema_id=entity.schema_id, data=data)
         self.asserts_after_entities_update(dbsession, born_time=time)
 
+    def test_no_changes(self, dbsession):
+        schema = self.get_default_schema(dbsession)
+        orig_entity = get_entity(db=dbsession, id_or_slug=self._default_entity_slug, schema=schema)
+        update_entity(
+            db=dbsession,
+            id_or_slug=orig_entity["id"],
+            schema_id=schema.id,
+            data={
+                "age": orig_entity["age"],
+                "born": orig_entity["born"],
+                "slug": orig_entity["slug"]
+            }
+        )
+        updated_entity = get_entity(db=dbsession, id_or_slug=self._default_entity_slug,
+                                    schema=schema)
+        for attr in ("age", "born", "nickname"):
+            assert orig_entity.get(attr, None) == updated_entity.get(attr, None)
+
     def test_no_raise_with_empty_optional_single_fk_field(self, dbsession):
         entity = self.get_default_entity(dbsession)
         attr = dbsession.execute(select(Attribute).where(Attribute.name == 'address')).scalar()

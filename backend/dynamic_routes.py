@@ -243,6 +243,7 @@ def route_update_entity(router: APIRouter, schema: Schema):
         responses={
             200: {"description": "Entity was updated"},
             202: {"description": "Request to update entity was stored"},
+            208: {"description": "Entity was unchanged because request contained no changes"},
             404: {
                 'description': '''Can be returned when:
 
@@ -285,6 +286,8 @@ def route_update_entity(router: APIRouter, schema: Schema):
             db.commit()
             response.status_code = status.HTTP_202_ACCEPTED
             return change_request
+        except exceptions.NoOpChangeException as e:
+            raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
         except (exceptions.MissingEntityException, exceptions.MissingSchemaException) as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except (exceptions.EntityExistsException, exceptions.UniqueValueException) as e:

@@ -15,7 +15,7 @@ from ..auth.models import User
 from ..config import DEFAULT_PARAMS
 from ..enum import ModelVariant
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
-    AttributeNotDefinedException, MissingEntityUpdateRequestException, \
+    AttributeNotDefinedException, MissingEntityUpdateRequestException, NoOpChangeException, \
     MissingEntityDeleteRequestException, MissingChangeRequestException
 from ..models import Entity, AttributeDefinition, Schema, Attribute
 from ..schemas.entity import EntityModelFactory
@@ -155,8 +155,9 @@ def get_old_value(db: Session, entity: Entity, attr_name: str) -> List[Any]:
 
 
 def _create_value_changes(db: Session, change_request: ChangeRequest, schema: Schema, data: dict,
-                          entity: Optional[Entity] = None, new: bool = False):
+                          entity: Optional[Entity] = None, new: bool = False) -> bool:
     attr_defs: Dict[str, AttributeDefinition] = {i.attribute.name: i for i in schema.attr_defs}
+    changes_present = False
     for field, value in data.items():
         attr_def = attr_defs.get(field)
         attr: Attribute = attr_def.attribute
@@ -164,7 +165,14 @@ def _create_value_changes(db: Session, change_request: ChangeRequest, schema: Sc
         model = ChangeAttrType[attr.type.name].value.model
         new_values = crud._convert_values(attr_def=attr_def, value=value, caster=caster) or []
         old_values = [] if new else get_old_value(db=db, entity=entity, attr_name=attr.name)
+        if old_values == new_values:
+            # Only, if both lists are identical, we can skip the logging of changes
+            continue
         for new_val, old_val in zip_longest(sorted(new_values), sorted(old_values), fillvalue=None):
+            if old_val != new_val:
+                # Caveat: For list attributes, we currently prefer to include the entire list in the
+                # change log. So, we need to log all values, even if single ones are not changed.
+                changes_present = True
             v = model(new_value=new_val, old_value=old_val)
             db.add(v)
             db.flush()
@@ -179,6 +187,7 @@ def _create_value_changes(db: Session, change_request: ChangeRequest, schema: Sc
             )
             db.add(change)
             db.flush()
+    return changes_present
 
 
 def create_entity_create_request(db: Session, data: dict, schema_id: int, created_by: User,
@@ -366,8 +375,13 @@ def create_entity_update_request(
     
     entity_fields = {'name': data.pop('name', None), 'slug': data.pop('slug', None)}
     entity_fields = {k: v for k, v in entity_fields.items() if v is not None}
+    changes_present = False
     for field, value in entity_fields.items():
-        v = ChangeValueStr(old_value=getattr(entity, field), new_value=value)
+        old_value = getattr(entity, field)
+        if old_value == value:
+            continue
+        changes_present = True
+        v = ChangeValueStr(old_value=old_value, new_value=value)
         db.add(v)
         db.flush()
         change = Change(
@@ -382,8 +396,10 @@ def create_entity_update_request(
         db.add(change)
 
     schema = db.query(Schema).get(schema_id)
-    _create_value_changes(db=db, change_request=change_request, schema=schema, data=data, new=False,
-                          entity=entity)
+    changes_present |= _create_value_changes(db=db, change_request=change_request, schema=schema,
+                                             data=data, new=False, entity=entity)
+    if not changes_present:
+        raise NoOpChangeException("Change request contains no changes")
     if commit:
         db.commit()
     else:
