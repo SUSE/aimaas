@@ -65,6 +65,18 @@ export default {
       if (oldPage !== newPage) {
         this.getEntities({resetPage: false});
       }
+    },
+    'schema': {
+      async handler(newValue, oldValue) {
+        try {
+          if (newValue !== oldValue) {
+            await this.onUpdate();
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      immediate: true
     }
   },
   methods: {
@@ -84,7 +96,7 @@ export default {
       }
       const response = await this.$api.getEntities({
         schemaSlug: this.schema.slug,
-        size: this.$refs.paginator.pageSize,
+        size: this.$refs.paginator?.pageSize || 10,
         page: this.currentPage,
         filters: this.filters,
         orderBy: this.orderBy,
@@ -120,12 +132,6 @@ export default {
       Promise.all(promises).then(() => this.getEntities({resetPage: true}));
     }
   },
-  async activated() {
-    await this.getEntities({resetPage: true}).then(() => null);
-  },
-  created() {
-    this.$watch("schema", this.onUpdate);
-  },
   data() {
     return {
       entities: [],
@@ -140,4 +146,3 @@ export default {
   }
 };
 </script>
-

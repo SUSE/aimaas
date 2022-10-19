@@ -36,14 +36,35 @@ export default {
       entity: null
     }
   },
-  async activated() {
-    if (this.entityId) {
-      this.loading = true;
-      const params = {schemaSlug: this.schemaSlug, entityIdOrSlug: this.entityId};
-      this.entity = await this.$api.getEntity(params);
-      this.loading = false;
-    } else {
-      this.loading = false;
+  computed: {
+    schemaAndEntity() {
+      if (this.schemaSlug && this.entityId) {
+        return {schema: this.schemaSlug, entity: this.entityId};
+      }
+      return null;
+    }
+  },
+  methods: {
+    async load() {
+      if (this.entityId) {
+        this.loading = true;
+        const params = {schemaSlug: this.schemaSlug, entityIdOrSlug: this.entityId};
+        this.entity = await this.$api.getEntity(params);
+        this.loading = false;
+      } else {
+        this.loading = false;
+      }
+    }
+  },
+  watch: {
+    "schemaAndEntity": {
+      async handler(oldValue, newValue) {
+        if (oldValue !== newValue) {
+          await this.load();
+        }
+      },
+      immediate: true,
+      deep: true
     }
   }
 }
