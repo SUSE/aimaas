@@ -38,9 +38,9 @@
                   </div>
                   <div>
                     <button type="button" class="btn btn-outline-cta ms-1"
-                            data-ts-toggle="tooltip" title="Remove">
+                            data-ts-toggle="tooltip" title="Remove"
+                            @click="removeListItem(attr.name, idx)">
                       <i class="eos-icons">backspace</i>
-
                     </button>
                   </div>
                 </li>
@@ -127,6 +127,13 @@ export default {
         this.editEntity[attrName].push('');
       } else {
         console.error("Attribute", attrName, "is not a multi-value attribute!");
+      }
+    },
+    removeListItem(attrName, idx) {
+      try {
+        this.editEntity[attrName].splice(idx, 1);
+      } catch (e) {
+        console.error("Failed to remove item from attribute list ", attrName);
       }
     },
     prepEntity() {
