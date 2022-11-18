@@ -373,9 +373,9 @@ class TestRoutesRequiringAuth:
         ('delete', '/users/tester'),
         ('post', '/permissions'),
         ('delete', '/permissions'),
-        ('post', '/entity/unperson'),
-        ('put', '/entity/unperson/foo'),
-        ('delete', '/entity/unperson/foo'),
+        ('post', '/entity/person'),
+        ('put', '/entity/person/foo'),
+        ('delete', '/entity/person/foo'),
     )
 
     @pytest.mark.parametrize("method, url", authenticated + authorized)
@@ -385,12 +385,61 @@ class TestRoutesRequiringAuth:
         assert response.status_code == 401
 
     @pytest.mark.parametrize("method, url", authorized)
-    def test_require_authorization(self, method, url, dbsession: Session, testuser: User,
-                                   authenticated_client: TestClient):
-        # The testuser is a superuser. Remove permissions first.
-        dbsession.query(Permission).filter(Permission.recipient_type == RecipientType.USER,
-                                           Permission.recipient_id == testuser.id).delete()
-
+    def test_require_authorization(self, method, url, dbsession: Session,
+                                   unauthorized_testuser: User, authenticated_client: TestClient):
         func = getattr(authenticated_client, method)
         response = func(url)
         assert response.status_code == 403
+
+    def test_review_change_request_breakout__create(self, dbsession: Session,
+                                                    unauthorized_testuser: User,
+                                                    authenticated_client: TestClient):
+        """
+        Test that authenticated user is allowed to create a change request without actually creating
+        an entity
+        """
+        response = authenticated_client.post("/entity/unperson",
+                                             json={"name": "Foo", "slug": "foo"})
+        assert response.status_code == 202
+        q = dbsession.query(Entity)\
+            .join(Schema)\
+            .filter(Schema.slug == "unperson", Entity.slug == "foo")\
+            .exists()
+        assert not dbsession.query(Entity.id).filter(q).scalar()
+
+    def test_review_change_request_breakout__update(self, dbsession: Session,
+                                                    unauthorized_testuser: User,
+                                                    authenticated_client: TestClient):
+        """
+        Test that authenticated user is allowed to create a change request without actually changing
+        an entity
+        """
+        schema = dbsession.query(Schema).where(Schema.slug == "unperson").one()
+        entity = Entity(name="Foo", slug="foo", schema_id=schema.id)
+        dbsession.add(entity)
+        dbsession.commit()
+        response = authenticated_client.put("/entity/unperson/foo",
+                                            json={"name": "Føø", "slug": "foo"})
+
+        assert response.status_code == 202
+        dbsession.refresh(entity)
+        assert entity.name == "Foo"
+
+    def test_review_change_request_breakout__delete(self, dbsession: Session,
+                                                    unauthorized_testuser: User,
+                                                    authenticated_client: TestClient):
+        """
+        Test that authenticated user is allowed to create a change request without actually deleting
+        an entity
+        """
+        schema = dbsession.query(Schema).where(Schema.slug == "unperson").one()
+        entity = Entity(name="Foo", slug="foo", schema_id=schema.id)
+        dbsession.add(entity)
+        dbsession.commit()
+        response = authenticated_client.delete("/entity/unperson/foo",
+                                               json={"name": "Føø", "slug": "foo"})
+
+        assert response.status_code == 202
+        dbsession.refresh(entity)
+        assert entity.name == "Foo"
+        assert entity.deleted is False

@@ -166,7 +166,7 @@ def route_get_entities(router: APIRouter, schema: Schema):
 
 def route_create_entity(router: APIRouter, schema: Schema):
     req_permission = authenticated_user
-    if schema.reviewable:
+    if not schema.reviewable:
         req_permission = authorized_user(RequirePermission(
             permission=PermissionType.CREATE_ENTITY,
             target=Schema()
@@ -229,7 +229,7 @@ def route_create_entity(router: APIRouter, schema: Schema):
 
 def route_update_entity(router: APIRouter, schema: Schema):
     req_permission = authenticated_user
-    if schema.reviewable:
+    if not schema.reviewable:
         req_permission = authorized_user(RequirePermission(
             permission=PermissionType.UPDATE_ENTITY,
             target=Entity()
@@ -300,7 +300,7 @@ def route_update_entity(router: APIRouter, schema: Schema):
 
 def route_delete_entity(router: APIRouter, schema: Schema):
     req_permission = authenticated_user
-    if schema.reviewable:
+    if not schema.reviewable:
         req_permission = authorized_user(RequirePermission(
             permission=PermissionType.DELETE_ENTITY,
             target=Entity()
