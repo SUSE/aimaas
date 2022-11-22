@@ -1,3 +1,5 @@
+# See: https://github.com/encode/starlette/issues/1943
+httpx
 pytest
 pytest-cov
 pytest-mock==3.6.1

@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 
 from alembic import command
 from alembic.config import Config
+from httpx._client import USE_CLIENT_DEFAULT
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -333,11 +334,30 @@ def testuser(dbsession) -> User:
     return get_user(db=dbsession, username=TEST_USER.username)
 
 
+class OldStyleTestClient(TestClient):
+    def delete(self, url, *, params=None, headers=None, cookies=None, auth=USE_CLIENT_DEFAULT,
+               follow_redirects=None, allow_redirects=None, timeout=USE_CLIENT_DEFAULT,
+               extensions=None, json=None):
+        # Note: Since starlette 0.21 `TestClient.delete` no longer accepts the `json` parameter.
+        return self.request(
+            "DELETE",
+            url,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=self._choose_redirect_arg(follow_redirects, allow_redirects),
+            timeout=timeout,
+            extensions=extensions,
+            json=json
+        )
+
+
 @pytest.fixture
 def client(dbsession):
     app = create_app(session=dbsession)
     app.dependency_overrides[get_db] = lambda: dbsession
-    client = TestClient(app)
+    client = OldStyleTestClient(app)
     yield client
 
 

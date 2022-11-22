@@ -1,7 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from sqlalchemy import update
 
 from ..models import *
 from ..dynamic_routes import *
@@ -13,10 +12,7 @@ from .mixins import DefaultMixin
 class TestRouteBasics:
     def test_load_schema_data(self, dbsession, client):
         schemas = load_schemas(db=dbsession)
-        assert len(schemas) == 2
-
-        s = schemas[0]
-        assert s.name == 'Person'
+        assert {s.name for s in schemas} == {'Person', 'UnPerson'}
 
     def test_routes_were_generated(self, dbsession, client):
         routes = [
