@@ -10,5 +10,4 @@ python-dotenv
 python-jose[cryptography]
 python-multipart
 SQLAlchemy
-starlette
 uvicorn
