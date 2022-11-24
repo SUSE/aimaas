@@ -12,6 +12,8 @@ from ..config import settings
 from ..models import Schema, Entity
 from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema, PermissionSchema, \
     RequirePermission
+from ..traceability.enum import ReviewResult, ChangeStatus
+from ..traceability.models import ChangeRequest
 from .conftest import TEST_USER
 from .mixins import CreateMixin
 
@@ -389,6 +391,18 @@ class TestRoutesRequiringAuth:
                                    unauthorized_testuser: User, authenticated_client: TestClient):
         func = getattr(authenticated_client, method)
         response = func(url)
+        assert response.status_code == 403
+
+    def test_approve_request(self, dbsession: Session, unauthorized_testuser: User,
+                             authenticated_client: TestClient):
+        change_request_ids = dbsession.query(ChangeRequest.id)\
+            .where(ChangeRequest.status == ChangeStatus.PENDING)\
+            .first()
+        assert len(change_request_ids) == 1
+
+        response = authenticated_client.post(f"/changes/review/{change_request_ids[0]}",
+                                             json={"result": ReviewResult.APPROVE.value,
+                                                   "comment": "Foo"})
         assert response.status_code == 403
 
     def test_review_change_request_breakout__create(self, dbsession: Session,
