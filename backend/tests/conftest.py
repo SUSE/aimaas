@@ -362,14 +362,6 @@ def unauthorized_testuser(dbsession, testuser) -> User:
 
 
 @pytest.fixture
-def unauthorized_testuser(dbsession, testuser) -> User:
-    # The testuser is a superuser. Remove permissions.
-    dbsession.query(Permission).filter(Permission.recipient_type == RecipientType.USER,
-                                       Permission.recipient_id == testuser.id).delete()
-    return testuser
-
-
-@pytest.fixture
 def client(dbsession):
     app = create_app(session=dbsession)
     app.dependency_overrides[get_db] = lambda: dbsession
