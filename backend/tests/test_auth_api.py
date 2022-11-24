@@ -436,8 +436,7 @@ class TestRoutesRequiringAuth:
         entity = Entity(name="Foo", slug="foo", schema_id=schema.id)
         dbsession.add(entity)
         dbsession.commit()
-        response = authenticated_client.delete("/entity/unperson/foo",
-                                               json={"name": "Føø", "slug": "foo"})
+        response = authenticated_client.delete("/entity/unperson/foo")
 
         assert response.status_code == 202
         dbsession.refresh(entity)
