@@ -96,7 +96,7 @@ class CreateMixin(DefaultMixin):
         # Grant permission to parent group
         self._grant_permission(dbsession, PermissionSchema(
             recipient_type=RecipientType.GROUP, recipient_name=pgroup.name,
-            obj_type=PermissionTargetType.SCHEMA, obj_id=entity.id,
+            obj_type=PermissionTargetType.SCHEMA, obj_id=entity.schema_id,
             permission=PermissionType.READ_ENTITY))
 
         # Grant permission to group
