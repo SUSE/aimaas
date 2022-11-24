@@ -411,7 +411,7 @@ class TestRoutesRequiringAuth:
                                                     unauthorized_testuser: User,
                                                     authenticated_client: TestClient):
         """
-        Test that authenticated user is allowed to create a change request without actually changing
+        Test that authenticated user is allowed to update a change request without actually changing
         an entity
         """
         schema = dbsession.query(Schema).where(Schema.slug == "unperson").one()
@@ -429,7 +429,7 @@ class TestRoutesRequiringAuth:
                                                     unauthorized_testuser: User,
                                                     authenticated_client: TestClient):
         """
-        Test that authenticated user is allowed to create a change request without actually deleting
+        Test that authenticated user is allowed to delete a change request without actually deleting
         an entity
         """
         schema = dbsession.query(Schema).where(Schema.slug == "unperson").one()
