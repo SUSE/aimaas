@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from ..auth import authenticated_user, authorized_user
 from ..auth.crud import get_or_create_user, get_user, grant_permission
 from ..auth.enum import RecipientType, PermissionType
-from ..auth.models import User
+from ..auth.models import User, Permission
 from ..database import get_db
 from ..models import *
 from ..schemas.auth import UserCreateSchema, PermissionSchema
@@ -351,6 +351,14 @@ class OldStyleTestClient(TestClient):
             extensions=extensions,
             json=json
         )
+
+
+@pytest.fixture
+def unauthorized_testuser(dbsession, testuser) -> User:
+    # The testuser is a superuser. Remove permissions.
+    dbsession.query(Permission).filter(Permission.recipient_type == RecipientType.USER,
+                                       Permission.recipient_id == testuser.id).delete()
+    return testuser
 
 
 @pytest.fixture
