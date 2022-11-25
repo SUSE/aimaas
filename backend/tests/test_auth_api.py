@@ -395,6 +395,9 @@ class TestRoutesRequiringAuth:
 
     def test_approve_request(self, dbsession: Session, unauthorized_testuser: User,
                              authenticated_client: TestClient):
+        """
+        Test that an authenticated but unauthorized user is not allowed to approve a change request.
+        """
         change_request_ids = dbsession.query(ChangeRequest.id)\
             .where(ChangeRequest.status == ChangeStatus.PENDING)\
             .first()
