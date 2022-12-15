@@ -104,5 +104,9 @@ class CreateMixin(DefaultMixin):
             recipient_type=RecipientType.GROUP, recipient_name=group.name,
             obj_type=PermissionTargetType.SCHEMA, obj_id=entity.schema_id,
             permission=PermissionType.UPDATE_ENTITY))
+        self._grant_permission(dbsession, PermissionSchema(
+            recipient_type=RecipientType.GROUP, recipient_name=group.name,
+            obj_type=PermissionTargetType.SCHEMA, obj_id=entity.schema_id,
+            permission=PermissionType.CREATE_ENTITY))
 
         return user, group, pgroup

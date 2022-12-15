@@ -169,7 +169,7 @@ def route_create_entity(router: APIRouter, schema: Schema):
     if not schema.reviewable:
         req_permission = authorized_user(RequirePermission(
             permission=PermissionType.CREATE_ENTITY,
-            target=Schema()
+            target=Schema(id=schema.id)
         ))
 
     @router.post(

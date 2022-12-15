@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from ..auth import authenticate_user
+from ..auth import authenticate_user, authenticated_user, authorized_user
 from ..auth.crud import add_members, has_permission
 from ..auth.enum import RecipientType, PermissionTargetType, PermissionType
 from ..auth.models import User, Permission, Group
@@ -14,7 +14,7 @@ from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema, Permission
     RequirePermission
 from ..traceability.enum import ReviewResult, ChangeStatus
 from ..traceability.models import ChangeRequest
-from .conftest import TEST_USER
+from .conftest import TEST_USER, fake_authenticated_user
 from .mixins import CreateMixin
 
 
@@ -351,7 +351,8 @@ class TestRouteLogin:
         assert response.status_code == 401
 
 
-class TestRoutesRequiringAuth:
+class TestRoutesRequiringAuth(CreateMixin):
+    # Routes requiring authentication
     authenticated = (
         # method, route
         ('post', '/changes/review/1'),
@@ -362,6 +363,7 @@ class TestRoutesRequiringAuth:
         ('get', '/users/tester/memberships'),
         ('get', '/permissions'),
     )
+    # Routes requiring authorization
     authorized = (
         ('post', '/schema'),
         ('put', '/schema/unperson'),
@@ -379,6 +381,12 @@ class TestRoutesRequiringAuth:
         ('put', '/entity/person/foo'),
         ('delete', '/entity/person/foo'),
     )
+    # Routes test user has actually permissions for
+    user_authorized = (
+        ('delete', '/entity/person/Jack'),
+        ('put', '/entity/person/Jack'),
+        ('post', '/entity/person')
+    )
 
     @pytest.mark.parametrize("method, url", authenticated + authorized)
     def test_require_authentication(self, method, url, client: TestClient):
@@ -392,6 +400,33 @@ class TestRoutesRequiringAuth:
         func = getattr(authenticated_client, method)
         response = func(url)
         assert response.status_code == 403
+
+    @pytest.mark.parametrize("method, url", authorized)
+    def test_has_authorization_su(self, method, url, dbsession: Session,
+                                  authorized_client: TestClient):
+        """
+        Test that default user is authorized
+
+        FYI: The default user has the SUPERUSER permissions
+        """
+        func = getattr(authorized_client, method)
+        response = func(url)
+        assert response.status_code != 403
+
+    @pytest.mark.parametrize("method, url", user_authorized)
+    def test_has_authorization(self, method, url, dbsession: Session,
+                               authorized_client: TestClient):
+        """
+        Test that a non-superuser is authorized
+        """
+        user, _, _ = self._create_user_group_with_perm(dbsession)
+        auth_user = fake_authenticated_user(db=dbsession, username_override=user.username)
+        authorized_client.app.dependency_overrides[authenticated_user] = auth_user
+        authorized_client.app.dependency_overrides[authorized_user] = auth_user
+
+        func = getattr(authorized_client, method)
+        response = func(url)
+        assert response.status_code != 403
 
     def test_approve_request(self, dbsession: Session, unauthorized_testuser: User,
                              authenticated_client: TestClient):
