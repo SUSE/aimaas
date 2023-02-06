@@ -62,19 +62,25 @@ def authorized_user(required_permission: RequirePermission) -> Callable:
     async def is_authorized(request: Request, db: Session = Depends(get_db),
                             user: User = Depends(authenticated_user)) -> User:
         if isinstance(required_permission.target, (Schema, Entity)):
-            id_or_slug = request.path_params.get("id_or_slug", None)
-            try:
-                required_permission.target.id = int(id_or_slug)
-            except (ValueError, TypeError):
-                Model = required_permission.target.__class__
-                try:
-                    required_permission.target.id = db.query(Model.id) \
-                                                      .filter(Model.slug == id_or_slug).one()[0]
-                except NoResultFound:
+            if not getattr(required_permission.target, "id", None):
+                id_or_slug = request.path_params.get("id_or_slug", None)
+                if id_or_slug is not None:
+                    try:
+                        required_permission.target.id = int(id_or_slug)
+                    except (ValueError, TypeError):
+                        Model = required_permission.target.__class__
+                        try:
+                            required_permission.target.id = db.query(Model.id) \
+                                                              .filter(Model.slug == id_or_slug) \
+                                                              .one()[0]
+                        except NoResultFound:
+                            required_permission.target = None
+                else:
                     required_permission.target = None
             if isinstance(required_permission.target, Entity):
                 parts = request.url.path.split("/")
-                required_permission.target.schema_id = db.query(Schema.id).filter(Schema.slug == parts[-2]).one()[0]
+                required_permission.target.schema_id = db.query(Schema.id) \
+                                                         .filter(Schema.slug == parts[-2]).one()[0]
         elif isinstance(required_permission.target, Group):
             group_id = request.path_params.get("group_id", None)
             required_permission.target.id = int(group_id)

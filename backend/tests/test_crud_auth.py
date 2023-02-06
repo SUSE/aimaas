@@ -239,11 +239,11 @@ class TestPermission(CreateMixin):
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.USER,
                                 recipient_id=user.id)
-        assert len(perms) == 3
+        assert len(perms) == 4
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.GROUP,
                                 recipient_id=group.id)
-        assert len(perms) == 2
+        assert len(perms) == 3
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.GROUP,
                                 recipient_id=parent_group.id)
@@ -277,6 +277,12 @@ class TestPermission(CreateMixin):
         assert has_permission(other_user, req_perm, dbsession) is False
         assert has_permission(testuser, req_perm, dbsession) is True
 
+        req_perm = RequirePermission(permission=PermissionType.CREATE_ENTITY,
+                                     target=models.Schema(id=entity.schema_id))
+        assert has_permission(user, req_perm, dbsession) is True
+        assert has_permission(other_user, req_perm, dbsession) is False
+        assert has_permission(testuser, req_perm, dbsession) is True
+
     def test_revoke_permission(self, dbsession: Session):
         user, group, parent_group = self._create_user_group_with_perm(dbsession)
         perms = sorted(get_permissions(dbsession, RecipientType.USER, user.id), key=lambda x: x.id)
@@ -285,11 +291,11 @@ class TestPermission(CreateMixin):
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.USER,
                                 recipient_id=user.id)
-        assert len(perms) == 2
+        assert len(perms) == 3
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.GROUP,
                                 recipient_id=group.id)
-        assert len(perms) == 1
+        assert len(perms) == 2
 
         perms = get_permissions(db=dbsession, recipient_type=RecipientType.GROUP,
                                 recipient_id=parent_group.id)
@@ -299,4 +305,4 @@ class TestPermission(CreateMixin):
         self._create_user_group_with_perm(dbsession)
         result = revoke_permissions([9999], dbsession)
         assert result is False
-        assert dbsession.query(Permission.id).count() == 4
+        assert dbsession.query(Permission.id).count() == 5
