@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 COPY . /opt/aimaas
 RUN pip3 install -r /opt/aimaas/requirements.txt; \

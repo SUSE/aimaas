@@ -9,5 +9,5 @@ pydantic<1.9.1
 python-dotenv
 python-jose[cryptography]
 python-multipart
-SQLAlchemy<2
+SQLAlchemy
 uvicorn
