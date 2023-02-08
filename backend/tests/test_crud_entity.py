@@ -18,16 +18,15 @@ class TestEntityCreate(DefaultMixin):
         jack = self.get_default_entity(db)
 
         persons = db.execute(select(Entity).where(Entity.schema_id == jack.schema_id)).scalars().all()
-        persons = {p.id: p for p in persons}
+        persons = {p.slug: p for p in persons}
 
         assert len(persons) == 5
 
-        john = persons[4]
-        mike = persons[3]
-        pumpkin_jack = persons[5]
+        john = persons["John"]
+        mike = persons["Mike"]
+        pumpkin_jack = persons["pumpkin-jack"]
 
         assert john.name == 'John'
-        assert john.slug == 'John'
         assert john.get('nickname', db).value == 'john'
         assert john.get('age', db).value == 10
         assert john.get('born', db).value == born
