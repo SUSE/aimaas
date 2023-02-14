@@ -4,7 +4,7 @@ from alembic import command
 from alembic.config import Config
 from httpx._client import USE_CLIENT_DEFAULT
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
@@ -304,14 +304,16 @@ def engine():
                            pool_timeout=5)
     Base.metadata.drop_all(engine)
     with engine.connect() as conn:
-        conn.execute("drop table if exists alembic_version")
+        conn.execute(text("drop table if exists alembic_version"))
+        conn.commit()
     cfg = Config("alembic.ini")
     command.upgrade(cfg, "head")
 
     yield engine
     Base.metadata.drop_all(engine)
     with engine.connect() as conn:
-        conn.execute("drop table if exists alembic_version")
+        conn.execute(text("drop table if exists alembic_version"))
+        conn.commit()
     engine.dispose()
 
 

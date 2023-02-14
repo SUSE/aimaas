@@ -18,15 +18,21 @@ class TestEntityCreate(DefaultMixin):
         jack = self.get_default_entity(db)
 
         persons = db.execute(select(Entity).where(Entity.schema_id == jack.schema_id)).scalars().all()
+        persons = {p.slug: p for p in persons}
+
         assert len(persons) == 5
-        assert persons[-2].name == 'John'
-        assert persons[-2].slug == 'John'
-        assert persons[-2].get('nickname', db).value == 'john'
-        assert persons[-2].get('age', db).value == 10
-        assert persons[-2].get('born', db).value == born
-        assert isinstance(persons[-2].get('age', db), ValueInt)
-        assert {i.value for i in persons[-2].get('friends', db)} == {jack.id, persons[-3].id}
-        assert persons[-1].get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(
+
+        john = persons["John"]
+        mike = persons["Mike"]
+        pumpkin_jack = persons["pumpkin-jack"]
+
+        assert john.name == 'John'
+        assert john.get('nickname', db).value == 'john'
+        assert john.get('age', db).value == 10
+        assert john.get('born', db).value == born
+        assert isinstance(john.get('age', db), ValueInt)
+        assert {i.value for i in john.get('friends', db)} == {jack.id, mike.id}
+        assert pumpkin_jack.get('born', db).value.astimezone(timezone.utc) == tz_born.astimezone(
             timezone.utc)
 
     def test_create(self, dbsession):

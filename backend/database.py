@@ -1,8 +1,7 @@
 from fastapi import HTTPException
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 from sqlalchemy import create_engine, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from .config import SQLALCHEMY_DATABASE_URL
 
