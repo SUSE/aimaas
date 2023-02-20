@@ -14,7 +14,7 @@
 import BaseInput from "@/components/layout/BaseInput";
 
 export default {
-  name: "Textarea",
+  name: "TextareaInput",
   components: {BaseInput},
   props: ["label", "modelValue", "args", "vertical", "required"],
   methods: {
