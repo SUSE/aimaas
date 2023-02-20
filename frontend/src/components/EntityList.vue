@@ -16,14 +16,24 @@
           :schema="schema"
           :loading="loading"
           :selectType="selectType"/>
-      <div class="flex-grow-1 align-middle">
-        <ConfirmButton v-if="numSelected > 0 && advancedControls" :callback="onDeletion"
-                       btn-class="btn-outline-danger">
-          <template v-slot:label>
-            <i class="eos-icons me-1">delete</i>
-            Delete {{ numSelected }} {{ numSelected == 1 ? 'entity' : 'entities' }}
-          </template>
-        </ConfirmButton>
+      <div class="flex-grow-1 align-middle d-flex gap-3" id="selected-actions">
+        <template v-if="numSelected > 0 && advancedControls">
+          <small class="align-self-end">
+            {{numSelected}} {{ entityPluralized }} selected
+          </small>
+          <ConfirmButton :callback="onDeletion"
+                         btn-class="btn-outline-danger">
+            <template v-slot:label>
+              <i class="eos-icons me-1">delete</i>
+              <span>Delete</span>
+            </template>
+          </ConfirmButton>
+          <RouterLink class="btn btn-outline-primary"
+                      :to="{name: 'bulk-edit', query: {entity: selected}}">
+            <i class="eos-icons me-1">edit</i>
+            <span>Edit</span>
+          </RouterLink>
+        </template>
       </div>
     </template>
   </Pagination>
@@ -55,9 +65,18 @@ export default {
     }
   },
   computed: {
-    pages: computed(() => this.$refs.paginator.pageCount),
+    pages: computed(() => {
+      try {
+        return this.$refs.paginator.pageCount;
+      } catch (e) {
+        return 0;
+      }
+    }),
     numSelected() {
       return this.selected.length;
+    },
+    entityPluralized(){
+      return this.numSelected === 1 ? 'entity' : 'entities'
     }
   },
   watch: {

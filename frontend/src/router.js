@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
 import Changes from "@/components/change_review/Changes";
 import Entity from "@/components/Entity.vue"
+import EntityBulkEdit from "@/components/EntityBulkEdit.vue";
 import Schema from "@/components/Schema";
 import SchemaList from "@/components/SchemaList";
 import AuthManager from "@/components/auth/AuthManager";
@@ -17,6 +18,11 @@ export const router = createRouter({
             meta: {
                 title: 'Create Schema'
             }
+        },
+        {
+            path: '/bulkEdit/:schemaSlug',
+            component: EntityBulkEdit,
+            name: 'bulk-edit'
         },
         {
             path: '/schema/:schemaSlug',
