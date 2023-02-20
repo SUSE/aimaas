@@ -15,13 +15,13 @@
                    return { value: schema.id, text: schema.name };
                  })"
                  :args="{ id: `initialboundFK${rowIndex}`, disabled: attr.id }"/>
-    <Textarea label="Description" @change="onChange()"
-              v-model="attributes[rowIndex].description"
-              :args="{ id: `initialDescription${rowIndex}` }">
+    <TextareaInput label="Description" @change="onChange()"
+                   v-model="attributes[rowIndex].description"
+                   :args="{ id: `initialDescription${rowIndex}` }">
       <template v-slot:helptext>
         (optional)
       </template>
-    </Textarea>
+    </TextareaInput>
     <div class="row mb-2 border-bottom">
       <div class="col-lg-2 d-grid px-3 py-1">
         <button @click="removeAttr(rowIndex); onChange()" type="button" class="btn btn-outline-danger"
@@ -68,7 +68,7 @@
 <script>
 import _cloneDeep from "lodash/cloneDeep";
 import TextInput from "@/components/inputs/TextInput.vue";
-import Textarea from "@/components/inputs/Textarea.vue";
+import TextareaInput from "@/components/inputs/TextareaInput.vue";
 import Checkbox from "@/components/inputs/Checkbox.vue";
 import SelectInput from "@/components/inputs/SelectInput.vue";
 import {ATTR_TYPES_NAMES} from "@/utils";
@@ -77,7 +77,7 @@ export default {
   name: "EditAttributes",
   props: ["schema", "schemas"],
   emits: ["change"],
-  components: {TextInput, Checkbox, SelectInput, Textarea},
+  components: {TextInput, Checkbox, SelectInput, TextareaInput},
   data() {
     return {
       attributes: [],
