@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid fixed-bottom m-3 d-flex flex-column align-items-end"
+  <div class="container-fluid fixed-top m-3 d-flex flex-column align-items-end fs-4"
        id="alert-container">
       <div v-for="alert of alerts" :key="alert.id"
            class="alert shadow alert-dismissible fade show w-50 me-3"
