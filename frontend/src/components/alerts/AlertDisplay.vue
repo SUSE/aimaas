@@ -1,8 +1,8 @@
 <template>
-  <div class="container-fluid fixed-top m-3 d-flex flex-column align-items-end fs-4"
+  <div class="container-fluid fixed-top m-3 d-flex flex-column w-50 fs-4 ms-auto p-0"
        id="alert-container">
       <div v-for="alert of alerts" :key="alert.id"
-           class="alert shadow alert-dismissible fade show w-50 me-3"
+           class="alert shadow alert-dismissible fade show"
            :class="`alert-${alert.level}`" role="alert">
         <i class="eos-icons me-1">{{ icons[alert.level] }}</i>
         {{ alert.message }}
