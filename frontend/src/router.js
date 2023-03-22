@@ -13,37 +13,58 @@ export const router = createRouter({
         {
             path: '/createSchema',
             component: SchemaCreate,
-            name: 'schema-new'
+            name: 'schema-new',
+            meta: {
+                title: 'Create Schema'
+            }
         },
         {
             path: '/schema/:schemaSlug',
             component: Schema,
-            name: 'schema-view'
+            name: 'schema-view',
+            meta: {
+                title: 'Schema Details'
+            }
         },
         {
             path: '/schema/:schemaSlug/:entitySlug',
             component: Entity,
-            name: 'entity-view'
+            name: 'entity-view',
+            meta: {
+                title: 'Entity Details'
+            }
         },
         {
           path: '/review',
           component: Changes,
-          name: 'review-list'
+          name: 'review-list',
+          meta: {
+            title: 'Pending Reviews'
+        }
         },
         {
             path: '/user-management',
             component: AuthManager,
-            name: 'auth-manager'
+            name: 'auth-manager',
+            meta: {
+                title: 'User Management'
+            }
         },
         {
             path: '/',
             component: SchemaList,
-            name: 'schema-list'
+            name: 'schema-list',
+            meta: {
+                title: 'All Schemas'
+            }
         },
         {
             path: '/help/about',
             component: About,
-            name: 'help-about'
+            name: 'help-about',
+            meta: {
+                title: 'About AIMAAS'
+            }
         }
     ],
 });

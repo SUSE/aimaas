@@ -99,6 +99,11 @@ export default {
     await this.updateEntity();
   },
   watch: {
+    entity(newValue) {
+      if (newValue?.name) {
+        document.title = newValue.name;
+      }
+    }, 
     async "$route.params.entitySlug"() {
       await this.updateEntity();
     },

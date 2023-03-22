@@ -48,8 +48,12 @@ import AlertDisplay from "@/components/alerts/AlertDisplay";
 import HelpNav from "@/components/help/HelpNav";
 import SchemaList from "@/components/SchemaList";
 import ReviewNav from "@/components/change_review/ReviewNav";
+import usePageTitle from '@/composables/usePageTitle';
 
 export default {
+  setup(){
+    usePageTitle();
+  },
   name: 'App',
   components: {SchemaList, AlertDisplay, AuthNav, ReviewNav, HelpNav},
   data: function () {
