@@ -86,6 +86,11 @@ export default {
         return "n/a";
       }
     }
+  },
+  updated() {
+    if (this.activeSchema?.name) {
+        document.title = this.activeSchema.name;
+      }
   }
 }
 </script>
