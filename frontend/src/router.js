@@ -22,7 +22,10 @@ export const router = createRouter({
         {
             path: '/bulkEdit/:schemaSlug',
             component: EntityBulkEdit,
-            name: 'bulk-edit'
+            name: 'bulk-edit',
+            meta: {
+                title: "Edit Schemas"
+            }
         },
         {
             path: '/schema/:schemaSlug',
