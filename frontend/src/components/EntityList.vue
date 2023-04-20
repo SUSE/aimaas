@@ -105,9 +105,10 @@ export default {
       await this.getEntities({resetPage: true});
     },
     async getEntities({resetPage = false} = {}) {
+      this.selected.length = 0;
+
       if (resetPage) {
         this.currentPage = 1;
-        this.selected = [];
       }
       this.loading = true;
       if (!this.schema) {
