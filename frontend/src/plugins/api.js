@@ -3,7 +3,6 @@ import {reactive} from "vue";
 
 class API {
     constructor(app) {
-        console.debug(document);
         this.base = "/api";
         this.storageprefix = "aimaas";
         this.app = app;

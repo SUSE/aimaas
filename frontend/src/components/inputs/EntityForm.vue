@@ -29,7 +29,8 @@
             </div>
             <div class="col-lg-10">
               <ul class="list-group">
-                <li v-for="(val, idx) in (editEntity[attr.name] || [])" :key="`${attr.name}-${idx}`"
+                <li v-for="(val, idx) in (editEntity[attr.name] || [])"
+                    :key="`${entity.id}-${attr.name}-${idx}`"
                     class="list-group-item d-flex">
                   <div class="flex-grow-1">
                     <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name][idx]"
@@ -57,9 +58,9 @@
         </template>
       </template>
       <div class="d-grid gap-2 mt-1">
-        <button type="button" class="btn btn-primary p-2" @click="sendBody">
+        <button type="button" class="btn btn-primary p-2" @click="saveChanges">
           <i class="eos-icons me-1">save</i>
-          Save changes
+          Save {{ batchMode? 'all changes' : 'changes'}}
         </button>
       </div>
     </div>
@@ -87,26 +88,35 @@ export default {
     Spinner, TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput,
     ReferencedEntitySelect
   },
-  props: ["schema", "entity"],
+  props: {
+    schema: {
+      type: Object,
+      required: true
+    },
+    entity: {
+      type: Object,
+      required: true
+    },
+    batchMode: {
+      type: Boolean,
+      default: false
+    }
+  },
   inject: ["updatePendingRequests"],
-  emits: ["update"],
+  emits: ["update", "save-all"],
   activated() {
     this.updateSchemaMeta();
   },
   watch: {
-    async schema() {
-      await this.updateSchemaMeta();
+    schema: {
+      handler: "updateSchemaMeta",
+      deep: true,
+      immediate: true
     },
-    async entity() {
-      if (this.entity?.schema_id && this.entity?.schema_id !== this.schema.id) {
-        await this.updateSchemaMeta();
-      }
-      if (this.entity && this.editEntity?.id !== this.entity?.id) {
-        this.editEntity = _cloneDeep(this.entity);
-      }
-      else if (!this.entity) {
-        this.prepEntity();
-      }
+    entity: {
+      handler: "updateEntityData",
+      deep: true,
+      immediate: true
     }
   },
   data() {
@@ -157,6 +167,16 @@ export default {
       }
       this.loading = false;
     },
+    async updateEntityData() {
+      if (this.entity?.schema_id && this.entity?.schema_id !== this.schema.id) {
+        await this.updateSchemaMeta();
+      }
+      if (this.entity && this.editEntity?.id !== this.entity?.id) {
+        this.editEntity = _cloneDeep(this.entity);
+      } else if (!this.entity) {
+        this.prepEntity();
+      }
+    },
     getChanges() {
       const result = {};
       for (const [attr, value] of Object.entries(this.editEntity)) {
@@ -166,31 +186,48 @@ export default {
       }
       return result;
     },
+    async saveChanges() {
+      if (this.batchMode) {
+        this.$emit("save-all");
+        return
+      }
 
-    async sendBody() {
+      return this.saveEntity();
+    },
+    async updateEntity() {
+      this.loading = true;
+      const body = this.getChanges();
+      if (Object.keys(body).length === 0) {
+        console.info("No changes, therefore pushing nothing to server.");
+        this.loading = false;
+        return null;
+      }
+      const response = await this.$api.updateEntity({
+        schemaSlug: this.schema.slug,
+        entityIdOrSlug: this.entity.id,
+        body: body,
+      });
+      this.loading = false;
+      return response
+    },
+    async createEntity() {
+      this.loading = true;
+      const response = await this.$api.createEntity({
+        schemaSlug: this.$route.params.schemaSlug,
+        body: this.editEntity
+      });
+      this.loading = false;
+      return response;
+    },
+    async saveEntity() {
       this.loading = true;
       let response;
       if (this.$route.params.entitySlug) {
         // UPDATE EXISTING ENTITY
-        const body = this.getChanges();
-        if (Object.keys(body).length === 0) {
-          console.info("No changes, therefore pushing nothing to server.");
-          this.loading = false;
-          return;
-        }
-        response = await this.$api.updateEntity({
-          schemaSlug: this.$route.params.schemaSlug,
-          entityIdOrSlug: this.$route.params.entitySlug,
-          body: body,
-        });
-        this.loading = false;
+        response = this.updateEntity();
       } else {
         // CREATE NEW ENTITY
-        response = await this.$api.createEntity({
-          schemaSlug: this.$route.params.schemaSlug,
-          body: this.editEntity
-        });
-        this.loading = false;
+        response = this.createEntity();
       }
       if (response) {
         this.updatePendingRequests();

@@ -3,14 +3,14 @@
              :required="required">
     <template v-slot:field>
       <div class="d-grid gap-2">
-      <input class="btn-check" type="checkbox" :checked="this.checked" @input="onInput"
-             autocomplete="off"
-             v-bind="args"/>
-      <label class="btn" :class="this.checked? 'btn-primary' : 'btn-light'"
-             :for="args.id">
-        {{ label || '&nbsp;'}}
-      </label>
-        </div>
+        <input class="btn-check" type="checkbox" v-model="this.checked" :true-value="true"
+               :false-value="false" autocomplete="off" v-bind="uniqueArgs"
+               @change="this.$emit('update:modelValue', this.checked)" />
+        <label class="btn" :class="this.checked? 'btn-primary' : 'btn-light'"
+               :for="uniqueArgs.id">
+          {{ label || '&nbsp;'}}
+        </label>
+      </div>
     </template>
     <template v-slot:helptext>
       <slot name="helptext"/>
@@ -27,14 +27,16 @@ export default {
   props: ["label", "modelValue", "args", "withoutOffset", "vertical", "required"],
   data() {
     return {
-      checked: null,
+      checked: false,
     };
   },
-  activated() {
-    this.checked = this.modelValue;
-  },
-  mounted() {
-    this.checked = this.modelValue;
+  computed: {
+    uniqueArgs() {
+      return {
+        id: `checkbox-${this.$.uid}-${this.args.id}`,
+        label: this.args.label
+      }
+    }
   },
   methods: {
     onInput() {
@@ -42,5 +44,14 @@ export default {
       this.$emit("update:modelValue", this.checked);
     },
   },
+  watch: {
+    modelValue: {
+      handler(value) {
+        this.checked = value
+      },
+      immediate: true,
+      deep: true
+    }
+  }
 };
 </script>
