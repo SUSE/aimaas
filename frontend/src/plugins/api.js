@@ -281,11 +281,14 @@ class API {
 
     async login({username, password} = {}) {
         const url = `${this.base}/login`;
-        const body = `username=${username}&password=${password}`;
+        const body = new URLSearchParams({
+            username: username,
+            password: password
+        });
         const response = await this._fetch({
             url: url,
             method: 'POST',
-            body: encodeURI(body),
+            body: body.toString(),
             headers: {'Content-Type': 'application/x-www-form-urlencoded'}
         });
         if (response !== null) {
