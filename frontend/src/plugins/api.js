@@ -89,7 +89,7 @@ class API {
         }
     }
 
-    async _fetch({url, headers, body, method} = {}) {
+    async _fetch({url, headers, body, method, timeout = 10000} = {}) {
         let allheaders = {"Content-Type": "application/json"};
         const token = this.token;
         if (token) {
@@ -104,11 +104,17 @@ class API {
         }
 
         try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeout);
+
             const response = await fetch(url, {
                 method: method || 'GET',
                 body: encoded_body,
-                headers: allheaders
+                headers: allheaders,
+                signal: controller.signal
             });
+
+            clearTimeout(timeout);
             await this._is_response_ok(response);
             return await response.json();
         } catch (e) {
