@@ -533,7 +533,7 @@ def get_entity_by_id(db: Session, entity_id: int) -> Entity:
     return entity
 
 
-def get_entity_model(db: Session, id_or_slug: Union[int, str], schema: Schema) -> Optional[Entity]:
+def get_entity_model(db: Session, id_or_slug: Union[int, str], schema: Schema) -> Entity:
     q = select(Entity).where(Entity.schema_id == schema.id)
     if isinstance(id_or_slug, int):
         filter = Entity.id == id_or_slug
