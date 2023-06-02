@@ -1,11 +1,10 @@
 alembic
 fastapi
-fastapi-pagination[sqlalchemy]
+fastapi-pagination[sqlalchemy]<0.12
 ldap3
 passlib[bcrypt]
 psycopg2-binary
-# See: https://github.com/samuelcolvin/pydantic/issues/4131
-pydantic<1.9.1
+pydantic<2
 python-dotenv
 python-jose[cryptography]
 python-multipart
