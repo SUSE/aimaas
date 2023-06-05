@@ -239,7 +239,9 @@ class TestSchemaRead:
         schema = dbsession.execute(select(Schema).where(Schema.name == 'Person')).scalar()
         schemas = get_schemas(dbsession)
         assert len(schemas) == 2
-        assert schemas[0] == schema
+        schema_dict = {schema.slug: schema for schema in schemas}
+        assert set(schema_dict) == {'person', 'unperson'}
+        assert schema == schema_dict.get("person", None)
 
     def test_get_all(self, dbsession):
         test = Schema(name='Test', slug='test', deleted=True)
