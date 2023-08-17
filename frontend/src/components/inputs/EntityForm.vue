@@ -9,10 +9,10 @@
       <template v-for="attr in schema?.attributes || []" :key="attr.name">
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
-            <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
-                                    :args="{id: attr.name, tooltip: attr.description}" :fk-schema-id="attr.bound_schema_id"
-                                    :select-type="attr.list ? 'many': 'single'"
-                                    :required="requiredAttrs.includes(attr.name)" />
+          <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
+                                  :args="{id: attr.name, tooltip: attr.description}" :fk-schema-id="attr.bound_schema_id"
+                                  :select-type="attr.list ? 'many': 'single'"
+                                  :required="requiredAttrs.includes(attr.name)" />
         </template>
         <!-- ATTRIBUTE IS SINGLE VALUED -->
         <template v-else-if="!attr.list">
