@@ -1,10 +1,11 @@
 <template>
   <div :class="classes" data-bs-toggle="tooltip"
        :title="args.tooltip">
-    <label :for="args.id" :class="labelClass" v-if="label" data-bs-toggle="tooltip"
-           :title="required ? 'This value is required': ''">
+    <label :for="args.id" :class="labelClass" v-if="label" >
       <slot name="label">
-        {{ label }} <sup v-if="required" class="text-danger">*</sup>
+        {{ label }}
+        <sup v-if="required" class="text-danger" data-bs-toggle="tooltip"
+             title="This value is required">*</sup>
       </slot>
     </label>
     <div :class="columns">

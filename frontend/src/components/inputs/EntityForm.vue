@@ -5,21 +5,20 @@
                  :required="true"/>
       <TextInput label="Slug" v-model="editEntity.slug" :args="{ id: 'slug', maxlength: 128 }"
                  :required="true"/>
-
       <h3 class="mt-3">Attributes</h3>
       <template v-for="attr in schema?.attributes || []" :key="attr.name">
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
           <ReferencedEntitySelect v-model="editEntity[attr.name]" :label="attr.name"
-                                  :args="{id: attr.name}" :fk-schema-id="attr.bound_schema_id"
+                                  :args="{id: attr.name, tooltip: attr.description}" :fk-schema-id="attr.bound_schema_id"
                                   :select-type="attr.list ? 'many': 'single'"
-                                  :required="requiredAttrs.includes(attr.name)"/>
+                                  :required="requiredAttrs.includes(attr.name)" />
         </template>
         <!-- ATTRIBUTE IS SINGLE VALUED -->
         <template v-else-if="!attr.list">
           <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name]"
-                     :label="attr.name" :args="{id: attr.name}"
-                     :required="requiredAttrs.includes(attr.name)"/>
+                    :label="attr.name" :args="{id: attr.name, tooltip: attr.description}"
+                    :required="requiredAttrs.includes(attr.name)" />
         </template>
         <!-- ATTRIBUTE IS MULTI VALUED -->
         <template v-else>
@@ -34,8 +33,8 @@
                     class="list-group-item d-flex">
                   <div class="flex-grow-1">
                     <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name][idx]"
-                               :vertical="true" :args="{id: `${attr.name}-${idx}`}"
-                               :required="requiredAttrs.includes(attr.name)"/>
+                              :vertical="true" :args="{id: `${attr.name}-${idx}`, tooltip: attr.description}"
+                              :required="requiredAttrs.includes(attr.name)"/>
                   </div>
                   <div>
                     <button type="button" class="btn btn-outline-cta ms-1"

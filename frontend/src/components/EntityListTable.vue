@@ -5,12 +5,13 @@
       <tr>
         <th v-if="showSelectors"></th>
         <th
-            @click="orderByField(field)"
-            v-for="field in displayFields"
-            :key="field"
+          @click="orderByField(field.name)"
+          v-for="field in displayFieldsWithDescriptions"
+          :key="field.name"
+          :title="field.description"
         >
-          {{ field }}
-          <template v-if="field === orderBy"
+          {{ field.name }}
+          <template v-if="field.name === orderBy"
           ><span v-if="ascending">↑</span
           ><span v-else>↓</span></template
           >
@@ -24,34 +25,34 @@
                  @change="$emit('select')" :checked="selected.includes(e.id)"
                  :disabled="e.deleted"/>
         </td>
-        <td v-for="field in displayFields" :key="field">
-          <template v-if="field === 'name'">
+        <td v-for="field in displayFieldsWithDescriptions" :key="field.name">
+          <template v-if="field.name === 'name'">
             <RouterLink
                 :to="{name: 'entity-view', params: {schemaSlug: schema.slug, entitySlug: e.slug }}">
-              {{ e[field] }}
+              {{ e[field.name] }}
             </RouterLink>
             <i class="eos-icons float-end text-muted" v-if="e.deleted" data-bs-toggle="tooltip"
                title="Entity is deleted">
               delete
             </i>
           </template>
-          <template v-else-if="field in fkFields">
-            <RefEntityList v-if="listFields.includes(field)" :entity-ids="e[field]"
-                           :schema-slug="fkFields[field]"/>
-            <RefEntity v-else :entity-id="e[field]" :schema-slug="fkFields[field]"/>
+          <template v-else-if="field.name in fkFields">
+            <RefEntityList v-if="listFields.includes(field.name)" :entity-ids="e[field.name]"
+                           :schema-slug="fkFields[field.name]"/>
+            <RefEntity v-else :entity-id="e[field.name]" :schema-slug="fkFields[field.name]"/>
           </template>
-          <template v-else-if="listFields.includes(field)">
+          <template v-else-if="listFields.includes(field.name)">
             <div class="d-flex flex-wrap gap-3">
-              <div v-for="(value, idx) in e[field]" :key="`${field}-${idx}`">
+              <div v-for="(value, idx) in e[field.name]" :key="`${field.name}-${idx}`">
                 {{ value }}
               </div>
             </div>
           </template>
-          <template v-else-if="field in dateFields">
-            {{ formatDT(field, e[field]) }}
+          <template v-else-if="field.name in dateFields">
+            {{ formatDT(field.name, e[field.name]) }}
           </template>
           <template v-else>
-            {{ e[field] }}
+            {{ e[field.name] }}
           </template>
         </td>
       </tr>
@@ -95,18 +96,30 @@ export default {
     }
   },
   computed: {
-    displayFields() {
+    displayFieldsWithDescriptions() {
       if (this.entities.length < 1) {
         return [];
       }
+
       let fields = Object.keys(this.entities[0]).filter(
-          (x) => !NON_DISPLAY_FIELDS.includes(x)
+        (x) => !NON_DISPLAY_FIELDS.includes(x)
       );
+
       fields = fields.sort((a, b) => (a > b ? 1 : -1));
+
       const nameIdx = fields.indexOf('name');
       fields.splice(nameIdx, 1);
       fields.unshift('name');
-      return fields;
+      
+      const fieldsWithDescriptions = fields.map((field) => {
+        let attribute = (this.schema?.attributes || []).find(attr => attr.name === field)
+        return {
+          name: field, // using attribute?.name causes display errors at runtime
+          description: attribute?.description
+        };
+      });
+      
+      return fieldsWithDescriptions;
     },
     fkFields() {
       const fkSchemas = {};
