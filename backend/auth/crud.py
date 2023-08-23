@@ -210,15 +210,15 @@ def has_permission(user: User, permission: RequirePermission, db: Session) -> bo
     base_u = db.query(Permission.id)\
         .join(Permission.user)\
         .filter(Permission.user.property.mapper.class_.id == user.id)
-    is_superuser = base_u.filter(Permission.permission == PermissionType.SUPERUSER)
-    has_user_perm = base_u.filter(Permission.permission == permission.permission)
+    
+    has_user_perm = base_u.filter(Permission.permission.in_([permission.permission, PermissionType.SUPERUSER]))
 
     user_groups = [x[0] for x in db.query(UserGroup.group_id).filter(UserGroup.user_id == user.id).all()]
     all_group_ids = [x[0] for x in db.execute(STATEMENTS.all_parent_groups, {"groupids": user_groups})]
     has_group_perm = db.query(Permission.id)\
         .join(Permission.group)\
         .filter(Permission.group.property.mapper.class_.id.in_(all_group_ids),
-                Permission.permission == permission.permission)
+                Permission.permission.in_([permission.permission, PermissionType.SUPERUSER]))
 
     if isinstance(permission.target, Group):
         q = or_(Permission.obj_id == None,
@@ -247,7 +247,7 @@ def has_permission(user: User, permission: RequirePermission, db: Session) -> bo
     has_group_perm = has_group_perm.filter(q)
 
     return db.query(literal(True))\
-        .filter(is_superuser.union(has_user_perm, has_group_perm).exists())\
+        .filter(has_user_perm.union(has_group_perm).exists())\
         .scalar() or False
 
 
