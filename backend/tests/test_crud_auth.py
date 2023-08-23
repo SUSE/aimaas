@@ -283,6 +283,20 @@ class TestPermission(CreateMixin):
         assert has_permission(other_user, req_perm, dbsession) is False
         assert has_permission(testuser, req_perm, dbsession) is True
 
+        su_testgroup = self._create_group(dbsession, BaseGroupSchema(name='su_testgroup', parent_id=None))
+
+        req_perm = RequirePermission(permission=PermissionType.SUPERUSER)
+
+        self._grant_permission(dbsession, PermissionSchema(
+                recipient_type=RecipientType.GROUP, recipient_name="su_testgroup",
+                permission=PermissionType.SUPERUSER
+            ))
+        
+        add_members(su_testgroup.id, [other_user.id], dbsession)
+
+        assert has_permission(other_user, req_perm, dbsession) is True
+        
+
     def test_revoke_permission(self, dbsession: Session):
         user, group, parent_group = self._create_user_group_with_perm(dbsession)
         perms = sorted(get_permissions(dbsession, RecipientType.USER, user.id), key=lambda x: x.id)
