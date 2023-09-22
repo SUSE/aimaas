@@ -3,7 +3,7 @@ export async function loadGroupData(api) {
   const groups = {};
   const tree = {};
 
-  for (let group of response) {
+  for (let group of (response || [])) {
     groups[group.id] = group;
     if (!(group.parent_id in tree)) {
       tree[group.parent_id] = [];
@@ -18,7 +18,7 @@ export async function loadGroupData(api) {
 export async function loadUserData(api) {
   const response = await api.getUsers();
   const users = {};
-  for (const user of response) {
+  for (const user of (response || [])) {
     users[user.id] = user;
   }
   return users;
