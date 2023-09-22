@@ -3,12 +3,12 @@ export async function loadGroupData(api) {
   const groups = {};
   const tree = {};
 
-    for (let group of (response || [])) {
-      groups[group.id] = group;
-      if (!(group.parent_id in tree)) {
-        tree[group.parent_id] = [];
-      }
-      tree[group.parent_id].push(group.id);
+  for (let group of (response || [])) {
+    groups[group.id] = group;
+    if (!(group.parent_id in tree)) {
+      tree[group.parent_id] = [];
+    }
+    tree[group.parent_id].push(group.id);
   }
 
   return [groups, tree];
