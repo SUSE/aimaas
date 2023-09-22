@@ -29,7 +29,7 @@
             <div class="col-lg-10">
               <ul class="list-group">
                 <li v-for="(val, idx) in (editEntity[attr.name] || [])"
-                    :key="`${entity.id}-${attr.name}-${idx}`"
+                    :key="`${entity?.id || 'new'}-${attr.name}-${idx}`"
                     class="list-group-item d-flex">
                   <div class="flex-grow-1">
                     <component :is="TYPE_INPUT_MAP[attr.type]" v-model="editEntity[attr.name][idx]"
