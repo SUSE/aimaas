@@ -637,6 +637,22 @@ class TestEntityUpdate(DefaultMixin):
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
 
+    def test_restore(self, dbsession):
+        """
+        Test that updating a deleted entity restores it implicitly
+        """
+        e = self.get_default_entity(dbsession)
+        delete_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id)
+
+        dbsession.refresh(e)
+        assert e.deleted is True
+
+        data = {'slug': e.slug}
+        update_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id, data=data)
+
+        dbsession.refresh(e)
+        assert e.deleted is False
+
 
 class TestEntityDelete(DefaultMixin):
     def asserts_after_entity_delete(self, db: Session):
@@ -667,3 +683,25 @@ class TestEntityDelete(DefaultMixin):
         dbsession.flush()
         with pytest.raises(MissingEntityException):
             delete_entity(dbsession, id_or_slug=entity.id, schema_id=entity.schema_id)
+
+
+class TestRestoreEntity(DefaultMixin):
+    def asserts_after_entity_restore(self, db: Session):
+        entities = db.execute(select(Entity)).scalars().all()
+        assert len(entities) == 2
+        e = self.get_default_entity(db)
+        assert e.deleted is False
+
+    def test_restore_by_id(self, dbsession):
+        e = self.get_default_entity(dbsession)
+        e.deleted = True
+        dbsession.flush()
+        restore_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id)
+        self.asserts_after_entity_restore(db=dbsession)
+
+    def test_restore_by_slug(self, dbsession):
+        e = self.get_default_entity(dbsession)
+        e.deleted = True
+        dbsession.flush()
+        restore_entity(dbsession, id_or_slug=e.slug, schema_id=e.schema_id)
+        self.asserts_after_entity_restore(db=dbsession)

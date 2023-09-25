@@ -22,8 +22,7 @@
       <tr v-for="e in entities" :key="e.id" :class="{'table-light': e.deleted}">
         <td v-if="showSelectors">
           <input :type="inputType" class="form-check-input" name="EntitySelection" :value="e.id"
-                 @change="$emit('select')" :checked="selected.includes(e.id)"
-                 :disabled="e.deleted"/>
+                 @change="$emit('select')" :checked="selected.includes(e.id)" />
         </td>
         <td v-for="field in displayFieldsWithDescriptions" :key="field.name">
           <template v-if="field.name === 'name'">

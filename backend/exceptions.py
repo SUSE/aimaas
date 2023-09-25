@@ -65,6 +65,11 @@ class MissingEntityDeleteRequestException(MissingObjectException):
         return f'There is no entity delete request with id {self.obj_id}'
 
 
+class MissingEntityRestoreRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity restore request with id {self.obj_id}'
+
+
 class MissingEntityCreateRequestException(MissingObjectException):
     def __str__(self) -> str:
         return f'There is no entity create request with id {self.obj_id}'

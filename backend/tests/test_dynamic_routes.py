@@ -506,6 +506,16 @@ class TestRouteUpdateEntity(DefaultMixin):
         response = authorized_client.put('/entity/person/Jack', json={})
         assert response.status_code == 208
 
+    def test_restore(self, dbsession, authorized_client):
+        entity = self.get_default_entity(dbsession)
+        entity.deleted = True
+        dbsession.flush()
+
+        data = {'slug': entity.slug}
+        response = authorized_client.put(f'entity/person/{entity.id}', json=data)
+        assert response.status_code == 200
+        assert response.json() == {'id': entity.id, 'slug': 'test', 'name': 'test', 'deleted': False}
+
 
 class TestRouteDeleteEntity(DefaultMixin):
     def test_delete(self, dbsession, authorized_client):
@@ -527,4 +537,19 @@ class TestRouteDeleteEntity(DefaultMixin):
         entity.deleted = True
         dbsession.commit()
         response = authorized_client.delete(f'/entity/person/{entity.id}')
+        assert response.status_code == 404
+
+    def test_restore(self, dbsession, authorized_client):
+        entity = self.get_default_entity(dbsession)
+        entity.deleted = True
+        dbsession.commit()
+        dbsession.refresh(entity)
+        assert entity.deleted is True
+        response = authorized_client.delete(f'/entity/person/{entity.slug}?restore=1')
+        assert response.status_code == 200
+        assert response.json() == {'id': entity.id, 'slug': 'Jack', 'name': 'Jack', 'deleted': False}
+
+    def test_restore_on_nondeleted(self, dbsession, authorized_client):
+        entity = self.get_default_entity(dbsession)
+        response = authorized_client.delete(f'/entity/person/{entity.slug}?restore=1')
         assert response.status_code == 404

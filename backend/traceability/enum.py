@@ -28,3 +28,4 @@ class ChangeType(enum.Enum):
     CREATE = 'CREATE'
     UPDATE = 'UPDATE'
     DELETE = 'DELETE'
+    RESTORE = 'RESTORE'

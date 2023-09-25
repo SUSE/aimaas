@@ -20,7 +20,7 @@ from . import crud, exceptions
 
 from .traceability.entity import create_entity_create_request, create_entity_update_request, \
     create_entity_delete_request, apply_entity_create_request, apply_entity_update_request, \
-    apply_entity_delete_request
+    apply_entity_delete_request, create_entity_restore_request, apply_entity_restore_request
 
 
 factory = EntityModelFactory()
@@ -320,14 +320,19 @@ def route_delete_entity(router: APIRouter, schema: Schema):
         }
     )
     def delete_entity(id_or_slug: Union[int, str], response: Response,
+                      restore: bool = False,
                       db: Session = Depends(get_db),
                       user: User = Depends(req_permission)):
+        create_fun, apply_fun = create_entity_delete_request, apply_entity_delete_request
+        if restore:
+            create_fun, apply_fun = create_entity_restore_request, apply_entity_restore_request
+
         try:
-            change_request = create_entity_delete_request(
+            change_request = create_fun(
                 db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user, commit=False
             )
             if not schema.reviewable:
-                return apply_entity_delete_request(
+                return apply_fun(
                     db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
                 )[1]
             db.commit()

@@ -247,6 +247,18 @@ class API {
         return response;
     }
 
+
+    async restoreEntity({schemaSlug, entityIdOrSlug} = {}){
+        const response = await this._fetch({
+            url: `${this.base}/entity/${schemaSlug}/${entityIdOrSlug}?restore=1`,
+            method: 'DELETE'
+        });
+        if (response !== null) {
+            this.alerts.push("success", `Entity restored: ${response.name}`);
+        }
+        return response;
+    }
+
     async getChangeRequests({page = 1, size = 10, schemaSlug, entityIdOrSlug} = {}) {
         const params = new URLSearchParams();
         params.set('page', page);

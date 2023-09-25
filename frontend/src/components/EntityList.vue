@@ -1,5 +1,6 @@
 <template>
   <SearchPanel
+      ref="searchpanel"
       @search="setFiltersAndSearch"
       :key="schema?.slug"
       :schema="schema"
@@ -22,10 +23,19 @@
             {{numSelected}} {{ entityPluralized }} selected
           </small>
           <ConfirmButton :callback="onDeletion"
-                         btn-class="btn-outline-danger">
+                         btn-class="btn-outline-danger"
+                         v-if="$refs?.searchpanel?.listMode !== 'deleted'">
             <template v-slot:label>
               <i class="eos-icons me-1">delete</i>
               <span>Delete</span>
+            </template>
+          </ConfirmButton>
+          <ConfirmButton :callback="onRestoration"
+                         btn-class="btn-outline-danger"
+                         v-if="$refs?.searchpanel?.listMode !== 'active'">
+            <template v-slot:label>
+              <i class="eos-icons me-1">restore_from_trash</i>
+              <span>Restore</span>
             </template>
           </ConfirmButton>
           <RouterLink class="btn btn-outline-primary"
@@ -145,6 +155,15 @@ export default {
     onDeletion() {
       const promises = this.selected.map(eId => {
         this.$api.deleteEntity({
+          schemaSlug: this.schema.slug,
+          entityIdOrSlug: eId
+        });
+      });
+      Promise.all(promises).then(() => this.getEntities({resetPage: true}));
+    },
+    onRestoration() {
+      const promises = this.selected.map(eId => {
+        this.$api.restoreEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });

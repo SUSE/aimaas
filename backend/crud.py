@@ -645,10 +645,13 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     q = select(Entity).where(Entity.schema_id == schema_id)
     q = q.where(Entity.id == id_or_slug) if isinstance(id_or_slug, int) else q.where(Entity.slug == id_or_slug)
     e = db.execute(q).scalar()
-    if e is None or e.deleted:
+    if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
     if e.schema.deleted:
         raise MissingSchemaException(obj_id=e.schema.id)
+    if e.deleted:
+        # Updating a deleted entity implies its restoration.
+        e.deleted = False
     
     slug = data.pop('slug', e.slug)
     name = data.pop('name', e.name)
@@ -725,6 +728,23 @@ def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, comm
     if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
     e.deleted = True
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return e
+
+
+def restore_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, commit: bool = True) -> Entity:
+    q = select(Entity).where(Entity.schema_id == schema_id).where(Entity.deleted == True)
+    if isinstance(id_or_slug, int):
+        q = q.where(Entity.id == id_or_slug)
+    else:
+        q = q.where(Entity.slug == id_or_slug)
+    e = db.execute(q).scalar()
+    if e is None:
+        raise MissingEntityException(obj_id=id_or_slug)
+    e.deleted = False
     if commit:
         db.commit()
     else:
