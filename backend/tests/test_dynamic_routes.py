@@ -422,13 +422,28 @@ class TestRouteUpdateEntity(DefaultMixin):
         assert response.status_code == 404
         assert "doesn't exist or was deleted" in response.json()['detail']
 
-    def test_raise_on_schema_is_deleted(self, dbsession, authorized_client):
+    def test_restore(self, dbsession, authorized_client):
+        entity = self.get_default_entity(dbsession)
+        entity.deleted = True
+        dbsession.commit()
+
+        data = {'slug': entity.slug, 'name': 'Foo Bær'}
+        response = authorized_client.put(f'entity/person/{entity.id}', json=data)
+        dbsession.refresh(entity)
+        assert entity.deleted is False
+        assert response.status_code == 200
+        assert response.json() == {'id': entity.id, 'slug': entity.slug, 'name': 'Foo Bær',
+                                   'deleted': False}
+
+    def test_restore__no_change(self, dbsession, authorized_client):
         entity = self.get_default_entity(dbsession)
         entity.deleted = True
         dbsession.commit()
         response = authorized_client.put(f'/entity/person/{entity.id}', json={})
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        dbsession.refresh(entity)
+        assert entity.deleted is True
+        assert response.status_code == 208
+        assert "contains no changes" in response.json()['detail']
 
     def test_raise_on_entity_already_exists(self, dbsession, authorized_client):
         data = {'slug': 'Jane'}
@@ -505,16 +520,6 @@ class TestRouteUpdateEntity(DefaultMixin):
     def test_no_raise_on_missing_data(self, dbsession, authorized_client):
         response = authorized_client.put('/entity/person/Jack', json={})
         assert response.status_code == 208
-
-    def test_restore(self, dbsession, authorized_client):
-        entity = self.get_default_entity(dbsession)
-        entity.deleted = True
-        dbsession.flush()
-
-        data = {'slug': entity.slug}
-        response = authorized_client.put(f'entity/person/{entity.id}', json=data)
-        assert response.status_code == 200
-        assert response.json() == {'id': entity.id, 'slug': 'test', 'name': 'test', 'deleted': False}
 
 
 class TestRouteDeleteEntity(DefaultMixin):
