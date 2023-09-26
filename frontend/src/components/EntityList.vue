@@ -31,7 +31,7 @@
             </template>
           </ConfirmButton>
           <ConfirmButton :callback="onRestoration"
-                         btn-class="btn-outline-danger"
+                         btn-class="btn-outline-primary"
                          v-if="$refs?.searchpanel?.listMode !== 'active'">
             <template v-slot:label>
               <i class="eos-icons me-1">restore_from_trash</i>
