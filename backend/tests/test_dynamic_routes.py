@@ -133,7 +133,7 @@ class TestRouteCreateEntity(DefaultMixin):
         }
         response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_fk_entity_is_deleted(self, dbsession, authorized_client):
         jack = self.get_default_entity(dbsession)
@@ -148,7 +148,7 @@ class TestRouteCreateEntity(DefaultMixin):
         }
         response = authorized_client.post(f'/entity/person', json=p1)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_fk_entity_from_wrong_schema(self, dbsession, authorized_client):
         schema = Schema(name='Test', slug='test')
@@ -193,7 +193,7 @@ class TestRouteGetEntity(DefaultMixin):
     def test_raise_on_entity_doesnt_exist(self, dbsession, client):
         response = client.get('/entity/person/99999999')
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_entity_doesnt_belong_to_schema(self, dbsession, client):
         s = Schema(name='test', slug='test')
@@ -203,7 +203,7 @@ class TestRouteGetEntity(DefaultMixin):
 
         response = client.get(f'/entity/person/{e.id}')
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
 
 class TestRouteGetEntities(DefaultMixin):
@@ -408,11 +408,11 @@ class TestRouteUpdateEntity(DefaultMixin):
     def test_raise_on_entity_doesnt_exist(self, dbsession, authorized_client):
         response = authorized_client.put('/entity/person/99999999999', json={})
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
         response = authorized_client.put('/entity/person/qwertyuiop', json={})
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
         s = Schema(name='test', slug='test')
         e = Entity(slug='test', schema=s, name='test')
@@ -420,9 +420,9 @@ class TestRouteUpdateEntity(DefaultMixin):
         dbsession.commit()
         response = authorized_client.put('/entity/person/test', json={})
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
-    def test_restore(self, dbsession, authorized_client):
+    def test_raise_on_deleted_entity(self, dbsession, authorized_client):
         entity = self.get_default_entity(dbsession)
         entity.deleted = True
         dbsession.commit()
@@ -430,20 +430,8 @@ class TestRouteUpdateEntity(DefaultMixin):
         data = {'slug': entity.slug, 'name': 'Foo Bær'}
         response = authorized_client.put(f'entity/person/{entity.id}', json=data)
         dbsession.refresh(entity)
-        assert entity.deleted is False
-        assert response.status_code == 200
-        assert response.json() == {'id': entity.id, 'slug': entity.slug, 'name': 'Foo Bær',
-                                   'deleted': False}
-
-    def test_restore__no_change(self, dbsession, authorized_client):
-        entity = self.get_default_entity(dbsession)
-        entity.deleted = True
-        dbsession.commit()
-        response = authorized_client.put(f'/entity/person/{entity.id}', json={})
-        dbsession.refresh(entity)
         assert entity.deleted is True
-        assert response.status_code == 208
-        assert "contains no changes" in response.json()['detail']
+        assert response.status_code == 410
 
     def test_raise_on_entity_already_exists(self, dbsession, authorized_client):
         data = {'slug': 'Jane'}
@@ -482,7 +470,7 @@ class TestRouteUpdateEntity(DefaultMixin):
         data = {'friends': [9999999999]}
         response = authorized_client.put('/entity/person/Jack', json=data)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_fk_entity_is_from_wrong_schema(self, dbsession, authorized_client):
         s = Schema(name='test', slug='test')
@@ -542,7 +530,7 @@ class TestRouteDeleteEntity(DefaultMixin):
         entity.deleted = True
         dbsession.commit()
         response = authorized_client.delete(f'/entity/person/{entity.id}')
-        assert response.status_code == 404
+        assert response.status_code == 208
 
     def test_restore(self, dbsession, authorized_client):
         entity = self.get_default_entity(dbsession)
@@ -557,4 +545,4 @@ class TestRouteDeleteEntity(DefaultMixin):
     def test_restore_on_nondeleted(self, dbsession, authorized_client):
         entity = self.get_default_entity(dbsession)
         response = authorized_client.delete(f'/entity/person/{entity.slug}?restore=1')
-        assert response.status_code == 404
+        assert response.status_code == 208

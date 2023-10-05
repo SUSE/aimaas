@@ -52,7 +52,7 @@ class TestRouteAttributes(DefaultMixin):
     def test_raise_on_attribute_doesnt_exist(self, dbsession: Session, client: TestClient):
         response = client.get('/attributes/123456789')
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
 
 class TestRouteSchemasGet(DefaultMixin):
@@ -171,11 +171,11 @@ class TestRouteSchemasGet(DefaultMixin):
     def test_raise_on_schema_doesnt_exist(self, dbsession, client):
         response = client.get('/schema/12345678')
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
         response = client.get('/schema/qwertyui')
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
 
 class TestRouteSchemaCreate(DefaultMixin):
@@ -287,7 +287,7 @@ class TestRouteSchemaCreate(DefaultMixin):
         } 
         response = authorized_client.post('/schema', json=data)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_passed_deleted_schema_for_binding(self, dbsession: Session, authorized_client: TestClient):
         schema = self.get_default_schema(dbsession)
@@ -309,8 +309,8 @@ class TestRouteSchemaCreate(DefaultMixin):
             ]
         } 
         response = authorized_client.post('/schema', json=data)
-        assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert response.status_code == 410
+        assert "is deleted" in response.json()['detail']
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession: Session, authorized_client: TestClient):
         data = {
@@ -411,7 +411,7 @@ class TestRouteSchemaUpdate(DefaultMixin):
         }
         response = authorized_client.put('/schema/12345678', json=data)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_existing_slug_or_name(self, dbsession: Session, authorized_client: TestClient):
         new_sch = Schema(name='Test', slug='test')
@@ -489,7 +489,7 @@ class TestRouteSchemaUpdate(DefaultMixin):
         schema = self.get_default_schema(dbsession)
         response = authorized_client.put(f'/schema/{schema.id}', json=data)
         assert response.status_code == 404
-        assert "doesn't exist or was deleted" in response.json()['detail']
+        assert "doesn't exist" in response.json()['detail']
 
     def test_raise_on_schema_not_passed_when_binding(self, dbsession: Session, authorized_client: TestClient):
         data = {
@@ -578,7 +578,7 @@ class TestRouteSchemaDelete(DefaultMixin):
         schema.deleted = True
         dbsession.commit()
         response = authorized_client.delete(f'/schema/{schema.id}')
-        assert response.status_code == 404
+        assert response.status_code == 208
 
     @pytest.mark.parametrize('id_or_slug', [1234567, 'qwerty'])
     def test_raise_on_delete_nonexistent(self, dbsession, authorized_client, id_or_slug):

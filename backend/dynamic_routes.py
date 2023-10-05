@@ -261,6 +261,7 @@ def route_update_entity(router: APIRouter, schema: Schema):
                 * there already exists an entity that has same value for unique field and this entity is not deleted
                 '''
             },
+            410: {"description": "Entity cannot be updated because it was deleted"},
             422: {
                 'description': '''Can be returned when:
 
@@ -288,6 +289,8 @@ def route_update_entity(router: APIRouter, schema: Schema):
             return change_request
         except exceptions.NoOpChangeException as e:
             raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
+        except exceptions.EntityIsDeletedException as e:
+            raise HTTPException(status.HTTP_410_GONE, str(e))
         except (exceptions.MissingEntityException, exceptions.MissingSchemaException) as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except (exceptions.EntityExistsException, exceptions.UniqueValueException) as e:
@@ -314,6 +317,7 @@ def route_delete_entity(router: APIRouter, schema: Schema):
         responses={
             200: {"description": "Entity was deleted"},
             202: {"description": "Request to delete entity was stored"},
+            208: {"description": "Entity was not changed because request contained no changes"},
             404: {
                 'description': "entity with provided id/slug doesn't exist on current schema"
             }
@@ -338,6 +342,8 @@ def route_delete_entity(router: APIRouter, schema: Schema):
             db.commit()
             response.status_code = status.HTTP_202_ACCEPTED
             return change_request
+        except exceptions.NoOpChangeException as e:
+            raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         

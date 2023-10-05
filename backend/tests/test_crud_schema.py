@@ -7,7 +7,7 @@ from ..crud import create_schema, get_schema, get_schemas, update_schema, delete
     get_entities, update_entity, get_entity
 from ..exceptions import SchemaExistsException, MissingSchemaException, RequiredFieldException, \
     NoOpChangeException, ListedToUnlistedException, MultipleAttributeOccurencesException, \
-    InvalidAttributeChange
+    InvalidAttributeChange, SchemaIsDeletedException
 from ..models import Schema, AttributeDefinition, Attribute, AttrType, Entity
 from .. schemas import AttrDefSchema, SchemaCreateSchema, AttrTypeMapping, SchemaUpdateSchema
 
@@ -151,7 +151,7 @@ class TestSchemaCreate(DefaultMixin):
         )
        
         sch = SchemaCreateSchema(name='Test', slug='test', attributes=[attr_def])
-        with pytest.raises(MissingSchemaException):
+        with pytest.raises(SchemaIsDeletedException):
             create_schema(dbsession, data=sch)
 
     def test_raise_on_multiple_attrs_with_same_name(self, dbsession):
@@ -656,7 +656,7 @@ class TestSchemaDelete(DefaultMixin):
         schema = self.get_default_schema(dbsession)
         schema.deleted = True
         dbsession.flush()
-        with pytest.raises(MissingSchemaException):
+        with pytest.raises(NoOpChangeException):
             delete_schema(dbsession, id_or_slug=schema.id)
 
     def test_raise_on_delete_nonexistent(self, dbsession):

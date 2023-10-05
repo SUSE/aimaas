@@ -86,7 +86,24 @@ def get_schemas(
 @router.post(
     '/schema',
     response_model=schemas.SchemaForListSchema,
-    tags=['General routes']
+    tags=['General routes'],
+    summary="Create a schema",
+    responses={
+            200: {"description": "Schema was created"},
+            404: {
+                'description': """Can be returned when:
+                
+                * A schema for foreign key binding does not exist
+                * No attribute exists for a given ID 
+                """
+            },
+            409: {"description": """Can be returned when:
+                
+                * Another schema uses the chosen slug already
+                * Duplicate use of attributes
+            """},
+            410: {"description": "The scheme to bind a foreign key to is deleted"}
+        }
 )
 def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.CREATE_SCHEMA)))):
@@ -100,14 +117,14 @@ def create_schema(data: schemas.SchemaCreateSchema, request: Request, db: Sessio
         return schema
     except exceptions.SchemaExistsException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except exceptions.MissingAttributeException as e:
+    except (exceptions.MissingAttributeException, exceptions.MissingSchemaException) as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except exceptions.MultipleAttributeOccurencesException as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     except exceptions.NoSchemaToBindException as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
-    except exceptions.MissingSchemaException as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except exceptions.SchemaIsDeletedException as e:
+        raise HTTPException(status.HTTP_410_GONE, str(e))
 
 
 @router.get(
@@ -161,7 +178,13 @@ def update_schema(
     '/schema/{id_or_slug}',
     response_model=schemas.SchemaDetailSchema,
     response_model_exclude=['attributes', 'attr_defs'],
-    tags=['General routes']
+    tags=['General routes'],
+    summary="Delete schema",
+    responses={
+        200: {"description": "Schema was deleted"},
+        208: {"description": "Schema was already deleted"},
+        404: {"description": "Schema does not exist"},
+    }
 )
 def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.DELETE_SCHEMA)))):
@@ -173,6 +196,8 @@ def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
                                                 reviewed_by=user, comment='Autosubmit')
         db.commit()
         return schema
+    except exceptions.NoOpChangeException as e:
+        raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
     except exceptions.MissingSchemaException as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
 
