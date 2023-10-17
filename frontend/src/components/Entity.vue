@@ -81,9 +81,9 @@ export default {
   },
   methods: {
     async updateEntity() {
-      if (this.$route.params.entitySlug && this.activeSchema) {
+      if (this.$route.params.entitySlug && this.$route.params.schemaSlug) {
         const params = {
-          schemaSlug: this.activeSchema.slug,
+          schemaSlug: this.$route.params.schemaSlug,
           entityIdOrSlug: this.$route.params.entitySlug
         };
         this.entity = await this.$api.getEntity(params);
@@ -107,9 +107,6 @@ export default {
     async "$route.params.entitySlug"() {
       await this.updateEntity();
     },
-    async activeSchema() {
-      await this.updateEntity();
-    }
   }
 };
 </script>
