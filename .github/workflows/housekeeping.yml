@@ -1,0 +1,20 @@
+name: Housekeeping
+on:
+  schedule:
+    - cron: "0 0 1 * *"
+jobs:
+  clean-ghcr:
+    name: Delete old container images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old releases
+        uses: snok/container-retention-policy@v2
+        with:
+          image-names: aimaas/aimaas-api, aimaas/aimaas-ui
+          cut-off: one month ago UTC
+          timestamp-to-use: updated_at
+          account-type: org
+          org-name: suse
+          keep-at-least: 3
+          skip-tags: latest
+          token: ${{ secrets.PAT }}

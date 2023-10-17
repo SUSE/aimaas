@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+import os
 
 from alembic import command
 from alembic.config import Config
@@ -306,7 +307,8 @@ def engine():
     with engine.connect() as conn:
         conn.execute(text("drop table if exists alembic_version"))
         conn.commit()
-    cfg = Config("alembic.ini")
+    cfg = Config(os.getenv("ALEMBIC_CONFIG",
+                           os.path.join(os.path.dirname(__file__), "../alembic/alembic.ini")))
     command.upgrade(cfg, "head")
 
     yield engine
