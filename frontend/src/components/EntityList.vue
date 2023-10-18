@@ -30,6 +30,7 @@
               <span>Delete</span>
             </template>
           </ConfirmButton>
+          <!-- Remember: Deleted entities can be included in modes 'deleted' and 'all' 😉 -->
           <ConfirmButton :callback="onRestoration"
                          btn-class="btn-outline-primary"
                          v-if="$refs?.searchpanel?.listMode !== 'active'">
