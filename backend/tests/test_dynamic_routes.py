@@ -541,6 +541,8 @@ class TestRouteDeleteEntity(DefaultMixin):
         response = authorized_client.delete(f'/entity/person/{entity.slug}?restore=1')
         assert response.status_code == 200
         assert response.json() == {'id': entity.id, 'slug': 'Jack', 'name': 'Jack', 'deleted': False}
+        dbsession.refresh(entity)
+        assert entity.deleted is False
 
     def test_restore_on_nondeleted(self, dbsession, authorized_client):
         entity = self.get_default_entity(dbsession)
