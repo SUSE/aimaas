@@ -182,7 +182,7 @@ def update_schema(
     summary="Delete schema",
     responses={
         200: {"description": "Schema was deleted"},
-        208: {"description": "Schema was already deleted"},
+        208: {"description": "Schema is already deleted"},
         404: {"description": "Schema does not exist"},
     }
 )
