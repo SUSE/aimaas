@@ -9,6 +9,7 @@ from ..auth.crud import add_members, has_permission
 from ..auth.enum import RecipientType, PermissionTargetType, PermissionType
 from ..auth.models import User, Permission, Group
 from ..config import settings
+from ..crud import create_entity
 from ..models import Schema, Entity
 from ..schemas import BaseGroupSchema, GroupSchema, UserCreateSchema, PermissionSchema, \
     RequirePermission
@@ -427,6 +428,24 @@ class TestRoutesRequiringAuth(CreateMixin):
         func = getattr(authorized_client, method)
         response = func(url)
         assert response.status_code != 403
+
+    def test_authorization_slug(self, dbsession: Session, client: TestClient):
+        """
+        Test that authorization works for entities in different schemas but with identical slugs
+        """
+        user, _, _ = self._create_user_group_with_perm(dbsession)
+        client.post("/login")
+        response = client.post('/login', data={'username': self.default_username,
+                                               'password': self.default_password})
+        assert response.status_code == 200
+        token = response.json()['access_token']
+        client.headers = {"Authorization": f"Bearer {token}"}
+
+        schema_id = dbsession.query(Schema.id).filter(Schema.slug == "unperson").one()[0]
+        create_entity(db=dbsession, schema_id=schema_id, data={"name": "Jack", "slug": "Jack"})
+        dbsession.flush()
+        response = client.put("/entity/person/Jack", json={"name": "UnJack", "slug": "Jack"})
+        assert response.status_code == 200
 
     def test_approve_request(self, dbsession: Session, unauthorized_testuser: User,
                              authenticated_client: TestClient):
