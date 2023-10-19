@@ -56,8 +56,18 @@
           </div>
         </template>
       </template>
-      <div class="d-grid gap-2 mt-1">
-        <button type="button" class="btn btn-primary p-2" @click="saveChanges">
+      <div class="d-flex gap-2 mt-1">
+        <button v-if="entity?.id && !entity?.deleted" type="button" class="btn btn-danger p-2"
+                @click="deleteEntity">
+          <i class="eos-icons me-1">delete</i>
+          Delete
+        </button>
+        <button v-if="entity?.id && entity?.deleted" type="button" class="btn btn-primary p-2"
+                @click="restoreEntity">
+          <i class="eos-icons me-1">restore_from_trash</i>
+          Restore
+        </button>
+        <button type="button" class="btn btn-primary p-2 flex-grow-1" @click="saveChanges">
           <i class="eos-icons me-1">save</i>
           Save {{ batchMode? 'all changes' : 'changes'}}
         </button>
@@ -231,7 +241,26 @@ export default {
       if (response) {
         this.updatePendingRequests();
       }
+      this.$emit("update");
     },
+    async deleteEntity() {
+      if (this.entity?.id) {
+        await this.$api.deleteEntity({
+          schemaSlug: this.schema.slug,
+          entityIdOrSlug: this.entity.id
+        });
+        this.$emit("update");
+      }
+    },
+    async restoreEntity() {
+      if (this.entity?.id) {
+        await this.$api.restoreEntity({
+          schemaSlug: this.schema.slug,
+          entityIdOrSlug: this.entity.id
+        });
+        this.$emit("update");
+      }
+    }
   },
 }
 </script>

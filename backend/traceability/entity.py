@@ -16,7 +16,8 @@ from ..config import DEFAULT_PARAMS
 from ..enum import ModelVariant
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
     AttributeNotDefinedException, MissingEntityUpdateRequestException, NoOpChangeException, \
-    MissingEntityDeleteRequestException, MissingChangeRequestException
+    MissingEntityDeleteRequestException, MissingChangeRequestException, \
+    MissingEntityRestoreRequestException
 from ..models import Entity, AttributeDefinition, Schema, Attribute
 from ..schemas.entity import EntityModelFactory
 from ..schemas.traceability import EntityChangeDetailSchema
@@ -532,6 +533,73 @@ def apply_entity_delete_request(db: Session, change_request: ChangeRequest, revi
         schema_id=entity.schema_id,
         commit=False
     ) 
+    change_request.status = ChangeStatus.APPROVED
+    change_request.reviewed_by = reviewed_by
+    change_request.reviewed_at = datetime.now(timezone.utc)
+    change_request.comment = comment
+    db.commit()
+    return True, entity
+
+
+def create_entity_restore_request(db: Session, id_or_slug: Union[int, str], schema_id: int,
+                                  created_by: User, commit: bool = True) -> ChangeRequest:
+    crud.restore_entity(db=db, id_or_slug=id_or_slug, schema_id=schema_id, commit=False)
+    db.rollback()
+    schema = crud.get_schema(db=db, id_or_slug=schema_id)
+    entity = crud.get_entity_model(db=db, id_or_slug=id_or_slug, schema=schema)
+
+    change_request = ChangeRequest(
+        created_by=created_by,
+        created_at=datetime.now(timezone.utc),
+        object_type=EditableObjectType.ENTITY,
+        object_id=entity.id,
+        change_type=ChangeType.RESTORE
+    )
+    db.add(change_request)
+
+    val = ChangeValueBool(old_value=entity.deleted, new_value=False)
+    db.add(val)
+    db.flush()
+    change = Change(
+        change_request=change_request,
+        data_type=ChangeAttrType.BOOL,
+        change_type=ChangeType.RESTORE,
+        content_type=ContentType.ENTITY,
+        object_id=entity.id,
+        field_name='deleted',
+        value_id=val.id
+    )
+    db.add(change)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return change_request
+
+
+def apply_entity_restore_request(db: Session, change_request: ChangeRequest, reviewed_by: User,
+                                 comment: Optional[str]) -> Tuple[bool, Entity]:
+    change = db.execute(
+        select(Change)
+        .where(Change.change_request_id == change_request.id)
+        .where(Change.data_type == ChangeAttrType.BOOL)
+        .where(Change.change_type == ChangeType.RESTORE)
+        .where(Change.content_type == ContentType.ENTITY)
+        .where(Change.field_name == 'deleted')
+        .where(Change.object_id != None)
+    ).scalar()
+
+    if change is None:
+        raise MissingEntityRestoreRequestException(obj_id=change_request.id)
+    entity = crud.get_entity_by_id(db=db, entity_id=change.object_id)
+    v = db.execute(select(ChangeValueBool).where(ChangeValueBool.id == change.value_id)).scalar()
+    v.old_value = entity.deleted
+    entity = crud.restore_entity(
+        db=db,
+        id_or_slug=entity.id,
+        schema_id=entity.schema_id,
+        commit=False
+    )
     change_request.status = ChangeStatus.APPROVED
     change_request.reviewed_by = reviewed_by
     change_request.reviewed_at = datetime.now(timezone.utc)

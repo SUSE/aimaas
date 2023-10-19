@@ -27,7 +27,7 @@ class GroupExistsException(Exception):
         return f'Group with name {self.name} already exists'
 
 
-class MissingObjectException(Exception):
+class ObjectException(Exception):
     obj_type: str = "Object"
 
     def __init__(self, obj_id: Union[int, str], obj_type: Optional[str] = None):
@@ -35,13 +35,34 @@ class MissingObjectException(Exception):
         self.obj_type = obj_type or self.obj_type
 
     def __str__(self) -> str:
-        return f"{self.obj_type} with id {self.obj_id} doesn't exist or was deleted"
+        raise NotImplementedError("Define in subclasses")
+
+
+class MissingObjectException(ObjectException):
+    def __str__(self) -> str:
+        return f"{self.obj_type} with id {self.obj_id} doesn't exist"
+
+
+class DeletedObjectException(ObjectException):
+    def __str__(self):
+        return f"{self.obj_type} with id {self.obj_id} is deleted"
+
 
 class MissingSchemaException(MissingObjectException):
     obj_type = 'Schema'
 
+
+class SchemaIsDeletedException(DeletedObjectException):
+    obj_type = 'Schema'
+
+
 class MissingEntityException(MissingObjectException):
     obj_type = 'Entity'
+
+
+class EntityIsDeletedException(DeletedObjectException):
+    obj_type = 'Entity'
+
 
 class MissingAttributeException(MissingObjectException):
     obj_type = 'Attribute'
@@ -63,6 +84,11 @@ class MissingEntityUpdateRequestException(MissingObjectException):
 class MissingEntityDeleteRequestException(MissingObjectException):
     def __str__(self) -> str:
         return f'There is no entity delete request with id {self.obj_id}'
+
+
+class MissingEntityRestoreRequestException(MissingObjectException):
+    def __str__(self) -> str:
+        return f'There is no entity restore request with id {self.obj_id}'
 
 
 class MissingEntityCreateRequestException(MissingObjectException):

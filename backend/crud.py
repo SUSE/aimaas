@@ -88,9 +88,12 @@ def get_schema(db: Session, id_or_slug: Union[int, str]) -> Schema:
 
 def _check_bound_schema_id(db: Session, schema_id: int):
     try:
-        db.query(Schema.id).filter(Schema.id == schema_id, Schema.deleted == False).one()
+        schema = db.query(Schema).filter(Schema.id == schema_id).one()
     except NoResultFound:
         raise MissingSchemaException(obj_id=schema_id)
+
+    if schema.deleted:
+        raise SchemaIsDeletedException(obj_id=schema_id)
 
 
 def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) -> Schema:
@@ -143,7 +146,7 @@ def create_schema(db: Session, data: SchemaCreateSchema, commit: bool = True) ->
 
 
 def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True) -> Schema:
-    q = select(Schema).where(Schema.deleted == False)
+    q = select(Schema)
     if isinstance(id_or_slug, int):
         q = q.where(Schema.id == id_or_slug)
     else:
@@ -152,6 +155,8 @@ def delete_schema(db: Session, id_or_slug: Union[int, str], commit: bool = True)
     schema = db.execute(q).scalar()
     if schema is None:
         raise MissingSchemaException(obj_id=id_or_slug)
+    if schema.deleted:
+        raise NoOpChangeException(f"Schema with id {schema.id} is already deleted")
     
     db.execute(update(Entity)
                .where(Entity.schema_id == schema.id, Entity.deleted == False)
@@ -645,10 +650,12 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
     q = select(Entity).where(Entity.schema_id == schema_id)
     q = q.where(Entity.id == id_or_slug) if isinstance(id_or_slug, int) else q.where(Entity.slug == id_or_slug)
     e = db.execute(q).scalar()
-    if e is None or e.deleted:
+    if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
     if e.schema.deleted:
         raise MissingSchemaException(obj_id=e.schema.id)
+    if e.deleted:
+        raise EntityIsDeletedException(obj_id=e.id)
     
     slug = data.pop('slug', e.slug)
     name = data.pop('name', e.name)
@@ -716,7 +723,7 @@ def update_entity(db: Session, id_or_slug: Union[str, int], schema_id: int, data
 
 
 def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, commit: bool = True) -> Entity:
-    q = select(Entity).where(Entity.deleted == False).where(Entity.schema_id == schema_id)
+    q = select(Entity).where(Entity.schema_id == schema_id)
     if isinstance(id_or_slug, int):
         q = q.where(Entity.id == id_or_slug)
     else:
@@ -724,7 +731,28 @@ def delete_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, comm
     e = db.execute(q).scalar()
     if e is None:
         raise MissingEntityException(obj_id=id_or_slug)
+    if e.deleted:
+        raise NoOpChangeException(f"Entity with id {e.id} is already deleted")
     e.deleted = True
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return e
+
+
+def restore_entity(db: Session, id_or_slug: Union[int, str], schema_id: int, commit: bool = True) -> Entity:
+    q = select(Entity).where(Entity.schema_id == schema_id)
+    if isinstance(id_or_slug, int):
+        q = q.where(Entity.id == id_or_slug)
+    else:
+        q = q.where(Entity.slug == id_or_slug)
+    e = db.execute(q).scalar()
+    if e is None:
+        raise MissingEntityException(obj_id=id_or_slug)
+    if not e.deleted:
+        raise NoOpChangeException(f"Entity with id {e.id} is not deleted")
+    e.deleted = False
     if commit:
         db.commit()
     else:

@@ -637,6 +637,23 @@ class TestEntityUpdate(DefaultMixin):
         e = dbsession.execute(select(Entity).where(Entity.slug == 'Jack')).scalar()
         assert e.get('nickname', dbsession).value == 'jane'
 
+    def test_raise_on_update_deleted(self, dbsession):
+        """
+        Test that updating a deleted entity warns about the entity already being deleted
+        """
+        e = self.get_default_entity(dbsession)
+        delete_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id)
+
+        dbsession.refresh(e)
+        assert e.deleted is True
+
+        data = {'slug': e.slug}
+        with pytest.raises(EntityIsDeletedException):
+            update_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id, data=data)
+
+        dbsession.refresh(e)
+        assert e.deleted is True
+
 
 class TestEntityDelete(DefaultMixin):
     def asserts_after_entity_delete(self, db: Session):
@@ -665,5 +682,33 @@ class TestEntityDelete(DefaultMixin):
         entity = self.get_default_entity(dbsession)
         entity.deleted = True
         dbsession.flush()
-        with pytest.raises(MissingEntityException):
+        with pytest.raises(NoOpChangeException):
             delete_entity(dbsession, id_or_slug=entity.id, schema_id=entity.schema_id)
+
+
+class TestRestoreEntity(DefaultMixin):
+    def asserts_after_entity_restore(self, db: Session):
+        entities = db.execute(select(Entity)).scalars().all()
+        assert len(entities) == 2
+        e = self.get_default_entity(db)
+        assert e.deleted is False
+
+    def test_restore_by_id(self, dbsession):
+        e = self.get_default_entity(dbsession)
+        e.deleted = True
+        dbsession.flush()
+        restore_entity(dbsession, id_or_slug=e.id, schema_id=e.schema_id)
+        self.asserts_after_entity_restore(db=dbsession)
+
+    def test_restore_by_slug(self, dbsession):
+        e = self.get_default_entity(dbsession)
+        e.deleted = True
+        dbsession.flush()
+        restore_entity(dbsession, id_or_slug=e.slug, schema_id=e.schema_id)
+        self.asserts_after_entity_restore(db=dbsession)
+
+    def test_restore_not_deleted(self, dbsession):
+        e = self.get_default_entity(dbsession)
+
+        with pytest.raises(NoOpChangeException):
+            restore_entity(dbsession, id_or_slug=e.slug, schema_id=e.schema_id)

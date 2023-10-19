@@ -20,7 +20,7 @@ from . import crud, exceptions
 
 from .traceability.entity import create_entity_create_request, create_entity_update_request, \
     create_entity_delete_request, apply_entity_create_request, apply_entity_update_request, \
-    apply_entity_delete_request
+    apply_entity_delete_request, create_entity_restore_request, apply_entity_restore_request
 
 
 factory = EntityModelFactory()
@@ -261,6 +261,7 @@ def route_update_entity(router: APIRouter, schema: Schema):
                 * there already exists an entity that has same value for unique field and this entity is not deleted
                 '''
             },
+            410: {"description": "Entity cannot be updated because it was deleted"},
             422: {
                 'description': '''Can be returned when:
 
@@ -288,6 +289,8 @@ def route_update_entity(router: APIRouter, schema: Schema):
             return change_request
         except exceptions.NoOpChangeException as e:
             raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
+        except exceptions.EntityIsDeletedException as e:
+            raise HTTPException(status.HTTP_410_GONE, str(e))
         except (exceptions.MissingEntityException, exceptions.MissingSchemaException) as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         except (exceptions.EntityExistsException, exceptions.UniqueValueException) as e:
@@ -314,25 +317,33 @@ def route_delete_entity(router: APIRouter, schema: Schema):
         responses={
             200: {"description": "Entity was deleted"},
             202: {"description": "Request to delete entity was stored"},
+            208: {"description": "Entity was not changed because request contained no changes"},
             404: {
                 'description': "entity with provided id/slug doesn't exist on current schema"
             }
         }
     )
     def delete_entity(id_or_slug: Union[int, str], response: Response,
+                      restore: bool = False,
                       db: Session = Depends(get_db),
                       user: User = Depends(req_permission)):
+        create_fun, apply_fun = create_entity_delete_request, apply_entity_delete_request
+        if restore:
+            create_fun, apply_fun = create_entity_restore_request, apply_entity_restore_request
+
         try:
-            change_request = create_entity_delete_request(
+            change_request = create_fun(
                 db=db, id_or_slug=id_or_slug, schema_id=schema.id, created_by=user, commit=False
             )
             if not schema.reviewable:
-                return apply_entity_delete_request(
+                return apply_fun(
                     db=db, change_request=change_request, reviewed_by=user, comment='Autosubmit'
                 )[1]
             db.commit()
             response.status_code = status.HTTP_202_ACCEPTED
             return change_request
+        except exceptions.NoOpChangeException as e:
+            raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
         except exceptions.MissingEntityException as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
         

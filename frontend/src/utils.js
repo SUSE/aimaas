@@ -51,6 +51,7 @@ export const CHANGE_STATUS_MAP = {
     APPROVED: 'success',
     add: 'add',
     create: 'add',
-    delete: 'remove',
-    update: 'mode_edit'
+    delete: 'delete',
+    update: 'mode_edit',
+    restore: 'restore_from_trash'
 }
