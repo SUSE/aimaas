@@ -79,7 +79,7 @@ def authorized_user(required_permission: RequirePermission) -> Callable:
                         Model = required_permission.target.__class__
                         query = db.query(Model.id).filter(Model.slug == id_or_slug)
                         if isinstance(required_permission.target, Entity):
-                            # Caveat, entities in different schemas are allowed th have the same
+                            # Caveat, entities in different schemas are allowed to have the same
                             # slug!
                             schema_slug = schema_slug_from_entity_url(request)
                             query = query.join(Schema).filter(Schema.slug == schema_slug)
