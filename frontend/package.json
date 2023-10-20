@@ -12,8 +12,8 @@
     "eos-icons": "^5.4.0",
     "lodash": "^4.17.21",
     "suse-bootstrap5-theme": "^1.1.2",
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.4"
+    "vue": "^3.3.6",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@babel/eslint-parser": "^7.22.15",
