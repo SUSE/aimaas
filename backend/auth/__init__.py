@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional,  Tuple, Callable
 
@@ -59,6 +60,13 @@ async def authenticated_user(token: str = Depends(oauth2_scheme),
 
 
 def authorized_user(required_permission: RequirePermission) -> Callable:
+    def schema_slug_from_entity_url(request: Request) -> str:
+        match = re.search("/entity/(?P<schema_slug>[^/]+)/", request.url.path)
+        if not match:
+            raise ValueError("URL does not contain a schema slug")
+
+        return match.group("schema_slug")
+
     async def is_authorized(request: Request, db: Session = Depends(get_db),
                             user: User = Depends(authenticated_user)) -> User:
         if isinstance(required_permission.target, (Schema, Entity)):
@@ -69,18 +77,23 @@ def authorized_user(required_permission: RequirePermission) -> Callable:
                         required_permission.target.id = int(id_or_slug)
                     except (ValueError, TypeError):
                         Model = required_permission.target.__class__
+                        query = db.query(Model.id).filter(Model.slug == id_or_slug)
+                        if isinstance(required_permission.target, Entity):
+                            # Caveat, entities in different schemas are allowed to have the same
+                            # slug!
+                            schema_slug = schema_slug_from_entity_url(request)
+                            query = query.join(Schema).filter(Schema.slug == schema_slug)
                         try:
-                            required_permission.target.id = db.query(Model.id) \
-                                                              .filter(Model.slug == id_or_slug) \
-                                                              .one()[0]
+                            required_permission.target.id = query.one()[0]
                         except NoResultFound:
                             required_permission.target = None
                 else:
                     required_permission.target = None
             if isinstance(required_permission.target, Entity):
-                parts = request.url.path.split("/")
+                schema_slug = schema_slug_from_entity_url(request)
                 required_permission.target.schema_id = db.query(Schema.id) \
-                                                         .filter(Schema.slug == parts[-2]).one()[0]
+                                                         .filter(Schema.slug == schema_slug) \
+                                                         .one()[0]
         elif isinstance(required_permission.target, Group):
             group_id = request.path_params.get("group_id", None)
             required_permission.target.id = int(group_id)
