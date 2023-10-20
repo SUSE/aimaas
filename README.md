@@ -35,6 +35,23 @@ In a nutshell, these are the steps to set up a development environment:
    1. Install `npm` (and `nodejs`, our suggestion: v16).
    2. Install JS dependencies with `npm install`.
 
+### Updating NPM packages
+
+The safe way to update packages is to run:
+
+```shell
+npm update
+```
+
+If you want to upgrade more aggressively (i.e. potentially introduce breaking changes) you can 
+consider something like this:
+
+```shell
+npm install ---no-save npm-check-updates
+ncu --upgrade
+npm install
+```
+
 ## Running development servers
 
 ### Backend
