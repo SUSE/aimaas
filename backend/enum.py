@@ -12,7 +12,7 @@ class FilterEnum(Enum):
     EQ = Filter('eq', '__eq__', 'equal to')
     LT = Filter('lt', '__lt__', 'less than')
     GT = Filter('gt', '__gt__', 'greater than')
-    LE = Filter('le', '__le__', 'less than of equal to')
+    LE = Filter('le', '__le__', 'less than or equal to')
     GE = Filter('ge', '__ge__', 'greater than or equal to')
     NE = Filter('ne', '__ne__', 'not equal to')
     CONTAINS = Filter('contains', 'icontains', 'contains substring')
