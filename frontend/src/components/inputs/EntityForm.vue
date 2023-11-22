@@ -80,6 +80,7 @@
 import _cloneDeep from "lodash/cloneDeep";
 import _isEqual from "lodash/isEqual";
 
+import TextareaInput from "@/components/inputs/TextareaInput.vue";
 import TextInput from "@/components/inputs/TextInput";
 import Checkbox from "@/components/inputs/Checkbox";
 import DateTime from "@/components/inputs/DateTime";
@@ -95,7 +96,7 @@ export default {
   name: "EntityForm",
   components: {
     Spinner, TextInput, Checkbox, DateTime, DateInput, IntegerInput, FloatInput,
-    ReferencedEntitySelect
+    ReferencedEntitySelect, TextareaInput
   },
   props: {
     schema: {
