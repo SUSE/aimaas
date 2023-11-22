@@ -36,7 +36,7 @@ export const ATTR_TYPES_NAMES = {
 
 
 export const TYPE_INPUT_MAP = {
-    STR: "TextInput",
+    STR: "TextareaInput",
     DT: "DateTime",
     INT: "IntegerInput",
     FLOAT: "FloatInput",
