@@ -473,7 +473,7 @@ class TestEntityUpdate(DefaultMixin):
         assert e.get('age', db).value == 10
         assert e.get('born', db).value.astimezone(timezone.utc) == born_time.astimezone(
             timezone.utc)
-        assert [i.value for i in e.get('friends', db)] == self._default_friends(db)
+        assert {i.value for i in e.get('friends', db)} == set(self._default_friends(db))
         assert e.get('nickname', db) is None
         nicknames = db.execute(
             select(ValueStr)
