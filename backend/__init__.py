@@ -45,7 +45,8 @@ def create_app(session: Optional[Session] = None) -> FastAPI:
         title='AIMAAS–API',
         summary='Application Programming Interface for the '
                 'Abstract Information Management and Authority Service.',
-        description=generate_api_description()
+        version='0.2.1',
+        description=generate_api_description(),
     )
     origins = ['*']
     app.add_middleware(CORSMiddleware,
