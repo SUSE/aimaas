@@ -41,7 +41,12 @@ def load_dynamic_routes(db: Session, app: FastAPI):
 
 
 def create_app(session: Optional[Session] = None) -> FastAPI:
-    app = FastAPI(description=generate_api_description())
+    app = FastAPI(
+        title='AIMAAS–API',
+        summary='Application Programming Interface for the '
+                'Abstract Information Management and Authority Service.',
+        description=generate_api_description()
+    )
     origins = ['*']
     app.add_middleware(CORSMiddleware,
         allow_origins=origins,
