@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy import select
 from sqlalchemy.orm import Session, subqueryload
 
@@ -40,14 +41,20 @@ def load_dynamic_routes(db: Session, app: FastAPI):
         create_dynamic_router(schema=schema, app=app)
 
 
-def create_app(session: Optional[Session] = None) -> FastAPI:
-    app = FastAPI(
+def fix_openapi_schema(app):
+    openapi_schema = get_openapi(
         title='AIMAAS–API',
         summary='Application Programming Interface for the '
                 'Abstract Information Management and Authority Service.',
         version='0.2.1',
         description=generate_api_description(),
+        routes=app.routes,
     )
+    return openapi_schema
+
+
+def create_app(session: Optional[Session] = None) -> FastAPI:
+    app = FastAPI()
     origins = ['*']
     app.add_middleware(CORSMiddleware,
         allow_origins=origins,
@@ -62,4 +69,10 @@ def create_app(session: Optional[Session] = None) -> FastAPI:
             load_dynamic_routes(db=db, app=app)
 
     app.include_router(router)
+
+    # Need to use a closure here to be able to pass `app` to `fix_openapi_schema`
+    def get_custom_openapi():
+        return fix_openapi_schema(app)
+    app.openapi = get_custom_openapi
+
     return app
