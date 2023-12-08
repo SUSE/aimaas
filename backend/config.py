@@ -20,6 +20,7 @@ class LdapSettings(BaseSettings):
     user: str = "uid=username,cn=users,dc=suse,dc=de"
     password: str = "secret"
     host: str = "example.com"
+    use_ssl: bool = False
     bind_template: str = "uid={username},cn=users,dc=suse,dc=de"
     search_template: str = "(uid={username})"
     attr: LdapAttributeMap = LdapAttributeMap()
