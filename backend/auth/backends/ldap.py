@@ -11,7 +11,9 @@ from .abstract import AbstractBackend
 
 
 class Backend(AbstractBackend):
-    _server = Server(host=settings.ldap.host, connect_timeout=settings.ldap.timeout)
+    _server = Server(host=settings.ldap.host,
+                     use_ssl=settings.ldap.use_ssl,
+                     connect_timeout=settings.ldap.timeout)
 
     @staticmethod
     def search_string(username: str) -> str:
