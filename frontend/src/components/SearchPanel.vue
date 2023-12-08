@@ -133,6 +133,12 @@ export default {
         t[a.name] = a.type;
       }
       return t;
+    },
+    typeInputMap() {
+      const dict = {...TYPE_INPUT_MAP};
+      // Override the default text area with a one-line input field
+      dict.STR = "TextInput";
+      return dict
     }
   },
   methods: {
@@ -159,7 +165,7 @@ export default {
       }
       try {
         const fieldType = this.fieldTypes[row.field].toUpperCase();
-        return TYPE_INPUT_MAP[fieldType];
+        return this.typeInputMap[fieldType];
       } catch (e) {
         console.error(e);
         return null;
@@ -189,8 +195,7 @@ export default {
       filters: [],
       searchQuery: "",
       allValues: false,
-      listMode: 'active',
-      TYPE_INPUT_MAP,
+      listMode: 'active'
     };
   },
 };
