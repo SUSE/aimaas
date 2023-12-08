@@ -369,3 +369,38 @@ def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
 
     app.include_router(router, prefix='/entity')
     app.openapi_schema = None
+
+
+
+router = APIRouter()
+
+@router.get(
+    '/entity/{schema_slug}',
+    # response_model=Page[factory(schema=schema, variant=ModelVariant.GET)],
+    # tags=[schema.name],
+    # summary=f'List {schema.name} entities',
+    # description=description,
+    # response_model_exclude_unset=True
+)
+def get_entities(
+        schema_slug: str,
+        # all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
+        # deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
+        # all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'),
+        # filters: filter_model = Depends(),
+        # order_by: str = Query('name', description='Ordering field'),
+        # ascending: bool = Query(True, description='Direction of ordering'),
+        db: Session = Depends(get_db),
+        # params: Params = Depends()
+):
+    return crud.get_entities(
+        db=db,
+        schema=schema,
+        # params=params,
+        # all=all,
+        # deleted_only=deleted_only,
+        # all_fields=all_fields,
+        # filters=new_filters,
+        # order_by=order_by,
+        # ascending=ascending
+    )

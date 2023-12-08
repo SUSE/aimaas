@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, subqueryload
 from .config import settings, VERSION
 from .database import SessionLocal
 from .enum import FilterEnum
-from .dynamic_routes import create_dynamic_router
+from .dynamic_routes import create_dynamic_router, router as dynamic_router
 from .models import Schema, AttributeDefinition, AttrType
 from .general_routes import router
 
@@ -83,7 +83,11 @@ def fix_openapi_schema(db, app):
     operation_ids = set()
     for route in app.routes:
         if route.path in paths_to_remove:
-            # ...
+            # Create OpenAPI path for route by doing the following:
+            # * check if `route.include_in_schema` is `True`, otherwise path is just an ampty dict
+            # * Iterate over `route.methods` (asserted to be a list earlier) and for each method
+            #   - call `get_openapi_operation_metadata` with the route, method and operation_ids to get operation metadata
+            #   - call `...` ... you know what? `get_openapi_path is an incredibly, stupidly, mind-boggingly long function that does way to mayn things and I don't think writing that all down here will get me anywhere.
             result = get_openapi_path(
                 route=route,
                 operation_ids=operation_ids,
@@ -141,10 +145,11 @@ def create_app(session: Optional[Session] = None) -> FastAPI:
             load_dynamic_routes(db=db, app=app)
 
     app.include_router(router)
+    app.include_router(dynamic_router)
 
     # Need to use a closure here to be able to pass `app` to `fix_openapi_schema`
-    def get_custom_openapi():
-        return fix_openapi_schema(db, app)
-    app.openapi = get_custom_openapi
+    # def get_custom_openapi():
+    #     return fix_openapi_schema(db, app)
+    # app.openapi = get_custom_openapi
 
     return app
