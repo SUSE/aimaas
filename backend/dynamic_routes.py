@@ -1,7 +1,7 @@
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 from dataclasses import make_dataclass
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from fastapi.applications import FastAPI
 from fastapi_pagination import Page, Params
 from sqlalchemy.exc import DataError
@@ -375,19 +375,22 @@ def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
 router = APIRouter()
 
 @router.get(
-    '/entity/{schema_slug}',
-    # response_model=Page[factory(schema=schema, variant=ModelVariant.GET)],
+    '/entit2/{schema_slug}',
+    # response_model=Page[factory(schema=schema, variant=ModelVariant.GET)],  # This will probably be tricky....
     # tags=[schema.name],
     # summary=f'List {schema.name} entities',
     # description=description,
     # response_model_exclude_unset=True
+    # Could we do just `include_in_schema = False` here to exclude this from OpenApi to begin with?
 )
 def get_entities(
-        schema_slug: str,
-        # all: bool = Query(False, description='If true, returns both deleted and not deleted entities'), 
+        schema_slug: Annotated[str, Path[title='Schema slug of the entity in question']],  # Validate schema_slug is actually a schema slug...
+        all: Annotated[bool, Query(description='If true, return both deleted and not deleted entities.') = False,
         # deleted_only: bool = Query(False, description='If true, returns only deleted entities. *Note:* if `all` is true `deleted_only` is not checked'), 
         # all_fields: bool = Query(False, description='If true, returns data for all entity fields, not just key ones'),
-        # filters: filter_model = Depends(),
+        # filters: filter_model = Depends(),  # This one will be tricky... perhaps `Annotated` could help?
+        # Annotated supports variadic arguments to add multiple pieces of metadata to a single annotation.
+                       # Alternatively, we could perhaps use a dict as the 2nd argument and then parse it... not sure about that, though.
         # order_by: str = Query('name', description='Ordering field'),
         # ascending: bool = Query(True, description='Direction of ordering'),
         db: Session = Depends(get_db),
@@ -404,3 +407,12 @@ def get_entities(
         # order_by=order_by,
         # ascending=ascending
     )
+
+# Point of interest:
+#     Extra keys passed to Field will also be present in the resulting OpenAPI schema for your application.
+#     As these keys may not necessarily be part of the OpenAPI specification, some OpenAPI tools,
+#     for example the OpenAPI validator, may not work with your generated schema.
+# (found here: https://fastapi.tiangolo.com/tutorial/body-fields/#add-extra-information)
+# I wonder whether this is also true of FastAPI's own Body, PAth and Query classes,
+# which share a common ancestor with pydantic's Field.
+
