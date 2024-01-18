@@ -125,6 +125,10 @@ export default {
   watch: {
     modelValue() {
       this.getSelected();
+    },
+    selected: {
+      handler: "getSelected",
+      immediate: true
     }
   }
 };
