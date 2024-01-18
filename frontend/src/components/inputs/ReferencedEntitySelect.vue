@@ -114,6 +114,7 @@ export default {
     },
     onClear(eId) {
       if (this.selectType === 'single') {
+        this.selected = [];
         this.$emit("update:modelValue", null);
       } else {
         this.selected = this.selected.filter(x => x.id !== eId);
