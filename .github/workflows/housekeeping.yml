@@ -1,7 +1,7 @@
 name: Housekeeping
 on:
   schedule:
-    - cron: "0 0 1 * *"
+    - cron: "15 0 1 * *"
 jobs:
   clean-ghcr:
     name: Delete old container images
@@ -10,7 +10,7 @@ jobs:
       - name: Delete old releases
         uses: snok/container-retention-policy@v2
         with:
-          image-names: aimaas/aimaas-api, aimaas/aimaas-ui
+          image-names: ${GITHUB_REPOSITORY,,}/aimaas-api, ${GITHUB_REPOSITORY,,}/aimaas-ui
           cut-off: one month ago UTC
           timestamp-to-use: updated_at
           account-type: org
