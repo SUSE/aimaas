@@ -44,7 +44,7 @@ export default {
   inject: ["apiInfo"],
   data() {
     return {
-      frontendVersion: "0.3.1"
+      frontendVersion: "0.3.2"
     };
   }
 }
