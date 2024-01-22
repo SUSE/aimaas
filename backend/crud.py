@@ -7,7 +7,7 @@ from fastapi_pagination.api import create_page
 from fastapi_pagination.ext.sqlalchemy import paginate_query
 from psycopg2.errors import ForeignKeyViolation
 from sqlalchemy import func, distinct, column, asc, desc, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
@@ -509,17 +509,24 @@ def get_entities(
     except AttributeError:
         pass
     if order_by != 'name':
-        attrs = {i.attribute.name: i.attribute for i in schema.attr_defs if i.attribute.type.value.filters}
+        attrs = {i.attribute.name: i.attribute for i in schema.attr_defs}
         attr = attrs[order_by]
         value_model = attr.type.value.model
         direction = asc if ascending else desc
-        q = q.order_by(
-            direction(
-                select(value_model.value)
-                .where(value_model.attribute_id == attr.id)
-                .where(value_model.entity_id == Entity.id).scalar_subquery()
-            ), Entity.name.asc()
-        )
+        outer_query = subquery = (select(value_model.value)
+                                  .where(value_model.attribute_id == attr.id)
+                                  .where(value_model.entity_id == Entity.id)
+                                  .scalar_subquery()
+                                  .correlate(Entity))
+        if attr.type == AttrType.FK:
+            attr_defs = {i.attribute.name: i for i in schema.attr_defs}
+            attr_def = attr_defs[order_by]
+            e_alias = aliased(Entity)
+            outer_query = (select(e_alias.name)
+                           .where(e_alias.schema_id == attr_def.bound_schema_id,
+                                  e_alias.id == subquery)
+                           .scalar_subquery())
+        q = q.order_by(direction(outer_query), Entity.name.asc())
     else:
         direction = 'asc' if ascending else 'desc'
         q = q.order_by(getattr(Entity.name, direction)())

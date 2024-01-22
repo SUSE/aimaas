@@ -180,7 +180,7 @@ export default {
       return s;
     },
     orderByField(field) {
-      if (this.listFields.includes(field) || field in this.fkFields) {
+      if (this.listFields.includes(field)) {
         return;
       }
       if (this.orderBy === field) {
