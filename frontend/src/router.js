@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {createRouter, createWebHistory} from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
 import Changes from "@/components/change_review/Changes";
 import Entity from "@/components/Entity.vue"
@@ -15,6 +15,7 @@ export const router = createRouter({
             path: '/createSchema',
             component: SchemaCreate,
             name: 'schema-new',
+            cached: true,
             meta: {
                 title: 'Create Schema'
             }
@@ -23,6 +24,7 @@ export const router = createRouter({
             path: '/bulkEdit/:schemaSlug',
             component: EntityBulkEdit,
             name: 'bulk-edit',
+            cached: true,
             meta: {
                 title: "Edit Schemas"
             }
@@ -31,6 +33,7 @@ export const router = createRouter({
             path: '/schema/:schemaSlug',
             component: Schema,
             name: 'schema-view',
+            cached: true,
             meta: {
                 title: 'Schema Details'
             }
@@ -39,21 +42,24 @@ export const router = createRouter({
             path: '/schema/:schemaSlug/:entitySlug',
             component: Entity,
             name: 'entity-view',
+            cached: false,
             meta: {
                 title: 'Entity Details'
             }
         },
         {
-          path: '/review',
-          component: Changes,
-          name: 'review-list',
-          meta: {
-            title: 'Pending Reviews'
-        }
+            path: '/review',
+            component: Changes,
+            name: 'review-list',
+            cached: true,
+            meta: {
+                title: 'Pending Reviews'
+            }
         },
         {
             path: '/user-management',
             component: AuthManager,
+            cached: true,
             name: 'auth-manager',
             meta: {
                 title: 'User Management'
@@ -63,6 +69,7 @@ export const router = createRouter({
             path: '/',
             component: SchemaList,
             name: 'schema-list',
+            cached: true,
             meta: {
                 title: 'All Schemas'
             }
@@ -71,6 +78,7 @@ export const router = createRouter({
             path: '/help/about',
             component: About,
             name: 'help-about',
+            cached: true,
             meta: {
                 title: 'About AIMAAS'
             }
