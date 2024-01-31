@@ -75,9 +75,6 @@ export default {
       default: false
     }
   },
-  activated() {
-    this.getEntities({resetPage: false});
-  },
   computed: {
     pages: computed(() => {
       try {
