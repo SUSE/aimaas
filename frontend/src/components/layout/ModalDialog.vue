@@ -68,6 +68,11 @@ export default {
       default: ""
     }
   },
+  deactivated() {
+    Array.from(document.querySelectorAll('.modal-backdrop')).forEach(function (el) {
+      el.classList.remove('modal-backdrop');
+    });
+  },
   computed: {
     uniqueId() {
       return this.modalId || `modal-${randomUUID()}`;
