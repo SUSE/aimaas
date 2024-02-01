@@ -75,6 +75,9 @@ export default {
       default: false
     }
   },
+  activated() {
+    this.getEntities({resetPage: false});
+  },
   computed: {
     pages: computed(() => {
       try {
@@ -89,9 +92,6 @@ export default {
     entityPluralized(){
       return this.numSelected === 1 ? 'entity' : 'entities'
     }
-  },
-  activated() {
-    this.getEntities({resetPage: false});
   },
   watch: {
     currentPage(oldPage, newPage) {
