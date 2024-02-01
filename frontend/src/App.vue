@@ -23,9 +23,7 @@
   <AlertDisplay/>
   <div class="container mt-2">
     <router-view v-slot="{Component}">
-      <keep-alive :exclude="nonCachedRouteComponents">
-        <component :is="Component"/>
-      </keep-alive>
+      <component :is="Component"/>
     </router-view>
   </div>
 
@@ -82,10 +80,7 @@ export default {
         console.warn("List of available schemas not ready, yet");
       }
       return _avail_schemas
-    },
-    nonCachedRouteComponents () {
-      return this.$router.options.routes.filter(route => !route.cached).map(route => route.component.name);
-    },
+    }
   },
   methods: {
     onPendingReviews() {
