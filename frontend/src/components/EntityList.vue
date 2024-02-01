@@ -90,6 +90,9 @@ export default {
       return this.numSelected === 1 ? 'entity' : 'entities'
     }
   },
+  activated() {
+    this.getEntities({resetPage: false});
+  },
   watch: {
     currentPage(oldPage, newPage) {
       if (oldPage !== newPage) {

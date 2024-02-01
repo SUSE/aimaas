@@ -22,8 +22,8 @@
   </nav>
   <AlertDisplay/>
   <div class="container mt-2">
-    <router-view v-slot="{Component}" :key="routerViewKey">
-      <keep-alive>
+    <router-view v-slot="{Component}">
+      <keep-alive :exclude="nonCachedRouteComponents">
         <component :is="Component"/>
       </keep-alive>
     </router-view>
@@ -60,8 +60,7 @@ export default {
     return {
       activeSchema: null,
       schemaDetails: {},
-      apiInfo: null,
-      routerViewKey: null,
+      apiInfo: null
     }
   },
   provide() {
@@ -84,8 +83,8 @@ export default {
       }
       return _avail_schemas
     },
-    nonCachedRouteNames () {
-      return this.$router.options.routes.filter(route => !route.cached).map(route => route.name);
+    nonCachedRouteComponents () {
+      return this.$router.options.routes.filter(route => !route.cached).map(route => route.component.name);
     },
   },
   methods: {
@@ -103,25 +102,11 @@ export default {
       }
 
       this.activeSchema = this.schemaDetails[schemaSlug];
-    },
-    async setRouterViewKey() {
-      // We are binding routerViewKey to <router-view> component in order to trigger an instance replacement
-      // on route change. We are doing this only for routes we don't want to get cached.
-      if (this.nonCachedRouteNames.includes(this.$route.name)) {
-        this.routerViewKey = this.$route.fullPath;
-      } else if (this.routerViewKey !== null) {
-        this.routerViewKey = null;
-      }
     }
   },
   watch: {
     $route: {
-      async handler(oldValue, newValue) {
-        if (oldValue !== newValue) {
-          await this.setRouterViewKey(); // run this first in order to not trigger unnecessary reloads.
-          await this.getSchemaFromRoute();
-        }
-      },
+      handler: "getSchemaFromRoute",
       immediate: true, // runs immediately with mount() instead of calling method on mount hook
     },
   },

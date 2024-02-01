@@ -57,7 +57,8 @@ export default {
             text: "Apply",
             callback: this.onSelect
           })
-      ]
+      ],
+      currentEntitySlug: this.$route.params.entitySlug,
     }
   },
   activated() {
@@ -78,6 +79,11 @@ export default {
       if (!this.modelValue) {
         return;
       }
+      if (this.currentEntitySlug !== this.$route.params.entitySlug) {
+        this.selected.length = 0;
+        this.currentEntitySlug = this.$route.params.entitySlug;
+      }
+
       const preselectedIds = this.selected.map(x => x.id);
       let toQuery = this.modelValue;
       if (!Array.isArray(this.modelValue)) {
