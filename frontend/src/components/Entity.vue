@@ -103,9 +103,10 @@ export default {
       if (newValue?.name) {
         document.title = newValue.name;
       }
-    }, 
-    async "$route.params.entitySlug"() {
-      await this.updateEntity();
+    },
+    $route: {
+      handler: "updateEntity",
+      immediate: true
     },
   }
 };

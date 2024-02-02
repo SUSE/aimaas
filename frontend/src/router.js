@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {createRouter, createWebHistory} from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
 import Changes from "@/components/change_review/Changes";
 import Entity from "@/components/Entity.vue"
@@ -44,12 +44,12 @@ export const router = createRouter({
             }
         },
         {
-          path: '/review',
-          component: Changes,
-          name: 'review-list',
-          meta: {
-            title: 'Pending Reviews'
-        }
+            path: '/review',
+            component: Changes,
+            name: 'review-list',
+            meta: {
+                title: 'Pending Reviews'
+            }
         },
         {
             path: '/user-management',
