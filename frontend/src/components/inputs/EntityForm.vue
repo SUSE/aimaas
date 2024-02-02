@@ -90,6 +90,7 @@ import FloatInput from "@/components/inputs/FloatInput";
 import ReferencedEntitySelect from "@/components/inputs/ReferencedEntitySelect";
 import Spinner from "@/components/layout/Spinner";
 import {TYPE_INPUT_MAP} from "@/utils";
+import {updateEntityList} from "@/store";
 
 
 export default {
@@ -227,6 +228,8 @@ export default {
         body: this.editEntity
       });
       this.loading = false;
+      updateEntityList();
+
       return response;
     },
     async saveEntity() {

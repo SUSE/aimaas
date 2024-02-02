@@ -51,12 +51,13 @@
 </template>
 
 <script>
-import {computed} from "vue";
+import {computed, watch} from "vue";
 
 import ConfirmButton from "@/components/inputs/ConfirmButton";
 import Pagination from "./layout/Pagination.vue";
 import EntityListTable from "@/components/EntityListTable";
 import SearchPanel from "./SearchPanel.vue";
+import {updateEntityListCount} from "@/store";
 
 export default {
   components: {EntityListTable, Pagination, SearchPanel, ConfirmButton},
@@ -75,8 +76,8 @@ export default {
       default: false
     }
   },
-  activated() {
-    this.getEntities({resetPage: false});
+  created() {
+    watch(updateEntityListCount, (async () => await this.getEntities({resetPage: false})));
   },
   computed: {
     pages: computed(() => {
