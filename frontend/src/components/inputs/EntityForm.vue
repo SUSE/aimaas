@@ -228,8 +228,6 @@ export default {
         body: this.editEntity
       });
       this.loading = false;
-      updateEntityList();
-
       return response;
     },
     async saveEntity() {
@@ -244,6 +242,7 @@ export default {
       }
       if (response) {
         this.updatePendingRequests();
+        updateEntityList();
       }
       this.$emit("update");
     },
