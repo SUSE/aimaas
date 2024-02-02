@@ -57,7 +57,7 @@ export default {
       await this.loadPage();
     }
   },
-  async activated() {
+  async mounted() {
     await this.loadPage();
   }
 }
