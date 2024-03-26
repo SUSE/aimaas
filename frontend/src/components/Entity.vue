@@ -15,12 +15,12 @@
     </div>
     </template>
   </BaseLayout>
-  <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="entitytabbing"
+  <Tabbing :bind-args="bindArgs" :tabs="tabs" ref="entitytabbing"
            :tabEvents="{update: onUpdate}"/>
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import { markRaw } from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
@@ -38,19 +38,19 @@ export default {
       tabs: [
         {
           name: 'Show/Edit',
-          component: shallowRef(EntityForm),
+          component: markRaw(EntityForm),
           icon: "mode_edit",
           tooltip: "Edit/show entity details"
         },
         {
           name: "Permissions",
-          component: PermissionList,
+          component: markRaw(PermissionList),
           icon: "security",
           tooltip: "Manage permissions on the entity"
         },
         {
           name: "History",
-          component: shallowRef(Changes),
+          component: markRaw(Changes),
           icon: "history",
           tooltip: 'Change history of entity'
         }
@@ -61,23 +61,13 @@ export default {
     title() {
       return this.entity?.name || this.$route.params.entitySlug || '-';
     },
-    currentProperties() {
-      const currIndex = this.$refs.entitytabbing?.currentTab || 0;
-      if (this.tabs[currIndex].component.name === "PermissionList") {
-        return {objectType: "Entity", objectId: this.entity?.id};
-      }
-      let props = {schema: this.activeSchema};
-
-      if (this.tabs[currIndex].component.name === "Changes") {
-        props.entitySlug = this.$route.params.entitySlug;
-      }
-
-      if (this.tabs[currIndex].component.name === "EntityForm") {
-        props.entity = this.entity;
-      }
-
-      return props;
-    }
+    bindArgs() {
+      return [
+        { schema: this.activeSchema, entity: this.entity },
+        { objectType: "Entity", objectId: this.entity?.id },
+        { schema: this.activeSchema, entitySlug: this.$route.params.entitySlug },
+      ]
+    },
   },
   methods: {
     async updateEntity() {

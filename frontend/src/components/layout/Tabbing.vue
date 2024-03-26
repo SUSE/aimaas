@@ -12,17 +12,23 @@
     </ul>
     <div class="tab-content">
       <div class="tab-pane show active border p-2" role="tabpanel">
-        <keep-alive>
-          <component :is="tabs[currentTab].component" v-bind="bindArgs" v-on="tabEvents"/>
-        </keep-alive>
+          <Suspense timeout="0">
+            <component v-if="currentTab !== undefined" :is="tabs[currentTab].component" v-bind="bindArgs[currentTab] ?? {}" v-on="tabEvents" :key="currentTab"/>
+            <template #fallback>
+              <Placeholder :big="true" />
+            </template>
+          </Suspense>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import Placeholder from "@/components/layout/Placeholder";
+
 export default {
   name: "Tabbing",
+  components: { Placeholder },
   props: {
     tabs: {
       required: true,
@@ -34,8 +40,11 @@ export default {
       default: 0
     },
     bindArgs: {
-      required: true,
-      type: Object
+      required: false,
+      type: Array,
+      default: function () {
+        return [];
+      },
     },
     tabEvents: {
       required: false,
@@ -50,6 +59,7 @@ export default {
       currentTab: this.initialTab
     }
   },
+  expose: ['currentTab'],
   methods: {
     navLinkClass(tabIndex) {
       if (this.currentTab === tabIndex) {
@@ -60,10 +70,15 @@ export default {
       }
       return "";
     }
+  },
+  watch: {
+    async bindArgs() {
+      // force-recreate the tab content component if its props (bind args) change reactively
+      // (which also triggers the suspense)
+      const tabIdx = this.currentTab;
+      this.currentTab = undefined;
+      setTimeout(() => this.currentTab = tabIdx, 0);
+    }
   }
 }
 </script>
-
-<style scoped>
-
-</style>

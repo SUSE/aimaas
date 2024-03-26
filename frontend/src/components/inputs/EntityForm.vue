@@ -105,7 +105,7 @@ export default {
     },
     entity: {
       type: Object,
-      required: true
+      required: false
     },
     batchMode: {
       type: Boolean,

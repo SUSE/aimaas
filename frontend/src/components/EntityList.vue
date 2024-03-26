@@ -51,8 +51,6 @@
 </template>
 
 <script>
-import {computed} from "vue";
-
 import ConfirmButton from "@/components/inputs/ConfirmButton";
 import Pagination from "./layout/Pagination.vue";
 import EntityListTable from "@/components/EntityListTable";
@@ -79,13 +77,13 @@ export default {
     this.getEntities({resetPage: false});
   },
   computed: {
-    pages: computed(() => {
+    pages() {
       try {
         return this.$refs.paginator.pageCount;
       } catch (e) {
         return 0;
       }
-    }),
+    },
     numSelected() {
       return this.selected.length;
     },

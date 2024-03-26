@@ -11,12 +11,12 @@
     </template>
   </BaseLayout>
 
-  <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="schematabbing"/>
+  <Tabbing :bind-args="bindArgs" :tabs="tabs" ref="schematabbing"/>
 
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import { shallowRef } from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityList from "@/components/EntityList";
 import EntityForm from "@/components/inputs/EntityForm";
@@ -51,7 +51,7 @@ export default {
         },
         {
           name: "Permissions",
-          component: PermissionList,
+          component: shallowRef(PermissionList),
           icon: "security",
           tooltip: "Manage permissions on the schema"
         },
@@ -66,18 +66,14 @@ export default {
   },
   inject: ['activeSchema'],
   computed: {
-    currentProperties() {
-      const currIndex = this.$refs.schematabbing?.currentTab || 0;
-      if (this.tabs[currIndex].component.name === "PermissionList") {
-        return {objectType: "Schema", objectId: this.activeSchema.id};
-      }
-
-      const props = {schema: this.activeSchema};
-
-      if (this.tabs[currIndex].component.name === "EntityList") {
-        props.advancedControls = true;
-      }
-      return props;
+    bindArgs() {
+      return [
+        { schema: this.activeSchema, advancedControls: true },
+        { schema: this.activeSchema },
+        { schema: this.activeSchema },
+        { objectType: "Schema", objectId: this.activeSchema?.id },
+        { schema: this.activeSchema },
+      ]
     },
     title() {
       try {
