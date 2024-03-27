@@ -30,62 +30,41 @@
     </div>
   </div>
   <h5>Group memberships</h5>
-  <Placeholder :loading="loading">
-    <template v-slot:content>
-      <ul class="list-group">
-        <li class="list-group-item" v-for="group in memberships" :key="group.id">
-          {{ group.name }}
-        </li>
-        <li v-if="memberships.length === 0" class="list-group-item p-0">
-          <div class="alert alert-info text-center m-0">Not a member of any group.</div>
-        </li>
-      </ul>
+  <Suspense v-if="user">
+    <GroupMemberships :username="user.username" />
+    <template #fallback>
+      <Placeholder />
     </template>
-  </Placeholder>
+  </Suspense>
 </template>
 
 <script>
 import Placeholder from "@/components/layout/Placeholder";
+import GroupMemberships from "@/components/auth/GroupMemberships";
+import { useAuthStore } from "@/store/auth";
 
 export default {
   name: "UserDetails",
-  components: {Placeholder},
+  components: { Placeholder, GroupMemberships },
   props: {
     user: {
-      required: true,
+      required: false,
       type: Object
     }
   },
-  data() {
-    return {
-      loading: true,
-      memberships: []
-    }
-  },
-  async activated() {
-    if (this.user) {
-      await this.loadMembership();
-    }
-  },
-  watch: {
-    async user() {
-      await this.loadMembership();
-    }
+  setup() {
+    const { activateUser, deactivateUser} = useAuthStore();
+    return { activateUser, deactivateUser }
   },
   methods: {
-    async loadMembership() {
-      this.loading = true;
-      this.memberships = await this.$api.getUserMemberships({username: this.user.username});
-      this.loading = false;
-    },
     async onClick() {
       if (this.user === null) {
         return;
       }
       if (this.user?.is_active) {
-        await this.$api.deactivate_user({username: this.user.username});
+        await this.deactivateUser(this.user.username)
       } else {
-        await this.$api.activate_user({username: this.user.username});
+        await this.activateUser(this.user.username)
       }
     }
   }
