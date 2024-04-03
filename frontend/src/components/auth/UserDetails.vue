@@ -10,22 +10,32 @@
   </div>
   <div class="row">
     <div class="col-3 fw-bold">Email:</div>
-    <div class="col-9"><a :href="`mailto:${user?.email}`">{{ user?.email }}</a></div>
+    <div class="col-9">
+      <a :href="`mailto:${user?.email}`">{{ user?.email }}</a>
+    </div>
   </div>
   <div class="row">
     <div class="col-3 fw-bold">Is Active?</div>
     <div class="col-9 d-flex flex-row justify-content-between flex-grow-0">
       <div>
-        <span class="badge" :class="user?.is_active? 'bg-success text-black': 'bg-dark text-light'">
-          {{ user?.is_active ? 'Yes' : 'No' }}
+        <span
+          class="badge"
+          :class="
+            user?.is_active ? 'bg-success text-black' : 'bg-dark text-light'
+          "
+        >
+          {{ user?.is_active ? "Yes" : "No" }}
         </span>
       </div>
-      <button class="btn" @click="onClick"
-              :class="`btn-outline-${user?.is_active? 'danger': 'primary'}`">
+      <button
+        class="btn"
+        @click="onClick"
+        :class="`btn-outline-${user?.is_active ? 'danger' : 'primary'}`"
+      >
         <i class="eos-icons me-1">
-          {{ user?.is_active? 'block': 'play_arrow'}}
+          {{ user?.is_active ? "block" : "play_arrow" }}
         </i>
-        {{ user?.is_active? 'Deactivate': 'Activate'}}
+        {{ user?.is_active ? "Deactivate" : "Activate" }}
       </button>
     </div>
   </div>
@@ -49,12 +59,12 @@ export default {
   props: {
     user: {
       required: false,
-      type: Object
-    }
+      type: Object,
+    },
   },
   setup() {
-    const { activateUser, deactivateUser} = useAuthStore();
-    return { activateUser, deactivateUser }
+    const { activateUser, deactivateUser } = useAuthStore();
+    return { activateUser, deactivateUser };
   },
   methods: {
     async onClick() {
@@ -62,15 +72,13 @@ export default {
         return;
       }
       if (this.user?.is_active) {
-        await this.deactivateUser(this.user.username)
+        await this.deactivateUser(this.user.username);
       } else {
-        await this.activateUser(this.user.username)
+        await this.activateUser(this.user.username);
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

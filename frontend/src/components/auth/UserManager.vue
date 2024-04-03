@@ -17,11 +17,9 @@
         </li>
       </ul>
     </div>
-    <div v-show="selectedUser" class="user-detail">
+    <div v-show="selectedUser" class="user-detail flex-fill">
       <h4>{{ selectedUser?.username}}</h4>
-      <keep-alive>
-        <Tabbing :bind-args="bindArgs" :tabs="tabs" />
-      </keep-alive>
+      <Tabbing :bind-args="bindArgs" :tabs="tabs" />
     </div>
   </div>
 </template>

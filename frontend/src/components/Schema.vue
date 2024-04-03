@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import { shallowRef } from "vue";
+import { markRaw } from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityList from "@/components/EntityList";
 import EntityForm from "@/components/inputs/EntityForm";
@@ -33,31 +33,31 @@ export default {
       tabs: [
         {
           name: "Entities",
-          component: shallowRef(EntityList),
+          component: markRaw(EntityList),
           icon: "table_view",
           tooltip: "Show entities"
         },
         {
           name: "Edit / Show",
-          component: shallowRef(SchemaEdit),
+          component: markRaw(SchemaEdit),
           icon: "mode_edit",
           tooltip: "Edit/Show schema structure"
         },
         {
           name: "Add Entity",
-          component: shallowRef(EntityForm),
+          component: markRaw(EntityForm),
           icon: 'add_circle',
           tooltip: 'Add new entity'
         },
         {
           name: "Permissions",
-          component: shallowRef(PermissionList),
+          component: markRaw(PermissionList),
           icon: "security",
           tooltip: "Manage permissions on the schema"
         },
         {
           name: "History",
-          component: shallowRef(Changes),
+          component: markRaw(Changes),
           icon: 'history',
           tooltip: 'Change history of schema'
         }

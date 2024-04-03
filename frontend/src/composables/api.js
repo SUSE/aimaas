@@ -210,9 +210,7 @@ class API {
   async getEntity({ schemaSlug, entityIdOrSlug } = {}) {
     const params = new URLSearchParams();
     return this._fetch({
-      url: `${
-        this.base
-      }/entity/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`,
+      url: `${this.base}/entity/${schemaSlug}/${entityIdOrSlug}?${params.toString()}`,
     });
   }
 
@@ -356,7 +354,11 @@ class API {
       method: "PATCH",
     });
     if (response !== null) {
-      this.alerts.push("success", `User activated: ${username}`);
+      if (response) {
+        this.alerts.push("success", `User activated: ${username}`);
+      } else {
+        this.alerts.push("success", `User already activated: ${username}`);
+      }
     }
     return response;
   }
@@ -367,7 +369,11 @@ class API {
       method: "DELETE",
     });
     if (response !== null) {
-      this.alerts.push("success", `User deactivated: ${username}`);
+      if (response) {
+        this.alerts.push("success", `User deactivated: ${username}`);
+      } else {
+        this.alerts.push("success", `User already deactivated: ${username}`);
+      }
     }
     return response;
   }

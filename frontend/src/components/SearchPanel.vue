@@ -86,7 +86,7 @@
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import { markRaw } from "vue";
 import {TYPE_INPUT_MAP} from "@/utils";
 import IntegerInput from "@/components/inputs/IntegerInput.vue";
 import FloatInput from "@/components/inputs/FloatInput.vue";
@@ -148,7 +148,7 @@ export default {
         operator: null,
         value: null,
         operatorOptions: [],
-        component: shallowRef(TextInput)
+        component: markRaw(TextInput)
       });
     },
     clearFilters() {

@@ -21,11 +21,17 @@ export const useAuthStore = () => {
     return computedTree;
   })
 
-  const loadGroupData = async () => {
+  const fetchGroupData = async () => {
     const response = await api.getGroups();
   
     for (let group of (response || [])) {
       groups.value[group.id] = group;
+    }
+  }
+
+  const loadGroupData = async () => {
+    if (Object.values(groups.value).length === 0) {
+      await fetchGroupData()
     }
   }
 
@@ -56,29 +62,39 @@ export const useAuthStore = () => {
     }
   }
   
-  const loadUserData = async () => {
+  const fetchUserData = async () => {
     const response = await api.getUsers();
     for (const user of (response || [])) {
       users.value[user.id] = user;
     }
   }
 
+  const loadUserData = async () => {
+    if (Object.values(users.value).length === 0) {
+      await fetchUserData();
+    }
+  }
+
   const activateUser = async (username) => {
-    await api.activate_user({username: username});
-    Object.values(users.value).forEach(user => {
-      if(user.username === username) {
-        user.is_active = !user.is_active
-      }
-    });
+    const result = await api.activate_user({username: username});
+    if (result != null) {
+      Object.values(users.value).forEach(user => {
+        if(user.username === username) {
+          user.is_active = true;
+        }
+      });
+    }
   }
 
   const deactivateUser = async (username) => {
-    await api.deactivate_user({username: username});
-    Object.values(users.value).forEach(user => {
-      if(user.username === username) {
-        user.is_active = !user.is_active
-      }
-    });
+    const result = await api.deactivate_user({username: username});
+    if (result !== null) {
+      Object.values(users.value).forEach(user => {
+        if(user.username === username) {
+          user.is_active = false;
+        }
+      });
+    }
   }
 
   return {

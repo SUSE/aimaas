@@ -59,7 +59,6 @@ export default {
       currentTab: this.initialTab
     }
   },
-  expose: ['currentTab'],
   methods: {
     navLinkClass(tabIndex) {
       if (this.currentTab === tabIndex) {

@@ -27,7 +27,12 @@
       <div v-if="activeGroup" class="d-flex justify-content-between">
         <h4 class="">{{ activeGroup.name }}</h4>
         <ConfirmButton
-          :callback="() => { deleteGroup(activeGroup.id); activeGroup = undefined }"
+          :callback="
+            () => {
+              deleteGroup(activeGroup.id);
+              activeGroup = undefined;
+            }
+          "
           btnClass="btn-outline-danger order-last"
           :reverse="true"
         >
@@ -54,7 +59,8 @@ import ModalDialog from "@/components/layout/ModalDialog";
 import PermissionList from "@/components/auth/PermissionList";
 import { useAuthStore } from "../../store/auth";
 
-const { groups, tree, loadGroupData, deleteGroup, createGroup } = useAuthStore();
+const { groups, tree, loadGroupData, deleteGroup, createGroup } =
+  useAuthStore();
 
 const toggleButton = new Button({
   css: "btn-outline-primary flex-grow-1",
@@ -69,7 +75,7 @@ const addGroupModalButtons = [
     icon: "group_add",
     text: "Add",
     callback: () => {
-      createGroup(addGroupModalContent.value.myGroup)
+      createGroup(addGroupModalContent.value.myGroup);
     },
   }),
 ];
@@ -95,25 +101,22 @@ const tabs = [
   },
 ];
 
-const bindArgs = computed(() => (
-  [
-    { group: activeGroup.value },
-    { group: activeGroup.value },
-    { recipientType: "Group", recipientId: activeGroup.value?.id },
-  ]
-));
-
+const bindArgs = computed(() => [
+  { group: activeGroup.value },
+  { group: activeGroup.value },
+  { recipientType: "Group", recipientId: activeGroup.value?.id },
+]);
 
 const rootGroups = computed(() => {
   return tree.value[null]?.map((i) => groups.value[i]);
-})
+});
 
 const activeGroup = ref();
 function selectGroup(newGroup) {
   if (newGroup.id === activeGroup.value?.id) {
     activeGroup.value = undefined;
   } else {
-    activeGroup.value = newGroup
+    activeGroup.value = newGroup;
   }
 }
 

@@ -12,12 +12,7 @@
 </template>
 <script setup>
 import { api } from "@/composables/api";
-import { onActivated } from "vue";
 
 const props = defineProps(["username"]);
 const memberships = await api.getUserMemberships({ username: props.username });
-
-onActivated(async () => {
-  memberships.value = await api.getUserMemberships({ username: props.username });
-})
 </script>
