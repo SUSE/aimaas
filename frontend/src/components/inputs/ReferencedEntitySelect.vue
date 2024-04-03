@@ -77,6 +77,7 @@ export default {
   methods: {
     getSelected() {
       if (!this.modelValue) {
+        this.selected.length = 0;
         return;
       }
       if (this.currentEntitySlug !== this.$route.params.entitySlug) {

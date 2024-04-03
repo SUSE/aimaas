@@ -43,6 +43,12 @@ export default {
           tooltip: "Edit/show entity details"
         },
         {
+          name: "Add Entity (copy Attributes)",
+          component: shallowRef(EntityForm),
+          icon: "add_circle",
+          tooltip: "Copy over entity attributes to a new entity"
+        },
+        {
           name: "Permissions",
           component: PermissionList,
           icon: "security",
@@ -63,24 +69,18 @@ export default {
     },
     currentProperties() {
       const currIndex = this.$refs.entitytabbing?.currentTab || 0;
-      if (this.tabs[currIndex].component.name === "PermissionList") {
-        return {objectType: "Entity", objectId: this.entity?.id};
-      }
-      let props = {schema: this.activeSchema};
-
-      if (this.tabs[currIndex].component.name === "Changes") {
-        props.entitySlug = this.$route.params.entitySlug;
+      const tabPropsMap = {
+        'Show/Edit': {schema: this.activeSchema, entity: this.entity},
+        'Add Entity (copy Attributes)': {schema: this.activeSchema, attributes: this.entity},
+        'Permissions': {objectType: "Entity", objectId: this.entity?.id},
+        'History': {schema: this.activeSchema, entitySlug: this.$route.params.entitySlug},
       }
 
-      if (this.tabs[currIndex].component.name === "EntityForm") {
-        props.entity = this.entity;
-      }
-
-      return props;
+      return tabPropsMap[this.tabs[currIndex].name];
     }
   },
   methods: {
-    async updateEntity() {
+    async getEntity() {
       if (this.$route.params.entitySlug && this.$route.params.schemaSlug) {
         const params = {
           schemaSlug: this.$route.params.schemaSlug,
@@ -91,12 +91,14 @@ export default {
         this.entity = null;
       }
     },
-    async onUpdate() {
-      await this.updateEntity();
+    async onUpdate(entity) {
+      if (entity) {
+        this.entity = entity;
+      }
     }
   },
   async activated() {
-    await this.updateEntity();
+    await this.getEntity();
   },
   watch: {
     entity(newValue) {
@@ -105,7 +107,7 @@ export default {
       }
     },
     $route: {
-      handler: "updateEntity",
+      handler: "getEntity",
       immediate: true
     },
   }
