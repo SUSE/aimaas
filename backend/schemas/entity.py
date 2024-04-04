@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, validator, Field, create_model
 
-from ..enum import ModelVariant
+from ..enums import ModelVariant
 from ..models import Schema, AttributeDefinition
 from .validators import validate_slug
 

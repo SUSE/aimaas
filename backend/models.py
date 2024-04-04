@@ -13,7 +13,7 @@ from sqlalchemy.sql.schema import UniqueConstraint
 
 from .base_models import Value, Mapping
 from .database import Base
-from .enum import FilterEnum
+from .enums import FilterEnum
 from .utils import make_aware_datetime
 
 

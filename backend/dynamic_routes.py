@@ -1,8 +1,10 @@
+import logging
 from typing import Optional, Union
 from dataclasses import make_dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.applications import FastAPI
+from fastapi.openapi.utils import get_openapi
 from fastapi_pagination import Page, Params
 from sqlalchemy.exc import DataError
 from sqlalchemy.orm.session import Session
@@ -11,7 +13,7 @@ from .auth import authorized_user, authenticated_user
 from .auth.enum import PermissionType
 from .auth.models import User
 from .database import get_db
-from .enum import FilterEnum, ModelVariant
+from .enums import FilterEnum, ModelVariant
 from .models import AttrType, Schema, Entity
 from .schemas.auth import RequirePermission
 from .schemas.entity import EntityModelFactory, EntityBaseSchema
@@ -357,7 +359,7 @@ def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
     route_update_entity(router=router, schema=schema)
     route_delete_entity(router=router, schema=schema)
 
-    router_routes = [(r.path, r.methods) for r in router.routes]
+    router_routes = [(f"/entity{r.path}", r.methods) for r in router.routes]
     routes_to_remove = []
     for route in app.routes:
         if (route.path, route.methods) in router_routes:
@@ -368,4 +370,3 @@ def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
         app.routes.remove(route)
 
     app.include_router(router, prefix='/entity')
-    app.openapi_schema = None

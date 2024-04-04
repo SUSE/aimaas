@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .config import settings, VERSION
 from . import crud, schemas, exceptions
 from .database import get_db
-from .enum import FilterEnum
+from .enums import FilterEnum
 from .models import Schema, AttrType
 from .dynamic_routes import create_dynamic_router
 from .auth import authenticate_user, authenticated_user, authorized_user, create_access_token,\

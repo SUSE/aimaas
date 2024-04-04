@@ -13,7 +13,7 @@ from sqlalchemy.sql.expression import delete, intersect
 from sqlalchemy.sql.selectable import CompoundSelect
 
 from .config import DEFAULT_PARAMS
-from .enum import FilterEnum
+from .enums import FilterEnum
 from .models import (
     AttrType,
     Attribute,

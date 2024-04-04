@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .. import crud
 from ..auth.models import User
 from ..config import DEFAULT_PARAMS
-from ..enum import ModelVariant
+from ..enums import ModelVariant
 from ..exceptions import MissingChangeException, MissingEntityCreateRequestException, \
     AttributeNotDefinedException, MissingEntityUpdateRequestException, NoOpChangeException, \
     MissingEntityDeleteRequestException, MissingChangeRequestException, \
