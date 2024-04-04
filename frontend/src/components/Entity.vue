@@ -26,6 +26,7 @@ import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
 import PermissionList from "@/components/auth/PermissionList";
+import EntityBulkAdd from "@/components/EntityBulkAdd.vue";
 
 export default {
   name: "Entity",
@@ -43,10 +44,10 @@ export default {
           tooltip: "Edit/show entity details"
         },
         {
-          name: "Add Entity (copy Attributes)",
-          component: shallowRef(EntityForm),
+          name: "Bulk Add (copy Attributes)",
+          component: shallowRef(EntityBulkAdd),
           icon: "add_circle",
-          tooltip: "Copy over entity attributes to a new entity"
+          tooltip: "Copy over entity attributes to a new entities"
         },
         {
           name: "Permissions",
@@ -70,13 +71,13 @@ export default {
     currentProperties() {
       const currIndex = this.$refs.entitytabbing?.currentTab || 0;
       const tabPropsMap = {
-        'Show/Edit': {schema: this.activeSchema, entity: this.entity},
-        'Add Entity (copy Attributes)': {schema: this.activeSchema, attributes: this.entity},
-        'Permissions': {objectType: "Entity", objectId: this.entity?.id},
-        'History': {schema: this.activeSchema, entitySlug: this.$route.params.entitySlug},
+        'EntityForm': {schema: this.activeSchema, entity: this.entity},
+        'EntityBulkAdd': {schema: this.activeSchema, attributes: this.entity},
+        'PermissionList': {objectType: "Entity", objectId: this.entity?.id},
+        'Changes': {schema: this.activeSchema, entitySlug: this.$route.params.entitySlug},
       }
 
-      return tabPropsMap[this.tabs[currIndex].name];
+      return tabPropsMap[this.tabs[currIndex].component.name];
     }
   },
   methods: {
