@@ -47,7 +47,7 @@ export default {
           name: "Bulk Add (copy Attributes)",
           component: EntityBulkAdd,
           icon: "add_circle",
-          tooltip: "Copy over entity attributes to a new entities"
+          tooltip: "Copy over entity attributes to new entities"
         },
         {
           name: "Permissions",
