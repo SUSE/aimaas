@@ -34,7 +34,7 @@ export default {
   },
   computed: {
     entityFormComponentsCountRange() {
-      return [...Array(this.entityFormComponentCount).keys()]
+      return [...Array(this.entityFormComponentCount).keys()];
     },
   },
   methods: {
@@ -42,7 +42,7 @@ export default {
       const promises = Object.entries(this.$refs)
           .filter(x => x[0].startsWith("entity-form-"))
           .map(x => x[1][0].createEntity());
-      await Promise.all(promises)
+      await Promise.all(promises);
     },
     addEntityForm() {
       ++this.entityFormComponentCount;

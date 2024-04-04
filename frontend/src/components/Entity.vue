@@ -45,7 +45,7 @@ export default {
         },
         {
           name: "Bulk Add (copy Attributes)",
-          component: shallowRef(EntityBulkAdd),
+          component: EntityBulkAdd,
           icon: "add_circle",
           tooltip: "Copy over entity attributes to a new entities"
         },
