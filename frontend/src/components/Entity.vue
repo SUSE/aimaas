@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import {shallowRef, markRaw} from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
@@ -45,7 +45,7 @@ export default {
         },
         {
           name: "Bulk Add (copy Attributes)",
-          component: EntityBulkAdd,
+          component: markRaw(EntityBulkAdd),
           icon: "add_circle",
           tooltip: "Copy over entity attributes to new entities"
         },

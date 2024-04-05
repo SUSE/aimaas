@@ -9,14 +9,14 @@
       <div v-if="attributes" class="border-bottom border-top border-light my-2">
         <div class="fw-bold my-2">Values to copy:</div>
         <div v-for="attr in schema?.attributes || []" :key="`${attr.name}-${attr.id}`" class="mb-1">
-          <label :class="`${attributes[attr.name] ? 'cursor-pointer' : ''}`">
+          <label :class="attributes[attr.name] ? 'cursor-pointer' : ''">
             {{ attr.name }}
             <sup v-if="requiredAttrs.includes(attr.name)" class="text-danger me-1"
                  data-bs-toggle="tooltip" title="This value is required">*</sup>
             <input type="checkbox" @change="onAttributeCopyChange($event.target.checked, attr.name)"
                    :checked="editEntity[attr.name]"
                    :disabled="!attributes[attr.name]"
-                   :class="`${attributes[attr.name] ? 'cursor-pointer' : ''}`" />
+                   :class="attributes[attr.name] ? 'cursor-pointer' : ''" />
           </label>
         </div>
       </div>
@@ -128,6 +128,10 @@ export default {
     attributes: {
       type: Object,
       required: false,
+    },
+    id: {
+      type: String,
+      required: false
     }
   },
   inject: ["updatePendingRequests"],
