@@ -1,9 +1,10 @@
 <template>
   <div v-for="(form, index) in entityForms" :key="form.props.id">
     <div :id="`form-${index}`">
-      <div v-if="index > 0" class="row mt-5 border-top border-light">
+      <div :class="`${entityForms.length < 2 && 'd-none'} ${index > 0 && 'mt-5 border-top border-light'} row`">
         <div class="col">
-          <button type="button" class="btn-close float-end mt-2" @click="closeForm(form.props.id)"/>
+          <button type="button" :class="`btn-close float-end ${index > 0 ? 'my-3': 'mb-3'}`"
+                  @click="closeForm(form.props.id)"/>
         </div>
       </div>
       <component :is="form.component" @save-all="saveAll" v-bind="form.props" :ref="form.props.id"/>
