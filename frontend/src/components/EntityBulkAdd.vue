@@ -52,7 +52,11 @@ export default {
             }
           });
       await Promise.all(promises);
-      this.entityForms = this.entityForms.filter(e => !successIds.includes(e.props.id));
+      if (this.entityForms.length > 1) {
+        this.entityForms = this.entityForms.filter(e => !successIds.includes(e.props.id));
+      } else {
+        this.entityForms = [this.generateEntityForm()];
+      }
     },
     async addEntityForm() {
       this.entityForms.push(this.generateEntityForm());
