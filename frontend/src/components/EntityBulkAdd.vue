@@ -54,7 +54,7 @@ export default {
       await Promise.all(promises);
       if (this.entityForms.length > 1) {
         this.entityForms = this.entityForms.filter(e => !successIds.includes(e.props.id));
-      } else {
+      } else if (successIds.length) {
         this.entityForms = [this.generateEntityForm()];
       }
     },
