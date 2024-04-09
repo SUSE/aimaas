@@ -2,7 +2,7 @@
   <BaseInput :label="label" :args="args" :vertical="vertical" :required="required">
     <template v-slot:field>
       <input class="form-control" type="datetime-local"
-             :value="modelValue && convertToDateTimeLocalString(modelValue)"
+             :value="value"
              @input="onInput"
              v-bind="args"/>
     </template>
@@ -16,6 +16,11 @@ export default {
   name: "DateTime",
   components: {BaseInput},
   props: ["label", "modelValue", "args", "vertical", "required"],
+  computed: {
+    value() {
+      return this.modelValue && this.convertToDateTimeLocalString(this.modelValue);
+    }
+  },
   methods: {
     onInput(event) {
       this.$emit("update:modelValue", event.target.value);
