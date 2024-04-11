@@ -1,13 +1,13 @@
 <template>
-  <div class="row m-0">
-    <div class="col-md-3">
+  <div class="d-flex gap-3 flex-wrap users-list">
+    <div class="users-list">
       <ul class="list-group">
         <li class="list-group-item">
           <input type="text" name="username" v-model="usernameFilter" placeholder="Filter username"
                  class="form-control"/>
         </li>
         <li class="list-group-item" v-for="user in filteredUsers" :key="user.id">
-          <button class="btn btn-link" @click="selectedUser = user">
+          <button class="btn btn-link" @click="selectUser(user)">
             {{ user.username }}
           </button>
 
@@ -17,22 +17,28 @@
         </li>
       </ul>
     </div>
-    <div class="col-md-9">
-      <h4 class="ps-5">{{ selectedUser?.username}}</h4>
-      <Tabbing v-show="selectedUser" :bind-args="bindArgs" :tabs="tabs" ref="userTab"/>
+    <div v-show="selectedUser" class="user-detail flex-fill">
+      <h4>{{ selectedUser?.username}}</h4>
+      <Tabbing :bind-args="bindArgs" :tabs="tabs" />
     </div>
   </div>
 </template>
 
 <script>
+import { markRaw } from "vue";
 import UserDetails from "@/components/auth/UserDetails";
 import PermissionList from "@/components/auth/PermissionList";
 import Tabbing from "@/components/layout/Tabbing";
+import { useAuthStore } from "@/store/auth";
 
 export default {
   name: "UserManager",
-  inject: ["users"],
-  components: {Tabbing},
+  components: { Tabbing },
+  async setup() {
+    const { users, loadUserData } = useAuthStore();
+    await loadUserData();
+    return { users }
+  },
   data() {
     return {
       usernameFilter: "",
@@ -40,19 +46,28 @@ export default {
       tabs: [
         {
           name: "Details",
-          component: UserDetails,
+          component: markRaw(UserDetails),
           icon: "details",
           tooltip: "Show user details"
         },
         {
           name: "Permissions",
-          component: PermissionList,
+          component: markRaw(PermissionList),
           icon: "security",
           tooltip: "Manage user permissions"
         }
       ]
     }
   },
+  methods: {
+    selectUser(user) {
+      if (this.selectedUser?.id === user.id) {
+        this.selectedUser = null;
+      } else {
+        this.selectedUser = user
+      }
+    }
+  },  
   computed: {
     filteredUsers() {
       if (this.usernameFilter.length > 0) {
@@ -61,16 +76,23 @@ export default {
       return Object.values(this.users);
     },
     bindArgs() {
-      const activeTab = this.$refs.userTab?.currentTab || 0;
-      if (activeTab === 1) {
-        return {recipientType: "User", recipientId: this.selectedUser.id};
-      }
-      return {user: this.selectedUser};
+      return [
+        { user: this.selectedUser },
+        { recipientType: "User", recipientId: this.selectedUser?.id },
+      ]
     }
   }
 }
 </script>
 
-<style scoped>
+<style lang="css" scoped>
+.users-list {
+  flex: 1;
+  min-width: 220px;
+}
 
+.user-detail {
+  flex: 2;
+  min-width: 360px;
+}
 </style>

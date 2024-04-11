@@ -11,12 +11,12 @@
     </template>
   </BaseLayout>
 
-  <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="schematabbing"/>
+  <Tabbing :bind-args="bindArgs" :tabs="tabs" ref="schematabbing"/>
 
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import { markRaw } from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityList from "@/components/EntityList";
 import EntityForm from "@/components/inputs/EntityForm";
@@ -33,31 +33,31 @@ export default {
       tabs: [
         {
           name: "Entities",
-          component: shallowRef(EntityList),
+          component: markRaw(EntityList),
           icon: "table_view",
           tooltip: "Show entities"
         },
         {
           name: "Edit / Show",
-          component: shallowRef(SchemaEdit),
+          component: markRaw(SchemaEdit),
           icon: "mode_edit",
           tooltip: "Edit/Show schema structure"
         },
         {
           name: "Add Entity",
-          component: shallowRef(EntityForm),
+          component: markRaw(EntityForm),
           icon: 'add_circle',
           tooltip: 'Add new entity'
         },
         {
           name: "Permissions",
-          component: PermissionList,
+          component: markRaw(PermissionList),
           icon: "security",
           tooltip: "Manage permissions on the schema"
         },
         {
           name: "History",
-          component: shallowRef(Changes),
+          component: markRaw(Changes),
           icon: 'history',
           tooltip: 'Change history of schema'
         }
@@ -66,18 +66,14 @@ export default {
   },
   inject: ['activeSchema'],
   computed: {
-    currentProperties() {
-      const currIndex = this.$refs.schematabbing?.currentTab || 0;
-      if (this.tabs[currIndex].component.name === "PermissionList") {
-        return {objectType: "Schema", objectId: this.activeSchema.id};
-      }
-
-      const props = {schema: this.activeSchema};
-
-      if (this.tabs[currIndex].component.name === "EntityList") {
-        props.advancedControls = true;
-      }
-      return props;
+    bindArgs() {
+      return [
+        { schema: this.activeSchema, advancedControls: true },
+        { schema: this.activeSchema },
+        { schema: this.activeSchema },
+        { objectType: "Schema", objectId: this.activeSchema?.id },
+        { schema: this.activeSchema },
+      ]
     },
     title() {
       try {
