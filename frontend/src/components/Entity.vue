@@ -15,12 +15,12 @@
     </div>
     </template>
   </BaseLayout>
-  <Tabbing :bind-args="currentProperties" :tabs="tabs" ref="entitytabbing"
+  <Tabbing :bind-args="bindArgs" :tabs="tabs" ref="entitytabbing"
            :tabEvents="{update: onUpdate}"/>
 </template>
 
 <script>
-import {shallowRef, markRaw} from "vue";
+import { markRaw } from "vue";
 import BaseLayout from "@/components/layout/BaseLayout";
 import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
@@ -39,7 +39,7 @@ export default {
       tabs: [
         {
           name: 'Show/Edit',
-          component: shallowRef(EntityForm),
+          component: markRaw(EntityForm),
           icon: "mode_edit",
           tooltip: "Edit/show entity details"
         },
@@ -51,13 +51,13 @@ export default {
         },
         {
           name: "Permissions",
-          component: PermissionList,
+          component: markRaw(PermissionList),
           icon: "security",
           tooltip: "Manage permissions on the entity"
         },
         {
           name: "History",
-          component: shallowRef(Changes),
+          component: markRaw(Changes),
           icon: "history",
           tooltip: 'Change history of entity'
         }
@@ -68,17 +68,14 @@ export default {
     title() {
       return this.entity?.name || this.$route.params.entitySlug || '-';
     },
-    currentProperties() {
-      const currIndex = this.$refs.entitytabbing?.currentTab || 0;
-      const tabPropsMap = {
-        'EntityForm': {schema: this.activeSchema, entity: this.entity},
-        'EntityBulkAdd': {schema: this.activeSchema, attributes: this.entity},
-        'PermissionList': {objectType: "Entity", objectId: this.entity?.id},
-        'Changes': {schema: this.activeSchema, entitySlug: this.$route.params.entitySlug},
-      }
-
-      return tabPropsMap[this.tabs[currIndex].component.name];
-    }
+    bindArgs() {
+      return [
+        { schema: this.activeSchema, entity: this.entity },
+        { schema: this.activeSchema, attributes: this.entity },
+        { objectType: "Entity", objectId: this.entity?.id },
+        { schema: this.activeSchema, entitySlug: this.$route.params.entitySlug },
+      ]
+    },
   },
   methods: {
     async getEntity() {

@@ -9,7 +9,7 @@
 </template>
 
 <script>
-import {shallowRef} from "vue";
+import { markRaw } from "vue";
 import AutoPagination from "@/components/layout/AutoPagination";
 import BaseLayout from "@/components/layout/BaseLayout";
 import ChangePage from "@/components/change_review/ChangePage";
@@ -32,7 +32,7 @@ export default {
   },
   data() {
     return {
-      pageComponent: shallowRef(ChangePage)
+      pageComponent: markRaw(ChangePage)
     }
   },
   computed: {
