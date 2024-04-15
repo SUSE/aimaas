@@ -7,7 +7,8 @@
                   @click="closeForm(form.props.id)"/>
         </div>
       </div>
-      <component :is="form.component" @save-all="saveAll" v-bind="form.props" :ref="form.props.id"/>
+      <component :is="form.component" @save-all="saveAll" v-bind="form.props"
+                 :ref="el => { refs[`entity-form-${index}`] = el }"/>
     </div>
   </div>
   <div class="container mt-2">
@@ -19,73 +20,73 @@
 </template>
 
 <script>
-import EntityForm from "@/components/inputs/EntityForm.vue";
-import {markRaw} from "vue";
-
 export default {
-  name: "EntityBulkAdd",
-  components: {EntityForm},
-  props: {
-    schema: {
-      type: Object,
-      required: true
-    },
-    attributes: {
-      type: Object,
-      required: true,
-    }
+  name: 'EntityBulkAdd'
+}
+</script>
+
+<script setup>
+import {markRaw, ref} from "vue";
+import EntityForm from "@/components/inputs/EntityForm.vue";
+
+const props = defineProps({
+  schema: {
+    type: Object,
+    required: true
   },
-  data() {
-    return {
-      entityForms: [this.generateEntityForm()]
-    }
-  },
-  methods: {
-    async saveAll() {
-      let successIds = [];
-      const promises = Object.entries(this.$refs)
-          .filter(x => x[0].startsWith("entity-form-"))
-          .map(async x => {
-            const resp = await x[1][0].createEntity();
-            if (resp?.id) {
-              successIds.push(x[0]);
-            }
-          });
-      await Promise.all(promises);
-      if (this.entityForms.length > 1) {
-        const forms = this.entityForms.filter(e => !successIds.includes(e.props.id));
-        this.entityForms = forms.length ? forms : [this.generateEntityForm()];
-      } else if (successIds.length) {
-        this.entityForms = [this.generateEntityForm()];
-      }
-    },
-    async addEntityForm() {
-      this.entityForms.push(this.generateEntityForm());
-    },
-    addNewItem() {
-      this.addEntityForm().then(() => {
-        document.getElementById(`form-${this.entityForms.length - 1}`).scrollIntoView();
-      });
-    },
-    generateEntityForm() {
-      return {
-        component: markRaw(EntityForm),
-        props: {
-          id: `entity-form-${(this.entityForms && this.entityForms.length) || 0}`,
-          attributes: this.attributes,
-          schema: this.schema,
-          batchMode: true,
-        }
-      }
-    },
-    closeForm(formId) {
-      this.entityForms = this.entityForms.filter(e => formId !== e.props.id);
+  attributes: {
+    type: Object,
+    required: true,
+  }
+});
+
+const entityForms = ref([generateEntityForm(0)]);
+const refs = ref([]);
+
+function generateEntityForm(id) {
+  return {
+    component: markRaw(EntityForm),
+    props: {
+      id: `entity-form-${id}`,
+      attributes: props.attributes,
+      schema: props.schema,
+      batchMode: true,
     }
   }
 }
 
+async function saveAll() {
+  let successIds = [];
+  const promises = Object.entries(refs.value).map(async x => {
+    const refName = x[0];
+    const component = x[1];
+
+    if (refName && component) {
+      const resp = await component.createEntity();
+      if (resp?.id) {
+        successIds.push(refName);
+        component.editEntity.name = null;
+        component.editEntity.slug = null;
+      }
+    }
+  });
+
+  await Promise.all(promises);
+  const forms = entityForms.value.filter(e => !successIds.includes(e.props.id));
+  entityForms.value = forms.length ? forms : [generateEntityForm(0)];
+}
+
+async function addEntityForm() {
+  entityForms.value.push(generateEntityForm(entityForms.value.length));
+}
+
+function addNewItem() {
+  addEntityForm().then(() => {
+    document.getElementById(`form-${entityForms.value.length - 1}`).scrollIntoView();
+  });
+}
+
+function closeForm(formId) {
+  entityForms.value = entityForms.value.filter(e => formId !== e.props.id);
+}
 </script>
-
-<style scoped>
-
-</style>
