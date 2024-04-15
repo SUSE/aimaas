@@ -53,7 +53,8 @@ export default {
           });
       await Promise.all(promises);
       if (this.entityForms.length > 1) {
-        this.entityForms = this.entityForms.filter(e => !successIds.includes(e.props.id));
+        const forms = this.entityForms.filter(e => !successIds.includes(e.props.id));
+        this.entityForms = forms.length ? forms : [this.generateEntityForm()];
       } else if (successIds.length) {
         this.entityForms = [this.generateEntityForm()];
       }
