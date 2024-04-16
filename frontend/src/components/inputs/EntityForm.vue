@@ -5,8 +5,8 @@
                  :required="true"/>
       <TextInput label="Slug" v-model="editEntity.slug" :args="{ id: 'slug', maxlength: 128 }"
                  :required="true"/>
-      <div class="d-flex justify-content-between align-items-end">
-        <h3 class="mt-3">Attributes</h3>
+      <div class="d-flex justify-content-between align-items-end mt-3">
+        <h3 class="align-self-start">Attributes</h3>
         <div v-if="attributes" class="ps-3 d-flex flex-column">
           <span class="fw-bold me-2">Values to copy:</span>
           <div>
