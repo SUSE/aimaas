@@ -128,10 +128,6 @@ export default {
     attributes: {
       type: Object,
       required: false,
-    },
-    id: {
-      type: String,
-      required: false
     }
   },
   inject: ["updatePendingRequests"],

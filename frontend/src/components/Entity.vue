@@ -26,7 +26,7 @@ import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
 import PermissionList from "@/components/auth/PermissionList";
-import EntityBulkAdd from "@/components/EntityBulkAdd.vue";
+import EntityBulkAdd from "@/components/EntityBulkAdd";
 
 export default {
   name: "Entity",
