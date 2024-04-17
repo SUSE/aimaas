@@ -5,19 +5,24 @@
                  :required="true"/>
       <TextInput label="Slug" v-model="editEntity.slug" :args="{ id: 'slug', maxlength: 128 }"
                  :required="true"/>
-      <h3 class="mt-3">Attributes</h3>
-      <div v-if="attributes" class="border-bottom border-top border-light my-2">
-        <div class="fw-bold my-2">Values to copy:</div>
-        <div v-for="attr in schema?.attributes || []" :key="`${attr.name}-${attr.id}`" class="mb-1">
-          <label :class="attributes[attr.name] ? 'cursor-pointer' : ''">
-            {{ attr.name }}
-            <sup v-if="requiredAttrs.includes(attr.name)" class="text-danger me-1"
-                 data-bs-toggle="tooltip" title="This value is required">*</sup>
-            <input type="checkbox" @change="onAttributeCopyChange($event.target.checked, attr.name)"
-                   :checked="editEntity[attr.name]"
-                   :disabled="!attributes[attr.name]"
-                   :class="attributes[attr.name] ? 'cursor-pointer' : ''" />
-          </label>
+      <div class="d-flex justify-content-between align-items-end mt-3">
+        <h3 class="align-self-start">Attributes</h3>
+        <div v-if="attributes" class="ps-3 d-flex flex-column">
+          <span class="fw-bold me-2">Values to copy:</span>
+          <div>
+            <div v-for="attr in schema?.attributes || []" :key="`${attr.name}-${attr.id}`"
+                 class="form-check form-check-inline">
+              <label :class="{'cursor-pointer': attributes[attr.name], 'form-check-label': true}">
+                {{ attr.name }}
+                <sup v-if="requiredAttrs.includes(attr.name)" class="text-danger me-1"
+                     data-bs-toggle="tooltip" title="This value is required">*</sup>
+                <input type="checkbox" @change="onAttributeCopyChange($event.target.checked, attr.name)"
+                       :checked="editEntity[attr.name]"
+                       :disabled="!attributes[attr.name]"
+                       :class="`${attributes[attr.name] ? 'cursor-pointer' : ''} form-check-input`" />
+              </label>
+            </div>
+          </div>
         </div>
       </div>
       <template v-for="attr in schema?.attributes || []" :key="attr.name">
