@@ -155,8 +155,8 @@ export default {
       this.selected = this.$refs.selector.getSelected();
     },
     onDeletion() {
-      const promises = this.selected.map(eId => {
-        this.$api.deleteEntity({
+      const promises = this.selected.map(async eId => {
+        await this.$api.deleteEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });
@@ -164,8 +164,8 @@ export default {
       Promise.all(promises).then(() => this.getEntities({resetPage: true}));
     },
     onRestoration() {
-      const promises = this.selected.map(eId => {
-        this.$api.restoreEntity({
+      const promises = this.selected.map(async eId => {
+        await this.$api.restoreEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });
