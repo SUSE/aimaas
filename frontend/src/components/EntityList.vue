@@ -156,7 +156,7 @@ export default {
     },
     onDeletion() {
       const promises = this.selected.map(eId => {
-        this.$api.deleteEntity({
+        return this.$api.deleteEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });
@@ -165,7 +165,7 @@ export default {
     },
     onRestoration() {
       const promises = this.selected.map(eId => {
-        this.$api.restoreEntity({
+        return this.$api.restoreEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });
