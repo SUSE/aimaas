@@ -155,8 +155,8 @@ export default {
       this.selected = this.$refs.selector.getSelected();
     },
     onDeletion() {
-      const promises = this.selected.map(async eId => {
-        await this.$api.deleteEntity({
+      const promises = this.selected.map(eId => {
+        return this.$api.deleteEntity({
           schemaSlug: this.schema.slug,
           entityIdOrSlug: eId
         });
