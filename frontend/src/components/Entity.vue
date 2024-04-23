@@ -71,7 +71,7 @@ export default {
     bindArgs() {
       return [
         { schema: this.activeSchema, entity: this.entity },
-        { schema: this.activeSchema, attributes: this.entity },
+        { schema: this.activeSchema, entity: this.entity },
         { objectType: "Entity", objectId: this.entity?.id },
         { schema: this.activeSchema, entitySlug: this.$route.params.entitySlug },
       ]

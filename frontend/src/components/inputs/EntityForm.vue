@@ -7,19 +7,19 @@
                  :required="true"/>
       <div class="d-flex justify-content-between align-items-end mt-3">
         <h3 class="align-self-start">Attributes</h3>
-        <div v-if="attributes" class="ps-3 d-flex flex-column">
+        <div v-if="showAttributeCheckboxes" class="ps-3 d-flex flex-column">
           <span class="fw-bold me-2">Values to copy:</span>
           <div>
             <div v-for="attr in schema?.attributes || []" :key="`${attr.name}-${attr.id}`"
                  class="form-check form-check-inline">
-              <label :class="{'cursor-pointer': attributes[attr.name], 'form-check-label': true}">
+              <label :class="{'cursor-pointer': entity[attr.name], 'form-check-label': true}">
                 {{ attr.name }}
                 <sup v-if="requiredAttrs.includes(attr.name)" class="text-danger me-1"
                      data-bs-toggle="tooltip" title="This value is required">*</sup>
                 <input type="checkbox" @change="onAttributeCopyChange($event.target.checked, attr.name)"
                        :checked="editEntity[attr.name]"
-                       :disabled="!attributes[attr.name]"
-                       :class="`${attributes[attr.name] ? 'cursor-pointer' : ''} form-check-input`" />
+                       :disabled="!entity[attr.name]"
+                       :class="`${entity[attr.name] ? 'cursor-pointer' : ''} form-check-input`" />
               </label>
             </div>
           </div>
@@ -130,9 +130,9 @@ export default {
       type: Boolean,
       default: false
     },
-    attributes: {
-      type: Object,
-      required: false,
+    showAttributeCheckboxes: {
+      type: Boolean,
+      default: false,
     }
   },
   inject: ["updatePendingRequests"],
@@ -184,7 +184,7 @@ export default {
       if (!this.entity) {
         this.editEntity = {name: null, slug: null};
         for (const attr of this.schema?.attributes || []) {
-          this.editEntity[attr.name] = this.attributes ? this.attributes[attr.name] : null;
+          this.editEntity[attr.name] = null;
         }
       }
       for (const attr of listAttrs) {
@@ -204,7 +204,7 @@ export default {
       if (this.entity?.schema_id && this.entity?.schema_id !== this.schema.id) {
         await this.updateSchemaMeta();
       }
-      if (this.entity && this.editEntity?.id !== this.entity?.id) {
+      if (this.entity && this.editEntity?.slug !== this.entity?.slug) {
         this.editEntity = _cloneDeep(this.entity);
       } else if (!this.entity) {
         this.prepEntity();
@@ -286,7 +286,7 @@ export default {
       }
     },
     onAttributeCopyChange(isChecked, attrName) {
-      this.editEntity[attrName] = isChecked ? this.attributes[attrName] : null;
+      this.editEntity[attrName] = isChecked ? this.entity[attrName] : null;
     }
   },
 }
