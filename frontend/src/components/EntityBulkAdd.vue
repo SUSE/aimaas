@@ -54,8 +54,7 @@ function generateEntityForm(id) {
 
 async function saveAll() {
   let successfullySaved = [];
-  const promises = Object.entries(entityFormRefs.value)
-      .filter(ref => ref[1] !== null).map(ref => saveSingle(ref));
+  const promises = Object.entries(entityFormRefs.value).map(ref => saveSingle(ref));
   Promise.all(promises).then(responses => {
     responses.forEach(resp => {
       if (resp?.id) {
