@@ -5,7 +5,26 @@
                  :required="true"/>
       <TextInput label="Slug" v-model="editEntity.slug" :args="{ id: 'slug', maxlength: 128 }"
                  :required="true"/>
-      <h3 class="mt-3">Attributes</h3>
+      <div class="d-flex justify-content-between align-items-end mt-3">
+        <h3 class="align-self-start">Attributes</h3>
+        <div v-if="showAttributeCheckboxes" class="ps-3 d-flex flex-column">
+          <span class="fw-bold me-2">Values to copy:</span>
+          <div>
+            <div v-for="attr in schema?.attributes || []" :key="`${attr.name}-${attr.id}`"
+                 class="form-check form-check-inline">
+              <label :class="{'cursor-pointer': entity[attr.name], 'form-check-label': true}">
+                {{ attr.name }}
+                <sup v-if="requiredAttrs.includes(attr.name)" class="text-danger me-1"
+                     data-bs-toggle="tooltip" title="This value is required">*</sup>
+                <input type="checkbox" @change="onAttributeCopyChange($event.target.checked, attr.name)"
+                       :checked="editEntity[attr.name]"
+                       :disabled="!entity[attr.name]"
+                       :class="`${entity[attr.name] ? 'cursor-pointer' : ''} form-check-input`" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
       <template v-for="attr in schema?.attributes || []" :key="attr.name">
         <!-- ATTRIBUTE IS REFERENCE -->
         <template v-if="attr.type === 'FK'">
@@ -110,6 +129,10 @@ export default {
     batchMode: {
       type: Boolean,
       default: false
+    },
+    showAttributeCheckboxes: {
+      type: Boolean,
+      default: false,
     }
   },
   inject: ["updatePendingRequests"],
@@ -181,7 +204,7 @@ export default {
       if (this.entity?.schema_id && this.entity?.schema_id !== this.schema.id) {
         await this.updateSchemaMeta();
       }
-      if (this.entity && this.editEntity?.id !== this.entity?.id) {
+      if (this.entity && this.editEntity?.slug !== this.entity?.slug) {
         this.editEntity = _cloneDeep(this.entity);
       } else if (!this.entity) {
         this.prepEntity();
@@ -232,7 +255,7 @@ export default {
     async saveEntity() {
       this.loading = true;
       let response;
-      if (this.$route.params.entitySlug) {
+      if (this.entity) {
         // UPDATE EXISTING ENTITY
         response = this.updateEntity();
       } else {
@@ -242,7 +265,7 @@ export default {
       if (response) {
         this.updatePendingRequests();
       }
-      this.$emit("update");
+      this.$emit("update", this.entity ? this.editEntity : null);
     },
     async deleteEntity() {
       if (this.entity?.id) {
@@ -261,11 +284,16 @@ export default {
         });
         this.$emit("update");
       }
+    },
+    onAttributeCopyChange(isChecked, attrName) {
+      this.editEntity[attrName] = isChecked ? this.entity[attrName] : null;
     }
   },
 }
 </script>
 
 <style scoped>
-
+  .cursor-pointer {
+    cursor: pointer;
+  }
 </style>

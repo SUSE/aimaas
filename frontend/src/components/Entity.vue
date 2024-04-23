@@ -26,6 +26,7 @@ import EntityForm from "@/components/inputs/EntityForm";
 import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
 import PermissionList from "@/components/auth/PermissionList";
+import EntityBulkAdd from "@/components/EntityBulkAdd";
 
 export default {
   name: "Entity",
@@ -41,6 +42,12 @@ export default {
           component: markRaw(EntityForm),
           icon: "mode_edit",
           tooltip: "Edit/show entity details"
+        },
+        {
+          name: "Bulk Add (copy Attributes)",
+          component: markRaw(EntityBulkAdd),
+          icon: "add_circle",
+          tooltip: "Copy over entity attributes to new entities"
         },
         {
           name: "Permissions",
@@ -64,13 +71,14 @@ export default {
     bindArgs() {
       return [
         { schema: this.activeSchema, entity: this.entity },
+        { schema: this.activeSchema, entity: this.entity },
         { objectType: "Entity", objectId: this.entity?.id },
         { schema: this.activeSchema, entitySlug: this.$route.params.entitySlug },
       ]
     },
   },
   methods: {
-    async updateEntity() {
+    async getEntity() {
       if (this.$route.params.entitySlug && this.$route.params.schemaSlug) {
         const params = {
           schemaSlug: this.$route.params.schemaSlug,
@@ -81,12 +89,14 @@ export default {
         this.entity = null;
       }
     },
-    async onUpdate() {
-      await this.updateEntity();
+    async onUpdate(entity) {
+      if (entity) {
+        this.entity = entity;
+      }
     }
   },
   async activated() {
-    await this.updateEntity();
+    await this.getEntity();
   },
   watch: {
     entity(newValue) {
@@ -95,7 +105,7 @@ export default {
       }
     },
     $route: {
-      handler: "updateEntity",
+      handler: "getEntity",
       immediate: true
     },
   }

@@ -61,7 +61,7 @@ export default {
       currentEntitySlug: this.$route.params.entitySlug,
     }
   },
-  activated() {
+  mounted() {
     this.getSelected();
   },
   computed: {
@@ -77,6 +77,7 @@ export default {
   methods: {
     getSelected() {
       if (!this.modelValue) {
+        this.selected.length = 0;
         return;
       }
       if (this.currentEntitySlug !== this.$route.params.entitySlug) {
@@ -133,10 +134,6 @@ export default {
     modelValue() {
       this.getSelected();
     },
-    selected: {
-      handler: "getSelected",
-      immediate: true
-    }
   }
 };
 </script>
