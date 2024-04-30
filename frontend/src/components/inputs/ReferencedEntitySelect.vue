@@ -39,7 +39,7 @@ export default {
   components: {BaseInput, EntityList, ModalDialog},
   emits: ["changed", "selected", "update:modelValue"],
   props: ["args", "label", "modelValue", "fkSchemaId", "selectType", "required"],
-  inject: ["activeSchema", "availableSchemas"],
+  inject: ["availableSchemas"],
   data() {
     return {
       loading: true,
