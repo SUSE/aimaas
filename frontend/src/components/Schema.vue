@@ -86,16 +86,18 @@ onUpdated(() => {
   }
 });
 
-async function onSchemaUpdate() {
-  await getSchema();
+function init() {
+  loading.value = true;
+  getSchema().then(() => loading.value = false);
+}
+
+function onSchemaUpdate() {
+  init();
 }
 
 watch(
     route,
-    () => {
-      loading.value = true;
-      getSchema().then(() => loading.value = false);
-    },
+    () => init(),
     {
       immediate: true
     }

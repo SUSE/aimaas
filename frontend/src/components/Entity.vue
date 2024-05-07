@@ -90,9 +90,9 @@ async function getEntity() {
   }
 }
 
-async function onUpdate(entity) {
-  if (entity) {
-    entity.value = entity;
+async function onUpdate(editEntity) {
+  if (editEntity) {
+    entity.value = editEntity;
   }
 }
 
