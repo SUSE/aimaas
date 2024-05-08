@@ -49,7 +49,7 @@ export default {
   name: "SchemaEdit",
   components: {EditAttributes, TextInput, Checkbox},
   props: ["schema"],
-  emits: ["update-schema"],
+  emits: ["updateSchema"],
   inject: ["availableSchemas"],
   data() {
     return {
@@ -118,7 +118,7 @@ export default {
       });
       if (response?.id) {
         this.$router.push({name: 'schema-view', params: {schemaSlug: this.schema.slug}});
-        this.$emit('update-schema');
+        this.$emit('updateSchema');
       }
     },
   },
