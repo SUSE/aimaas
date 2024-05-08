@@ -28,7 +28,7 @@ import Changes from "@/components/change_review/Changes";
 import Tabbing from "@/components/layout/Tabbing";
 import PermissionList from "@/components/auth/PermissionList";
 import Placeholder from "@/components/layout/Placeholder";
-import {useSchema} from "@/store/schema";
+import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";
 
 const {getSchema, activeSchema} = useSchema();

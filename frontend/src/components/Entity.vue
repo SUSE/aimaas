@@ -31,7 +31,7 @@ import Tabbing from "@/components/layout/Tabbing";
 import PermissionList from "@/components/auth/PermissionList";
 import EntityBulkAdd from "@/components/EntityBulkAdd";
 import Placeholder from "@/components/layout/Placeholder";
-import {useSchema} from "@/store/schema";
+import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";
 import {api} from "@/composables/api";
 

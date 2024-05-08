@@ -25,7 +25,7 @@ import BaseLayout from "@/components/layout/BaseLayout";
 import EntityForm from "@/components/inputs/EntityForm";
 import Placeholder from "@/components/layout/Placeholder";
 import {ref, computed, watch} from "vue";
-import {useSchema} from "@/store/schema";
+import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";
 import {api} from "@/composables/api";
 import {alertStore} from "@/composables/alert";
