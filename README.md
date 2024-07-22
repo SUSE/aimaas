@@ -78,7 +78,7 @@ cd frontend
 npm run dev
 ```
 
-This will run the frontend on `localhost:5173`.
+This will run the frontend on `localhost:8080`.
 
 **Note**: The dev server is configured to proxy API requests to `localhost:8000` by default. If your
 backend development server is listening somewhere else, make sure to adjust the proxy target in 
