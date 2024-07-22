@@ -51,9 +51,9 @@
 </template>
 
 <script>
-import ConfirmButton from "@/components/inputs/ConfirmButton";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
 import Pagination from "./layout/Pagination.vue";
-import EntityListTable from "@/components/EntityListTable";
+import EntityListTable from "@/components/EntityListTable.vue";
 import SearchPanel from "./SearchPanel.vue";
 
 export default {

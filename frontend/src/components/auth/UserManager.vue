@@ -26,9 +26,9 @@
 
 <script>
 import { markRaw } from "vue";
-import UserDetails from "@/components/auth/UserDetails";
-import PermissionList from "@/components/auth/PermissionList";
-import Tabbing from "@/components/layout/Tabbing";
+import UserDetails from "@/components/auth/UserDetails.vue";
+import PermissionList from "@/components/auth/PermissionList.vue";
+import Tabbing from "@/components/layout/Tabbing.vue";
 import { useAuthStore } from "@/store/auth";
 
 export default {

@@ -24,13 +24,13 @@
 
 <script setup>
 import {markRaw, ref, computed, watch} from "vue";
-import BaseLayout from "@/components/layout/BaseLayout";
-import EntityForm from "@/components/inputs/EntityForm";
-import Changes from "@/components/change_review/Changes";
-import Tabbing from "@/components/layout/Tabbing";
-import PermissionList from "@/components/auth/PermissionList";
-import EntityBulkAdd from "@/components/EntityBulkAdd";
-import Placeholder from "@/components/layout/Placeholder";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import EntityForm from "@/components/inputs/EntityForm.vue";
+import Changes from "@/components/change_review/Changes.vue";
+import Tabbing from "@/components/layout/Tabbing.vue";
+import PermissionList from "@/components/auth/PermissionList.vue";
+import EntityBulkAdd from "@/components/EntityBulkAdd.vue";
+import Placeholder from "@/components/layout/Placeholder.vue";
 import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";
 import {api} from "@/composables/api";

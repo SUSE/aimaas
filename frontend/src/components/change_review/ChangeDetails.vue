@@ -50,7 +50,7 @@
 <script>
 import {CHANGE_STATUS_MAP} from "@/utils";
 import {loadChangeDetails} from "@/composables/changes";
-import Placeholder from "@/components/layout/Placeholder";
+import Placeholder from "@/components/layout/Placeholder.vue";
 
 export default {
   name: "ChangeDetails",

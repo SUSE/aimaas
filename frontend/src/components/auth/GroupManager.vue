@@ -50,13 +50,13 @@
 <script setup>
 import { computed, ref, markRaw } from "vue";
 import { Button, ModalButton } from "@/composables/modals";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
-import GroupMembers from "@/components/auth/GroupMembers";
-import GroupForm from "@/components/auth/GroupForm";
-import GroupListItem from "@/components/auth/GroupListItem";
-import Tabbing from "@/components/layout/Tabbing";
-import ModalDialog from "@/components/layout/ModalDialog";
-import PermissionList from "@/components/auth/PermissionList";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
+import GroupMembers from "@/components/auth/GroupMembers.vue";
+import GroupForm from "@/components/auth/GroupForm.vue";
+import GroupListItem from "@/components/auth/GroupListItem.vue";
+import Tabbing from "@/components/layout/Tabbing.vue";
+import ModalDialog from "@/components/layout/ModalDialog.vue";
+import PermissionList from "@/components/auth/PermissionList.vue";
 import { useAuthStore } from "../../store/auth";
 
 const { groups, tree, loadGroupData, deleteGroup, createGroup } =

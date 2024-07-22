@@ -87,8 +87,8 @@
 <script setup>
 import { ref } from "vue";
 import { Button, ModalButton } from "@/composables/modals";
-import ModalDialog from "@/components/layout/ModalDialog";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
+import ModalDialog from "@/components/layout/ModalDialog.vue";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
 import { useAuthStore } from "@/store/auth";
 import { api } from "@/composables/api";
 

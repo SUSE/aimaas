@@ -79,9 +79,9 @@
 </template>
 
 <script>
-import BaseLayout from "@/components/layout/BaseLayout";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
-import SelectInput from "@/components/inputs/SelectInput";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
+import SelectInput from "@/components/inputs/SelectInput.vue";
 
 export default {
   name: "SchemaList",

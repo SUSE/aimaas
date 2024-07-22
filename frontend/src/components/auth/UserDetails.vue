@@ -49,8 +49,8 @@
 </template>
 
 <script>
-import Placeholder from "@/components/layout/Placeholder";
-import GroupMemberships from "@/components/auth/GroupMemberships";
+import Placeholder from "@/components/layout/Placeholder.vue";
+import GroupMemberships from "@/components/auth/GroupMemberships.vue";
 import { useAuthStore } from "@/store/auth";
 
 export default {

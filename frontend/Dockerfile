@@ -1,7 +1,7 @@
 # build stage
 FROM node:lts-alpine as build-stage
 WORKDIR /app
-COPY package*.json *.config.js ./
+COPY package*.json *.config.js index.html ./
 RUN npm install
 COPY public ./public/
 COPY src ./src/

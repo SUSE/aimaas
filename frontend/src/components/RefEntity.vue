@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import Placeholder from "@/components/layout/Placeholder";
+import Placeholder from "@/components/layout/Placeholder.vue";
 
 export default {
   name: "RefEntity",

@@ -41,11 +41,11 @@ import 'bootstrap/dist/js/bootstrap.min.js';
 import "eos-icons/dist/css/eos-icons.css";
 import "suse-bootstrap5-theme/dist/css/suse.css";
 
-import AuthNav from "@/components/auth/AuthNav";
-import AlertDisplay from "@/components/alerts/AlertDisplay";
-import HelpNav from "@/components/help/HelpNav";
-import SchemaList from "@/components/SchemaList";
-import ReviewNav from "@/components/change_review/ReviewNav";
+import AuthNav from "@/components/auth/AuthNav.vue";
+import AlertDisplay from "@/components/alerts/AlertDisplay.vue";
+import HelpNav from "@/components/help/HelpNav.vue";
+import SchemaList from "@/components/SchemaList.vue";
+import ReviewNav from "@/components/change_review/ReviewNav.vue";
 import usePageTitle from '@/composables/usePageTitle';
 
 export default {

@@ -13,8 +13,8 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import _ from "lodash";
-import TextInput from "@/components/inputs/TextInput";
-import DropdownSelect from "@/components/inputs/DropdownSelect";
+import TextInput from "@/components/inputs/TextInput.vue";
+import DropdownSelect from "@/components/inputs/DropdownSelect.vue";
 import { useAuthStore } from "@/store/auth";
 
 const emit = defineEmits(["update"]);
