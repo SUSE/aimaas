@@ -100,14 +100,14 @@ import _cloneDeep from "lodash/cloneDeep";
 import _isEqual from "lodash/isEqual";
 
 import TextareaInput from "@/components/inputs/TextareaInput.vue";
-import TextInput from "@/components/inputs/TextInput";
-import Checkbox from "@/components/inputs/Checkbox";
-import DateTime from "@/components/inputs/DateTime";
-import DateInput from "@/components/inputs/DateInput";
-import IntegerInput from "@/components/inputs/IntegerInput";
-import FloatInput from "@/components/inputs/FloatInput";
-import ReferencedEntitySelect from "@/components/inputs/ReferencedEntitySelect";
-import Spinner from "@/components/layout/Spinner";
+import TextInput from "@/components/inputs/TextInput.vue";
+import Checkbox from "@/components/inputs/Checkbox.vue";
+import DateTime from "@/components/inputs/DateTime.vue";
+import DateInput from "@/components/inputs/DateInput.vue";
+import IntegerInput from "@/components/inputs/IntegerInput.vue";
+import FloatInput from "@/components/inputs/FloatInput.vue";
+import ReferencedEntitySelect from "@/components/inputs/ReferencedEntitySelect.vue";
+import Spinner from "@/components/layout/Spinner.vue";
 import {TYPE_INPUT_MAP} from "@/utils";
 
 

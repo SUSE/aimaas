@@ -7,7 +7,7 @@
 </template>
 
 <script>
-import RefEntity from "@/components/RefEntity";
+import RefEntity from "@/components/RefEntity.vue";
 
 export default {
   name: "RefEntityList",

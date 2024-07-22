@@ -1,12 +1,12 @@
 import {createRouter, createWebHistory} from 'vue-router'
 import SchemaCreate from "@/components/SchemaCreate.vue"
-import Changes from "@/components/change_review/Changes";
+import Changes from "@/components/change_review/Changes.vue";
 import Entity from "@/components/Entity.vue"
 import EntityBulkEdit from "@/components/EntityBulkEdit.vue";
-import Schema from "@/components/Schema";
-import SchemaList from "@/components/SchemaList";
-import AuthManager from "@/components/auth/AuthManager";
-import About from "@/components/help/About";
+import Schema from "@/components/Schema.vue";
+import SchemaList from "@/components/SchemaList.vue";
+import AuthManager from "@/components/auth/AuthManager.vue";
+import About from "@/components/help/About.vue";
 
 export const router = createRouter({
     history: createWebHistory(),

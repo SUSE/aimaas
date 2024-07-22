@@ -9,10 +9,10 @@
 
 <script setup>
 import { markRaw } from "vue";
-import BaseLayout from "@/components/layout/BaseLayout";
-import GroupManager from "@/components/auth/GroupManager";
-import UserManager from "@/components/auth/UserManager";
-import Tabbing from "@/components/layout/Tabbing";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import GroupManager from "@/components/auth/GroupManager.vue";
+import UserManager from "@/components/auth/UserManager.vue";
+import Tabbing from "@/components/layout/Tabbing.vue";
 
 const tabs = [
   {

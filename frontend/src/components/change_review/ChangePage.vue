@@ -64,8 +64,8 @@
 
 <script>
 import {formatDate, CHANGE_STATUS_MAP} from "@/utils";
-import ConfirmWithComment from "@/components/inputs/ConfirmWithComment";
-import ChangeDetails from "@/components/change_review/ChangeDetails";
+import ConfirmWithComment from "@/components/inputs/ConfirmWithComment.vue";
+import ChangeDetails from "@/components/change_review/ChangeDetails.vue";
 
 export default {
   name: "ChangePage",

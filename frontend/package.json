@@ -1,48 +1,29 @@
 {
   "name": "AIMAAS",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
     "eos-icons": "^5.4.0",
     "lodash": "^4.17.21",
     "suse-bootstrap5-theme": "^1.1.2",
-    "vue": "^3.3.6",
-    "vue-router": "^4.2.5"
+    "vue": "^3.4.33",
+    "vue-router": "^4.4.0"
   },
   "devDependencies": {
-    "@babel/eslint-parser": "^7.22.15",
-    "@vue/cli-plugin-babel": "^5.0.8",
-    "@vue/cli-plugin-eslint": "^5.0.8",
-    "@vue/cli-service": "^5.0.8",
-    "cssloader": "^1.1.1",
-    "eslint-plugin-vue": "^9.17.0"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/vue3-essential",
-      "eslint:recommended"
-    ],
-    "parserOptions": {
-      "parser": "@babel/eslint-parser"
-    },
-    "rules": {
-      "vue/no-multiple-template-root": "off",
-      "vue/multi-word-component-names": "off"
-    }
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+    "@rushstack/eslint-patch": "^1.8.0",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.23.0",
+    "prettier": "^3.2.5",
+    "vite": "^5.3.1"
+  }
 }

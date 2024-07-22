@@ -8,7 +8,7 @@
 </template>
 
 <script>
-import BaseInput from "@/components/layout/BaseInput";
+import BaseInput from "@/components/layout/BaseInput.vue";
 
 export default {
   name: "IntegerInput",

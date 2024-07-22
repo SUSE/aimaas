@@ -11,8 +11,8 @@
 </template>
 
 <script>
-import Pagination from "@/components/layout/Pagination";
-import Placeholder from "@/components/layout/Placeholder";
+import Pagination from "@/components/layout/Pagination.vue";
+import Placeholder from "@/components/layout/Placeholder.vue";
 
 export default {
   name: "AutoPagination",

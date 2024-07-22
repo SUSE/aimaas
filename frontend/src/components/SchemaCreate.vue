@@ -12,8 +12,8 @@
 
 
 <script>
-import BaseLayout from "@/components/layout/BaseLayout";
-import SchemaEdit from "@/components/SchemaEdit";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import SchemaEdit from "@/components/SchemaEdit.vue";
 
 export default {
   name: "SchemaCreate",

@@ -69,8 +69,8 @@
 </template>
 
 <script>
-import RefEntity from "@/components/RefEntity";
-import RefEntityList from "@/components/RefEntityList";
+import RefEntity from "@/components/RefEntity.vue";
+import RefEntityList from "@/components/RefEntityList.vue";
 
 const NON_DISPLAY_FIELDS = ['id', 'slug', 'deleted'];
 

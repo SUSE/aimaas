@@ -132,11 +132,11 @@
 
 <script setup>
 import { ref, computed, inject, defineProps } from "vue";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
-import ModalDialog from "@/components/layout/ModalDialog";
-import SelectInput from "@/components/inputs/SelectInput";
-import DropdownSelect from "@/components/inputs/DropdownSelect";
-import IntegerInput from "@/components/inputs/IntegerInput";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
+import ModalDialog from "@/components/layout/ModalDialog.vue";
+import SelectInput from "@/components/inputs/SelectInput.vue";
+import DropdownSelect from "@/components/inputs/DropdownSelect.vue";
+import IntegerInput from "@/components/inputs/IntegerInput.vue";
 import { Button, ModalButton } from "@/composables/modals";
 import { useAuthStore } from "@/store/auth";
 import { api } from "@/composables/api";

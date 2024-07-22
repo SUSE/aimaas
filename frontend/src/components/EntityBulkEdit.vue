@@ -21,9 +21,9 @@
 </template>
 
 <script setup>
-import BaseLayout from "@/components/layout/BaseLayout";
-import EntityForm from "@/components/inputs/EntityForm";
-import Placeholder from "@/components/layout/Placeholder";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import EntityForm from "@/components/inputs/EntityForm.vue";
+import Placeholder from "@/components/layout/Placeholder.vue";
 import {ref, computed, watch} from "vue";
 import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";

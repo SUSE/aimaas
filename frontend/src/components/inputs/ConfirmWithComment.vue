@@ -16,7 +16,7 @@
 
 <script>
 import {randomUUID} from "@/utils";
-import ConfirmButton from "@/components/inputs/ConfirmButton";
+import ConfirmButton from "@/components/inputs/ConfirmButton.vue";
 
 export default {
   name: "ConfirmWithComment",

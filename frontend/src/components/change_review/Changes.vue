@@ -10,9 +10,9 @@
 
 <script>
 import { markRaw } from "vue";
-import AutoPagination from "@/components/layout/AutoPagination";
-import BaseLayout from "@/components/layout/BaseLayout";
-import ChangePage from "@/components/change_review/ChangePage";
+import AutoPagination from "@/components/layout/AutoPagination.vue";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import ChangePage from "@/components/change_review/ChangePage.vue";
 
 export default {
   name: "Changes",

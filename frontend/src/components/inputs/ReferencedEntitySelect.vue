@@ -30,9 +30,9 @@
 
 <script>
 import {Button, ModalButton} from "@/composables/modals";
-import BaseInput from "@/components/layout/BaseInput";
-import EntityList from "@/components/EntityList";
-import ModalDialog from "@/components/layout/ModalDialog";
+import BaseInput from "@/components/layout/BaseInput.vue";
+import EntityList from "@/components/EntityList.vue";
+import ModalDialog from "@/components/layout/ModalDialog.vue";
 
 export default {
   name: "ReferencedEntitySelect",

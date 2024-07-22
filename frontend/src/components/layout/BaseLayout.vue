@@ -10,11 +10,10 @@
 </template>
 
 <script>
-import breadcrumbs from "@/components/layout/breadcrumbs";
+import breadcrumbs from "@/components/layout/breadcrumbs.vue";
 
 export default {
   name: "BaseView",
   components: {breadcrumbs},
 }
 </script>
-

@@ -20,14 +20,14 @@
 
 <script setup>
 import {markRaw, ref, computed, watch, onUpdated} from "vue";
-import BaseLayout from "@/components/layout/BaseLayout";
-import EntityList from "@/components/EntityList";
-import EntityForm from "@/components/inputs/EntityForm";
-import SchemaEdit from "@/components/SchemaEdit";
-import Changes from "@/components/change_review/Changes";
-import Tabbing from "@/components/layout/Tabbing";
-import PermissionList from "@/components/auth/PermissionList";
-import Placeholder from "@/components/layout/Placeholder";
+import BaseLayout from "@/components/layout/BaseLayout.vue";
+import EntityList from "@/components/EntityList.vue";
+import EntityForm from "@/components/inputs/EntityForm.vue";
+import SchemaEdit from "@/components/SchemaEdit.vue";
+import Changes from "@/components/change_review/Changes.vue";
+import Tabbing from "@/components/layout/Tabbing.vue";
+import PermissionList from "@/components/auth/PermissionList.vue";
+import Placeholder from "@/components/layout/Placeholder.vue";
 import {useSchema} from "@/composables/schema";
 import {useRoute} from "vue-router";
 

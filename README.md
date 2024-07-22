@@ -28,11 +28,11 @@ In a nutshell, these are the steps to set up a development environment:
 3. Backend
    1. Create a file with environment variable definitions (See [config.py](backend/config.py) for 
       which variables are available/required).
-   2. Create a Python virtualenv (Our suggestion: Python 3.9).
+   2. Create a Python virtualenv (Our suggestion: Python 3.12).
    3. Install Python dependencies with `pip`.
    4. Run database migrations: `alembic upgrade head`.
 4. Frontend
-   1. Install `npm` (and `nodejs`, our suggestion: v16).
+   1. Install `npm` (and `nodejs`, our suggestion: v20).
    2. Install JS dependencies with `npm install`.
 
 ### Updating NPM packages
@@ -75,14 +75,14 @@ command:
 
 ```shell
 cd frontend
-npm run serve
+npm run dev
 ```
 
 This will run the frontend on `localhost:8080`.
 
 **Note**: The dev server is configured to proxy API requests to `localhost:8000` by default. If your
 backend development server is listening somewhere else, make sure to adjust the proxy target in 
-[vue.config.js](frontend/vue.config.js)!
+[vite.config.js](frontend/vite.config.js)!
 
 ## Building production images
 
