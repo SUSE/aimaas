@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Enum, Table
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Enum, text
+from sqlalchemy.event import listens_for
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import UniqueConstraint
 
-from ..base_models import Base
 from .enum import RecipientType, PermissionTargetType, PermissionType
+from ..base_models import Base
 
 
 class Group(Base):
@@ -104,3 +105,22 @@ class UserGroup(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'group_id'),
     )
+
+
+def delete_dangling_permissions(connection, recipient_type: RecipientType, recipient_id: int):
+    connection.execute(
+        text("DELETE FROM permissions WHERE recipient_type = :type AND recipient_id = :id"),
+        {"type": recipient_type.name, "id": recipient_id}
+    )
+
+
+# Since permissions table doesn't relate to its recipient tables we can't use sqlalchemy's cascade
+# setting, but we have to delete those manually using event listeners.
+@listens_for(User, "after_delete")
+def delete_dangling_user_permissions(_, connection, target):
+    delete_dangling_permissions(connection, RecipientType.USER, target.id)
+
+
+@listens_for(Group, "after_delete")
+def delete_dangling_group_permissions(_, connection, target):
+    delete_dangling_permissions(connection, RecipientType.GROUP, target.id)
