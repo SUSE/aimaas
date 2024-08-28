@@ -295,7 +295,6 @@ class TestPermission(CreateMixin):
         add_members(su_testgroup.id, [other_user.id], dbsession)
 
         assert has_permission(other_user, req_perm, dbsession) is True
-        
 
     def test_revoke_permission(self, dbsession: Session):
         user, group, parent_group = self._create_user_group_with_perm(dbsession)
@@ -320,3 +319,28 @@ class TestPermission(CreateMixin):
         result = revoke_permissions([9999], dbsession)
         assert result is False
         assert dbsession.query(Permission.id).count() == 5
+
+    @pytest.mark.parametrize(["recipient_type", "attr_name"], [
+        (RecipientType.USER.name, 'user'),
+        (RecipientType.GROUP.name, 'group'),
+    ])
+    def test_cascade_delete_permissions(self, dbsession: Session, recipient_type, attr_name):
+        user, group, _ = self._create_user_group_with_perm(dbsession)
+
+        permissions_count = (
+            dbsession.query(Permission)
+            .filter_by(recipient_type=recipient_type, recipient_id=locals().get(attr_name).id)
+            .count()
+        )
+        assert permissions_count > 0
+
+        dbsession.delete(locals().get(attr_name))
+        dbsession.commit()
+
+        permissions_count = (
+            dbsession.query(Permission)
+            .filter_by(recipient_type=recipient_type, recipient_id=locals().get(attr_name).id)
+            .count()
+        )
+        assert permissions_count == 0
+
