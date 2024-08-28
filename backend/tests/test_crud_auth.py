@@ -344,4 +344,3 @@ class TestPermission(CreateMixin):
         )
         assert permissions_count == 0
 
-        x = 1
