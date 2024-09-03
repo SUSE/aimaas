@@ -84,4 +84,4 @@ DEFAULT_PARAMS = Params(page=1, size=settings.default_page_size)
 SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{settings.pg_user}:{settings.pg_password}@" \
                           f"{settings.pg_host}:{settings.pg_port}/{settings.pg_db}?"\
                           f"client_encoding={settings.pg_client_encoding}"
-VERSION = "0.4.0"
+VERSION = "0.4.1"
