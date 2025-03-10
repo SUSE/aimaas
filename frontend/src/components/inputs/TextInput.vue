@@ -1,35 +1,44 @@
 <template>
-  <BaseInput :label="label" :args="args" :vertical="vertical" :required="required">
+  <BaseInput
+    :label="label"
+    :args="args"
+    :vertical="vertical"
+    :required="required"
+  >
     <template v-slot:field>
-      <input class="form-control" type="text" :value="modelValue" @input="onInput" v-bind="args"
-             :list="datalistId"/>
+      <input
+        class="form-control"
+        type="text"
+        v-model.trim="modelValue"
+        v-bind="args"
+        :list="datalistId"
+      />
       <datalist :id="datalistId">
-      <slot name="datalist" />
-    </datalist>
+        <slot name="datalist" />
+      </datalist>
     </template>
     <template v-slot:helptext>
-      <slot name="helptext"/>
+      <slot name="helptext" />
     </template>
   </BaseInput>
 </template>
 
-<script>
+<script setup>
 import BaseInput from "@/components/layout/BaseInput.vue";
+import { computed } from "vue";
 
-export default {
-  name: "TextInput",
-  components: {BaseInput},
-  props: ["label", "modelValue", "args", "vertical", "required"],
-  emits: ["update:modelValue"],
-  computed: {
-    datalistId() {
-      return `dl-${this.args.id}`;
-    },
-  },
-  methods: {
-    onInput(event) {
-      this.$emit("update:modelValue", event.target.value);
-    },
-  },
-};
+const modelValue = defineModel({ required: true });
+
+const props = defineProps([
+  "label",
+  "string",
+  "args",
+  "vertical",
+  "boolean",
+  "required",
+]);
+
+const datalistId = computed(() => {
+  return `dl-${props.args.id}`;
+});
 </script>
