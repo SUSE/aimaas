@@ -52,6 +52,13 @@ class AttributeDefinitionBase(BaseModel):
 
         return values
 
+    @validator("description", pre=True)
+    def check_description_length(cls, value):
+        if value and len(value) > 1000:
+            raise ValueError("Description exceeds the maximum character length of 1000.")
+
+        return value
+
     class Config:
         orm_mode = True
         allow_population_by_field_name = True

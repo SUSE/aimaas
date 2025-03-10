@@ -179,7 +179,7 @@ class AttributeDefinition(Base):
     unique = Column(Boolean)
     key = Column(Boolean)
     list = Column(Boolean, default=False)
-    description = Column(String(128))
+    description = Column(String(1000))
     bound_schema_id = Column(Integer, ForeignKey('schemas.id'), nullable=True)
 
     schema = relationship('Schema', back_populates='attr_defs', foreign_keys=[schema_id])

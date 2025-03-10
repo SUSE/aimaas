@@ -17,7 +17,7 @@
                  :args="{ id: `initialboundFK${rowIndex}`, disabled: attr.id }"/>
     <TextareaInput label="Description" @change="onChange()"
                    v-model="attributes[rowIndex].description"
-                   :args="{ id: `initialDescription${rowIndex}` }">
+                   :args="{ id: `initialDescription${rowIndex}` }" :max_characters="1000">
       <template v-slot:helptext>
         (optional)
       </template>
