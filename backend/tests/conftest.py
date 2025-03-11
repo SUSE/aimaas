@@ -350,7 +350,7 @@ class OldStyleTestClient(TestClient):
             headers=headers,
             cookies=cookies,
             auth=auth,
-            follow_redirects=self._choose_redirect_arg(follow_redirects, allow_redirects),
+            follow_redirects=False,
             timeout=timeout,
             extensions=extensions,
             json=json
