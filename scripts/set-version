@@ -1,0 +1,17 @@
+#!/bin/sh
+if [ -z "$1" ] ; then
+    version=`git branch --show-current | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+$'`
+    if [ -z "$version" ] ; then
+	echo "Sorry, can't deduce the release version from the current git branch."
+        echo "Usage: ./scripts/set-version VERSION"
+        exit 1
+    fi
+else
+    version="$1"
+fi
+
+sed -i "s/VERSION = .*/VERSION = \"$version\"/" backend/config.py
+sed -i "s/\"version\":.*/\"version\": \"$version\",/" frontend/package.json
+sed -i "s/frontendVersion:.*/frontendVersion: \"$version\"/" frontend/src/components/help/HelpNav.vue
+
+find . -type f -name '*.py' -exec sed -i -E "s/\{\{ *NEXT[_ ]?RELEASE *\}\}/$version/g" {} \;
