@@ -29,14 +29,7 @@ import { computed } from "vue";
 
 const modelValue = defineModel({ required: true });
 
-const props = defineProps([
-  "label",
-  "string",
-  "args",
-  "vertical",
-  "boolean",
-  "required",
-]);
+const props = defineProps(["label", "args", "vertical", "boolean", "required"]);
 
 const datalistId = computed(() => {
   return `dl-${props.args.id}`;
