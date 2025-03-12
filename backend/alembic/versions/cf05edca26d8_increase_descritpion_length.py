@@ -14,7 +14,6 @@ down_revision = '5e46d4ff6f21'
 branch_labels = None
 depends_on = None
 
-# Assuming this is the correct table name and column
 def upgrade():
     op.alter_column('attr_definitions', 'description',
                     existing_type=sa.String(128),
@@ -22,5 +21,5 @@ def upgrade():
 
 def downgrade():
     op.alter_column('attr_definitions', 'description',
-                    existing_type=sa.String(128),
-                    type_=sa.String(1000))
+                    existing_type=sa.String(1000),
+                    type_=sa.String(128))
