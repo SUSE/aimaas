@@ -349,23 +349,32 @@ def route_delete_entity(router: APIRouter, schema: Schema):
         
 
 def create_dynamic_router(schema: Schema, app: FastAPI, old_slug: str = None):
-    router = APIRouter()
-    
-    route_get_entities(router=router, schema=schema)
-    route_get_entity(router=router, schema=schema)
-    route_create_entity(router=router, schema=schema)
-    route_update_entity(router=router, schema=schema)
-    route_delete_entity(router=router, schema=schema)
+    router = None
+    router_routes = []
 
-    router_routes = [(r.path, r.methods) for r in router.routes]
+    if not schema.deleted:
+        router = APIRouter()
+
+        route_get_entities(router=router, schema=schema)
+        route_get_entity(router=router, schema=schema)
+        route_create_entity(router=router, schema=schema)
+        route_update_entity(router=router, schema=schema)
+        route_delete_entity(router=router, schema=schema)
+
+        router_routes = [(r.path, r.methods) for r in router.routes]
+
     routes_to_remove = []
     for route in app.routes:
         if (route.path, route.methods) in router_routes:
             routes_to_remove.append(route)
         elif old_slug and (route.path.startswith(f'/entity/{old_slug}/') or route.path == f'/entity/{old_slug}'):
             routes_to_remove.append(route)
+        elif schema.deleted and (route.path.startswith(f'/entity/{schema.slug}/') or route.path == f'/entity/{schema.slug}'):
+            routes_to_remove.append(route)
+
     for route in routes_to_remove:
         app.routes.remove(route)
 
-    app.include_router(router, prefix='/entity')
+    if router:
+        app.include_router(router, prefix='/entity')
     app.openapi_schema = None

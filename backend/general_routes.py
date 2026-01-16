@@ -186,7 +186,7 @@ def update_schema(
         404: {"description": "Schema does not exist"},
     }
 )
-def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
+def delete_schema(id_or_slug: Union[int, str], request: Request, db: Session = Depends(get_db),
                   user: User = Depends(authorized_user(RequirePermission(permission=PermissionType.DELETE_SCHEMA)))):
     try:
         change_request = create_schema_delete_request(
@@ -195,6 +195,7 @@ def delete_schema(id_or_slug: Union[int, str], db: Session = Depends(get_db),
         _, schema = apply_schema_delete_request(db=db, change_request=change_request,
                                                 reviewed_by=user, comment='Autosubmit')
         db.commit()
+        create_dynamic_router(schema=schema, app=request.app)
         return schema
     except exceptions.NoOpChangeException as e:
         raise HTTPException(status.HTTP_208_ALREADY_REPORTED, str(e))
