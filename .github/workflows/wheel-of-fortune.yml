@@ -1,0 +1,72 @@
+---
+name: wheel of fortune
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  assign-reviewers:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to add reviewers
+      pull-requests: write
+
+    steps:
+      - name: Randomly Request Reviewers
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const candidatePool = ['TeodoraPavlova', 'jonas-brr', 'der-gabe', 'frozenIceage', 's-leon', 'dcermak'];
+            const targetCount = 2;
+
+            const { owner, repo, number } = context.issue;
+
+            const pr = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: number
+            });
+
+            const currentReviewers = pr.data.requested_reviewers.map(user => user.login);
+
+            if (currentReviewers.length >= targetCount) {
+              console.log(`PR already has ${currentReviewers.length} reviewers. No action needed.`);
+              return;
+            }
+
+            // - Remove the PR author (cannot review own PR)
+            // - Remove users who are already reviewing
+            const prAuthor = pr.data.user.login;
+            let availableCandidates = candidatePool.filter(user =>
+              user !== prAuthor && !currentReviewers.includes(user)
+            );
+
+            // Calculate how many reviews we still need
+            const needed = targetCount - currentReviewers.length;
+            const reviewersToAdd = [];
+
+            for (let i = 0; i < needed; i++) {
+              if (availableCandidates.length === 0) {
+                console.log("Not enough candidates available to meet target.");
+                break;
+              }
+
+              const randomIndex = Math.floor(Math.random() * availableCandidates.length);
+              reviewersToAdd.push(availableCandidates[randomIndex]);
+
+              // Remove the selected user so they aren't picked twice
+              availableCandidates.splice(randomIndex, 1);
+            }
+
+            // assign reviewers
+            if (reviewersToAdd.length > 0) {
+              console.log(`Adding reviewers: ${reviewersToAdd.join(', ')}`);
+              await github.rest.pulls.requestReviewers({
+                owner,
+                repo,
+                pull_number: number,
+                reviewers: reviewersToAdd
+              });
+            }
